@@ -1,0 +1,28 @@
+name: smartcharge_v2
+description: "A new Flutter project."
+version: 1.0.0+1
+environment:
+  sdk: ^3.10.8
+dependencies:
+  flutter:
+    sdk: flutter
+  google_fonts: ^6.1.0
+  # Allineamento corretto a 2 spazi
+  pdf: ^3.10.8
+  printing: ^5.11.1
+  path_provider: ^2.1.2
+  intl: ^0.19.0
+  fl_chart: ^0.66.0
+  shared_preferences: ^2.5.4
+  cupertino_icons: ^1.0.8
+  firebase_core: ^4.4.0
+  cloud_firestore: ^6.1.2
+dev_dependencies:
+  flutter_test:
+    sdk: flutter
+  flutter_lints: ^6.0.0
+flutter:
+  uses-material-design: true
+  assets:
+    - assets/cars.json
+  
