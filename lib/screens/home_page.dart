@@ -27,7 +27,6 @@ class HomePage extends StatefulWidget {
 }
 
 class _HomePageState extends State<HomePage> {
-  // ... (Tutte le tue variabili originali rimangono identiche)
   double currentSoc = 20.0;
   double targetSoc = 80.0;
   late CarModel selectedCar; 
@@ -52,7 +51,6 @@ class _HomePageState extends State<HomePage> {
     super.dispose();
   }
 
-  // ... (Tutte le funzioni _initializeApp, _loadCarsFromJson, ecc. rimangono identiche)
   Future<void> _initializeApp() async {
     await _loadCarsFromJson();
     await _loadHistory();
@@ -226,7 +224,14 @@ class _HomePageState extends State<HomePage> {
     double currentBatteryCap = double.tryParse(_capacityController.text) ?? selectedCar.batteryCapacity;
     double energyNeeded = ChargeEngine.calculateEnergy(currentSoc, targetSoc, currentBatteryCap);
     Duration duration = ChargeEngine.calculateDuration(energyNeeded, wallboxPwr);
-    final targetDateTime = DateTime(DateTime.now().year, DateTime.now().month, DateTime.now().day + 1, readyTime.hour, readyTime.minute);
+
+    // --- LOGICA SMART: CALCOLO ORA TARGET ---
+    final now = DateTime.now();
+    DateTime targetDateTime = DateTime(now.year, now.month, now.day, readyTime.hour, readyTime.minute);
+    if (targetDateTime.isBefore(now)) {
+      targetDateTime = targetDateTime.add(const Duration(days: 1));
+    }
+
     String startTimeStr = ChargeEngine.calculateStartTime(targetDateTime, duration);
     double estimatedCost = CostCalculator.calculate(energyNeeded, const TimeOfDay(hour: 23, minute: 0), DateTime.now(), myContract);
 
@@ -305,6 +310,37 @@ class _HomePageState extends State<HomePage> {
                 ],
               ),
               const SizedBox(height: 16),
+
+              // --- SELETTORE ORA TARGET (READY TIME) ---
+              GestureDetector(
+                onTap: () => _selectTime(context),
+                child: Container(
+                  padding: const EdgeInsets.all(16),
+                  decoration: BoxDecoration(
+                    color: const Color(0xFF1C1C1E),
+                    borderRadius: BorderRadius.circular(18),
+                    border: Border.all(color: Colors.blueAccent.withOpacity(0.2)),
+                  ),
+                  child: Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    children: [
+                      Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          const Text("AUTO PRONTA PER LE ORE:", style: TextStyle(color: Colors.white38, fontSize: 9, fontWeight: FontWeight.bold, letterSpacing: 1.1)),
+                          const SizedBox(height: 4),
+                          Text(
+                            readyTime.format(context),
+                            style: const TextStyle(color: Colors.white, fontSize: 32, fontWeight: FontWeight.w900),
+                          ),
+                        ],
+                      ),
+                      const Icon(Icons.access_time_rounded, color: Colors.blueAccent, size: 36),
+                    ],
+                  ),
+                ),
+              ),
+              const SizedBox(height: 16),
               
               // --- BATTERIA E STATO ---
               Row(
@@ -317,12 +353,12 @@ class _HomePageState extends State<HomePage> {
               ),
               const SizedBox(height: 16),
 
-              // --- MINI STATS CON EFFETTO GLOW ---
+              // --- MINI STATS ---
               Row(
                 children: [
                   Expanded(child: _buildMiniStat("COSTO STIMATO", "${estimatedCost.toStringAsFixed(2)} €", Colors.greenAccent)),
                   const SizedBox(width: 8),
-                  Expanded(child: GestureDetector(onTap: () => _selectTime(context), child: _buildMiniStat("INIZIO CARICA", startTimeStr, Colors.orangeAccent))),
+                  Expanded(child: _buildMiniStat("INIZIO CARICA", startTimeStr, Colors.orangeAccent)),
                 ],
               ),
               const SizedBox(height: 16),
@@ -348,7 +384,7 @@ class _HomePageState extends State<HomePage> {
               
               const SizedBox(height: 30),
 
-              // --- NOME AUTO CON EFFETTO VETRO OPACO (FROSTED GLASS) ---
+              // --- NOME AUTO CON EFFETTO VETRO ---
               Column(
                 children: [
                   Text(selectedCar.brand.toUpperCase(), style: TextStyle(color: Colors.white.withOpacity(0.3), fontSize: 10, letterSpacing: 3)),
@@ -387,7 +423,6 @@ class _HomePageState extends State<HomePage> {
     );
   }
 
-  // MODIFICATO CON EFFETTO GLOW (SHADOWS)
   Widget _buildMiniStat(String label, String value, Color color) {
     return Container(
       height: 60,
