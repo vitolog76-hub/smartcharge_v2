@@ -1,8 +1,12 @@
 import 'package:flutter/material.dart';
 import 'package:intl/date_symbol_data_local.dart';
-import 'package:smartcharge_v2/screens/home_page.dart';
+import 'package:provider/provider.dart';
 import 'package:firebase_core/firebase_core.dart';
 import 'package:google_fonts/google_fonts.dart';
+import 'package:smartcharge_v2/providers/auth_provider.dart';
+import 'package:smartcharge_v2/providers/home_provider.dart';
+import 'package:smartcharge_v2/screens/login_page.dart';
+import 'package:smartcharge_v2/screens/home_page.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -29,30 +33,79 @@ class SmartChargeApp extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return MaterialApp(
-      debugShowCheckedModeBanner: false,
-      title: 'Smart Charge',
-      theme: ThemeData.dark().copyWith(
-        // Fondamentale: Apple usa il nero assoluto (OLED) o un grigio scurissimo
-        scaffoldBackgroundColor: Colors.black,
-        
-        // Font principale: Inter (molto simile al San Francisco di iOS)
-        textTheme: GoogleFonts.interTextTheme(ThemeData.dark().textTheme),
-        
-        appBarTheme: AppBarTheme(
-          centerTitle: true,
-          backgroundColor: Colors.black.withOpacity(0.8), // Effetto semi-trasparente
-          elevation: 0,
-          titleTextStyle: GoogleFonts.inter(
-            fontSize: 17, // Dimensione standard Apple per AppBar
-            fontWeight: FontWeight.w600, // Semi-bold elegante
-            letterSpacing: -0.5, // Apple usa kerning stretto per un look premium
-            color: Colors.white,
+    return MultiProvider(
+      providers: [
+        ChangeNotifierProvider(create: (_) => AuthProvider()),
+      ],
+      child: MaterialApp(
+        debugShowCheckedModeBanner: false,
+        title: 'Smart Charge',
+        theme: ThemeData.dark().copyWith(
+          scaffoldBackgroundColor: Colors.black,
+          textTheme: GoogleFonts.interTextTheme(ThemeData.dark().textTheme),
+          appBarTheme: AppBarTheme(
+            centerTitle: true,
+            backgroundColor: Colors.black.withOpacity(0.8),
+            elevation: 0,
+            titleTextStyle: GoogleFonts.inter(
+              fontSize: 17,
+              fontWeight: FontWeight.w600,
+              letterSpacing: -0.5,
+              color: Colors.white,
+            ),
+            iconTheme: const IconThemeData(color: Colors.blueAccent),
           ),
-          iconTheme: const IconThemeData(color: Colors.blueAccent), // Icone blu iOS
         ),
+        home: const AuthWrapper(),
       ),
-      home: const HomePage(),
+    );
+  }
+}
+
+class AuthWrapper extends StatelessWidget {
+  const AuthWrapper({super.key});
+
+  @override
+  Widget build(BuildContext context) {
+    return Consumer<AuthProvider>(
+      builder: (context, authProvider, child) {
+        if (authProvider.isLoading) {
+          return const Scaffold(
+            backgroundColor: Colors.black,
+            body: Center(child: CircularProgressIndicator()),
+          );
+        }
+        
+        if (authProvider.isAuthenticated) {
+          // 🔥 SE I DATI NON SONO ANCORA STATI SCARICATI, MOSTRA UN LOADING
+          if (!authProvider.dataDownloaded) {
+            return const Scaffold(
+              backgroundColor: Colors.black,
+              body: Center(
+                child: Column(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    CircularProgressIndicator(),
+                    SizedBox(height: 20),
+                    Text(
+                      "Caricamento dati...",
+                      style: TextStyle(color: Colors.white70),
+                    ),
+                  ],
+                ),
+              ),
+            );
+          }
+          
+          // 🔥 DATI SCARICATI, MOSTRA LA HOME
+          return ChangeNotifierProvider(
+            create: (_) => HomeProvider()..init(),
+            child: const HomePage(),
+          );
+        }
+        
+        return const LoginPage();
+      },
     );
   }
 }
