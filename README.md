@@ -1,16 +1,30 @@
-# smartcharge_v2
+# SmartCharge V2
 
-A new Flutter project.
+App Flutter per la gestione intelligente delle ricariche di veicoli elettrici.
 
-## Getting Started
+## 🚀 Funzionalità
 
-This project is a starting point for a Flutter application.
+- 🔐 **Autenticazione** con email/password (Firebase Auth)
+- ☁️ **Sincronizzazione cloud** automatica dei dati
+- 📊 **Dashboard** con simulazione ricarica in tempo reale
+- 📈 **Cronologia** con grafici mensili
+- 📄 **Esportazione PDF** dei report
+- ⚡ **Calcolo costi** per fasce orarie (F1/F2/F3)
+- 🚗 **Selezione veicolo** da database aggiornato
 
-A few resources to get you started if this is your first Flutter project:
 
-- [Lab: Write your first Flutter app](https://docs.flutter.dev/get-started/codelab)
-- [Cookbook: Useful Flutter samples](https://docs.flutter.dev/cookbook)
 
-For help getting started with Flutter development, view the
-[online documentation](https://docs.flutter.dev/), which offers tutorials,
-samples, guidance on mobile development, and a full API reference.
+## 🛠️ Tecnologie
+
+- Flutter
+- Firebase (Auth, Firestore)
+- Provider per state management
+- SharedPreferences per persistenza locale
+- fl_chart per grafici
+- pdf/printing per report
+
+## 📦 Installazione
+
+1. Clona il repository
+```bash
+git clone https://github.com/TUO_USERNAME/smartcharge_v2.git
