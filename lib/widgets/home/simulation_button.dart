@@ -10,19 +10,18 @@ class SimulationButton extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return SizedBox(
-      width: double.infinity,
-      height: 56,
+      height: 40, // 🔥 RIDOTTO da 56 a 40
       child: ElevatedButton.icon(
         onPressed: () => _handleSimulation(context),
-        icon: Icon(provider.isSimulating ? Icons.stop_rounded : Icons.play_arrow_rounded),
+        icon: Icon(provider.isSimulating ? Icons.stop_rounded : Icons.play_arrow_rounded, size: 16), // 🔥 RIDOTTO
         label: Text(
-          provider.isSimulating ? "STOP" : "AVVIA SIMULAZIONE",
-          style: const TextStyle(fontWeight: FontWeight.bold),
+          provider.isSimulating ? "STOP" : "AVVIA",
+          style: const TextStyle(fontSize: 12, fontWeight: FontWeight.bold), // 🔥 RIDOTTO
         ),
         style: ElevatedButton.styleFrom(
           backgroundColor: provider.isSimulating ? Colors.redAccent : Colors.blueAccent,
           shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(16),
+            borderRadius: BorderRadius.circular(12),
           ),
         ),
       ),
@@ -31,14 +30,12 @@ class SimulationButton extends StatelessWidget {
 
   void _handleSimulation(BuildContext context) {
     if (provider.isSimulating) {
-      // LOGICA STOP
       if (provider.isChargingReal && provider.currentSoc > 20) {
         _showInterruptDialog(context);
       } else {
         provider.stopSimulation();
       }
     } else {
-      // LOGICA AVVIO
       provider.startSimulation();
     }
   }

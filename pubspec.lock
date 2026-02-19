@@ -209,6 +209,14 @@ packages:
       url: "https://pub.dev"
     source: hosted
     version: "0.66.2"
+  fluid_background:
+    dependency: "direct main"
+    description:
+      name: fluid_background
+      sha256: fea78f5b0b5bc701163d2472e2fd88095549b0af3c834b1e1ba1753d5eb6a073
+      url: "https://pub.dev"
+    source: hosted
+    version: "1.0.5"
   flutter:
     dependency: "direct main"
     description: flutter

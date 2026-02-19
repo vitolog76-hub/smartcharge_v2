@@ -11,59 +11,38 @@ class ReadyTimeCard extends StatelessWidget {
     return GestureDetector(
       onTap: provider.isSimulating ? null : () => _selectTime(context),
       child: Container(
-        padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 16),
+        padding: const EdgeInsets.symmetric(vertical: 8, horizontal: 12), // 🔥 RIDOTTO
         decoration: BoxDecoration(
-          gradient: LinearGradient(
-            colors: [
-              const Color(0xFF1C1C1E),
-              provider.isSimulating
-                  ? (provider.isChargingReal
-                      ? Colors.greenAccent.withOpacity(0.1)
-                      : Colors.orangeAccent.withOpacity(0.1))
-                  : Colors.blueAccent.withOpacity(0.05),
-            ],
-            begin: Alignment.topLeft,
-            end: Alignment.bottomRight,
-          ),
-          borderRadius: BorderRadius.circular(18),
-          border: Border.all(
-            color: provider.isSimulating
-                ? (provider.isChargingReal
-                    ? Colors.greenAccent.withOpacity(0.5)
-                    : Colors.orangeAccent.withOpacity(0.5))
-                : Colors.blueAccent.withOpacity(0.3),
-            width: 1.5,
-          ),
+          color: Colors.transparent,
+          borderRadius: BorderRadius.circular(16),
         ),
         child: Row(
           children: [
             Expanded(
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
+                mainAxisSize: MainAxisSize.min,
                 children: [
                   Text(
                     provider.isSimulating
-                        ? (provider.isChargingReal ? "⚡ IN CARICA" : "⏳ IN ATTESA")
-                        : "🕐 PRONTA ALLE",
+                        ? (provider.isChargingReal ? "IN CARICA" : "IN ATTESA")
+                        : "PRONTA ALLE",
                     style: TextStyle(
                       color: provider.isSimulating
                           ? (provider.isChargingReal
                               ? Colors.greenAccent
                               : Colors.orangeAccent)
                           : Colors.blueAccent,
-                      fontSize: 11,
+                      fontSize: 10,
                       fontWeight: FontWeight.w600,
-                      letterSpacing: 0.5,
                     ),
                   ),
-                  const SizedBox(height: 4),
                   Text(
                     provider.readyTime.format(context),
                     style: TextStyle(
                       color: Colors.white,
-                      fontSize: 32,
+                      fontSize: 24, // 🔥 RIDOTTO da 32 a 24
                       fontWeight: FontWeight.w800,
-                      letterSpacing: 1,
                       shadows: [
                         Shadow(
                           color: provider.isSimulating
@@ -71,7 +50,7 @@ class ReadyTimeCard extends StatelessWidget {
                                   ? Colors.greenAccent
                                   : Colors.orangeAccent)
                               : Colors.blueAccent,
-                          blurRadius: 15,
+                          blurRadius: 12,
                         ),
                       ],
                     ),
@@ -80,7 +59,7 @@ class ReadyTimeCard extends StatelessWidget {
               ),
             ),
             Container(
-              padding: const EdgeInsets.all(10),
+              padding: const EdgeInsets.all(8), // 🔥 RIDOTTO
               decoration: BoxDecoration(
                 color: provider.isSimulating
                     ? (provider.isChargingReal
@@ -98,7 +77,7 @@ class ReadyTimeCard extends StatelessWidget {
                         ? Colors.greenAccent
                         : Colors.orangeAccent)
                     : Colors.blueAccent,
-                size: 28,
+                size: 22, // 🔥 RIDOTTO
               ),
             ),
           ],
