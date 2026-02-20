@@ -12,12 +12,14 @@ class HistoryPage extends StatefulWidget {
   final List<ChargeSession> history;
   final EnergyContract contract;
   final CarModel selectedCar;
+  final Function(List<ChargeSession>)? onHistoryChanged;
 
   const HistoryPage({
     super.key, 
     required this.history, 
     required this.contract, 
-    required this.selectedCar
+    required this.selectedCar,
+    this.onHistoryChanged,
   });
 
   @override
@@ -26,16 +28,53 @@ class HistoryPage extends StatefulWidget {
 
 class _HistoryPageState extends State<HistoryPage> {
   int? selectedMonth;
-  int? selectedYearForPdf; 
+  int? selectedYearForPdf;
+  
+  late List<ChargeSession> _localHistory;
 
-  // Funzione per il tasto PDF nell'AppBar
+  @override
+  void initState() {
+    super.initState();
+    _localHistory = List.from(widget.history);
+  }
+
+  @override
+  void didUpdateWidget(HistoryPage oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (widget.history != oldWidget.history) {
+      _localHistory = List.from(widget.history);
+    }
+  }
+
   void _generateAndSharePdf() {
     _showPdfExportDialog();
   }
 
+  // Calcola totali per anno
+  Map<String, Map<String, double>> _getYearlyTotals() {
+    Map<String, Map<String, double>> yearlyTotals = {};
+    
+    for (var session in _localHistory) {
+      String year = DateFormat('yyyy').format(session.date);
+      if (!yearlyTotals.containsKey(year)) {
+        yearlyTotals[year] = {'kwh': 0, 'cost': 0};
+      }
+      yearlyTotals[year]!['kwh'] = (yearlyTotals[year]!['kwh'] ?? 0) + session.kwh;
+      yearlyTotals[year]!['cost'] = (yearlyTotals[year]!['cost'] ?? 0) + session.cost;
+    }
+    
+    return yearlyTotals;
+  }
+
   Map<String, double> _getAggregatedMonthlyData() {
     Map<String, double> aggregated = {};
-    var sortedHistory = List<ChargeSession>.from(widget.history)..sort((a, b) => a.date.compareTo(b.date));
+    
+    // 🔥 Aggiungi un mese fittizio precedente se non ci sono dati
+    final now = DateTime.now();
+    String lastMonthKey = DateFormat('MM-yyyy').format(DateTime(now.year, now.month - 1, 1));
+    aggregated[lastMonthKey] = 0;
+    
+    var sortedHistory = List<ChargeSession>.from(_localHistory)..sort((a, b) => a.date.compareTo(b.date));
     for (var session in sortedHistory) {
       String key = DateFormat('MM-yyyy').format(session.date);
       aggregated[key] = (aggregated[key] ?? 0) + session.kwh;
@@ -45,7 +84,7 @@ class _HistoryPageState extends State<HistoryPage> {
 
   Map<String, Map<String, List<ChargeSession>>> _getGroupedHistory() {
     Map<String, Map<String, List<ChargeSession>>> grouped = {};
-    var sortedHistory = List<ChargeSession>.from(widget.history)..sort((a, b) => b.date.compareTo(a.date));
+    var sortedHistory = List<ChargeSession>.from(_localHistory)..sort((a, b) => b.date.compareTo(a.date));
 
     for (var session in sortedHistory) {
       String year = DateFormat('yyyy').format(session.date);
@@ -65,6 +104,7 @@ class _HistoryPageState extends State<HistoryPage> {
     final chartKeys = monthlyData.keys.toList();
     final chartValues = monthlyData.values.toList();
     final groupedHistory = _getGroupedHistory();
+    final yearlyTotals = _getYearlyTotals();
 
     double maxKwh = chartValues.isEmpty ? 50 : chartValues.reduce((a, b) => a > b ? a : b);
     maxKwh = (maxKwh / 10).ceil() * 10.0 + 20;
@@ -96,12 +136,17 @@ class _HistoryPageState extends State<HistoryPage> {
             child: Divider(color: Colors.white10, thickness: 1)
           ),
           Expanded(
-            child: widget.history.isEmpty
+            child: _localHistory.isEmpty
                 ? const Center(child: Text("Nessuna ricarica", style: TextStyle(color: Colors.white24)))
                 : ListView(
+                    key: ValueKey(_localHistory.length),
                     padding: const EdgeInsets.symmetric(horizontal: 10),
                     children: groupedHistory.entries.map((yearEntry) {
-                      return _buildYearFolder(yearEntry.key, yearEntry.value);
+                      return _buildYearFolder(
+                        yearEntry.key, 
+                        yearEntry.value,
+                        yearlyTotals[yearEntry.key]
+                      );
                     }).toList(),
                   ),
           ),
@@ -110,8 +155,14 @@ class _HistoryPageState extends State<HistoryPage> {
     );
   }
 
-  Widget _buildYearFolder(String year, Map<String, List<ChargeSession>> months) {
+  Widget _buildYearFolder(
+    String year, 
+    Map<String, List<ChargeSession>> months,
+    Map<String, double>? yearlyTotal
+  ) {
     bool isCurrentYear = year == DateTime.now().year.toString();
+    double totalKwh = yearlyTotal?['kwh'] ?? 0;
+    double totalCost = yearlyTotal?['cost'] ?? 0;
 
     return Theme(
       data: Theme.of(context).copyWith(dividerColor: Colors.transparent),
@@ -119,7 +170,29 @@ class _HistoryPageState extends State<HistoryPage> {
         initiallyExpanded: isCurrentYear,
         iconColor: Colors.blueAccent,
         collapsedIconColor: Colors.white24,
-        title: Text(year, style: const TextStyle(color: Colors.white, fontSize: 22, fontWeight: FontWeight.bold)),
+        title: Row(
+          children: [
+            Text(year, style: const TextStyle(color: Colors.white, fontSize: 22, fontWeight: FontWeight.bold)),
+            const Spacer(),
+            if (totalKwh > 0)
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                decoration: BoxDecoration(
+                  color: Colors.blueAccent.withOpacity(0.1),
+                  borderRadius: BorderRadius.circular(8),
+                  border: Border.all(color: Colors.blueAccent.withOpacity(0.3)),
+                ),
+                child: Text(
+                  "${totalKwh.toStringAsFixed(1)} kWh  •  ${totalCost.toStringAsFixed(2)} €",
+                  style: const TextStyle(
+                    color: Colors.blueAccent,
+                    fontSize: 12,
+                    fontWeight: FontWeight.bold,
+                  ),
+                ),
+              ),
+          ],
+        ),
         children: months.entries.map((monthEntry) {
           return _buildMonthFolder(monthEntry.key, monthEntry.value, year);
         }).toList(),
@@ -129,6 +202,7 @@ class _HistoryPageState extends State<HistoryPage> {
 
   Widget _buildMonthFolder(String monthName, List<ChargeSession> sessions, String year) {
     double totalKwh = sessions.fold(0, (sum, item) => sum + item.kwh);
+    double totalCost = sessions.fold(0, (sum, item) => sum + item.cost);
     String currentMonthName = DateFormat('MMMM', 'it_IT').format(DateTime.now());
     currentMonthName = currentMonthName[0].toUpperCase() + currentMonthName.substring(1);
     
@@ -149,15 +223,98 @@ class _HistoryPageState extends State<HistoryPage> {
           fontWeight: FontWeight.w600
         )
       ),
-      subtitle: Text(
-        "${totalKwh.toStringAsFixed(1)} kWh totali", 
-        style: const TextStyle(color: Colors.white24, fontSize: 11)
+      subtitle: Row(
+        children: [
+          Text(
+            "${totalKwh.toStringAsFixed(1)} kWh",
+            style: const TextStyle(color: Colors.blueAccent, fontSize: 11),
+          ),
+          const SizedBox(width: 8),
+          Text(
+            "${totalCost.toStringAsFixed(2)} €",
+            style: const TextStyle(color: Colors.greenAccent, fontSize: 11),
+          ),
+        ],
       ),
-      children: sessions.map((session) => _buildSessionCard(session)).toList(),
+      children: sessions.asMap().entries.map((entry) {
+        int idx = entry.key;
+        ChargeSession session = entry.value;
+        return _buildSessionCard(session, idx);
+      }).toList(),
     );
   }
 
-  Widget _buildSessionCard(ChargeSession session) {
+  Widget _buildSessionCard(ChargeSession session, int index) {
+    return Dismissible(
+      key: Key(session.date.toString() + index.toString()),
+      direction: DismissDirection.endToStart,
+      background: Container(
+        alignment: Alignment.centerRight,
+        padding: const EdgeInsets.only(right: 20),
+        decoration: BoxDecoration(
+          color: Colors.redAccent,
+          borderRadius: BorderRadius.circular(14),
+        ),
+        child: const Icon(
+          Icons.delete,
+          color: Colors.white,
+          size: 30,
+        ),
+      ),
+      confirmDismiss: (direction) async {
+        return await showDialog(
+          context: context,
+          builder: (BuildContext context) {
+            return AlertDialog(
+              backgroundColor: const Color(0xFF1C1C1E),
+              title: const Text(
+                "Conferma",
+                style: TextStyle(color: Colors.white),
+              ),
+              content: const Text(
+                "Eliminare questa ricarica?",
+                style: TextStyle(color: Colors.white70),
+              ),
+              actions: [
+                TextButton(
+                  onPressed: () => Navigator.of(context).pop(false),
+                  child: const Text("ANNULLA"),
+                ),
+                TextButton(
+                  onPressed: () => Navigator.of(context).pop(true),
+                  child: const Text(
+                    "ELIMINA",
+                    style: TextStyle(color: Colors.redAccent),
+                  ),
+                ),
+              ],
+            );
+          },
+        );
+      },
+      onDismissed: (direction) {
+        final removedIndex = index;
+        
+        final updatedHistory = List<ChargeSession>.from(_localHistory)..removeAt(removedIndex);
+        _localHistory = updatedHistory;
+        
+        if (widget.onHistoryChanged != null) {
+          widget.onHistoryChanged!(updatedHistory);
+        }
+        
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text("Ricarica eliminata"),
+            backgroundColor: Colors.green,
+            duration: Duration(seconds: 2),
+          ),
+        );
+      },
+      child: _buildSessionCardContent(session),
+    );
+  }
+
+  Widget _buildSessionCardContent(ChargeSession session) {
     return Container(
       margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
       decoration: BoxDecoration(

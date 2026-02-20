@@ -10,13 +10,16 @@ class SimulationButton extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return SizedBox(
-      height: 40, // 🔥 RIDOTTO da 56 a 40
+      height: 70, // 🔥 DA 60 A 70
       child: ElevatedButton.icon(
         onPressed: () => _handleSimulation(context),
-        icon: Icon(provider.isSimulating ? Icons.stop_rounded : Icons.play_arrow_rounded, size: 16), // 🔥 RIDOTTO
+        icon: Icon(
+          provider.isSimulating ? Icons.stop_rounded : Icons.play_arrow_rounded, 
+          size: 22 // 🔥 DA 20 A 22
+        ),
         label: Text(
           provider.isSimulating ? "STOP" : "AVVIA",
-          style: const TextStyle(fontSize: 12, fontWeight: FontWeight.bold), // 🔥 RIDOTTO
+          style: const TextStyle(fontSize: 15, fontWeight: FontWeight.bold), // 🔥 DA 14 A 15
         ),
         style: ElevatedButton.styleFrom(
           backgroundColor: provider.isSimulating ? Colors.redAccent : Colors.blueAccent,

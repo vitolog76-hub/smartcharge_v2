@@ -9,7 +9,7 @@ class ChargingControls extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Container(
-      padding: const EdgeInsets.all(16),
+      padding: const EdgeInsets.symmetric(vertical: 6, horizontal: 16), // 🔥 VERTICALE RIDOTTO
       decoration: BoxDecoration(
         color: const Color(0xFF111111),
         borderRadius: BorderRadius.circular(20),
@@ -37,7 +37,7 @@ class ChargingControls extends StatelessWidget {
               }
             },
           ),
-          const SizedBox(height: 16),
+          const SizedBox(height: 4), // 🔥 DA 8 A 4
           _buildSliderRow(
             label: "SOC INIZIALE",
             value: provider.currentSoc,
@@ -58,7 +58,7 @@ class ChargingControls extends StatelessWidget {
               }
             },
           ),
-          const SizedBox(height: 16),
+          const SizedBox(height: 4), // 🔥 DA 8 A 4
           _buildSliderRow(
             label: "SOC FINALE",
             value: provider.targetSoc,
@@ -98,28 +98,27 @@ class ChargingControls extends StatelessWidget {
   }) {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
+      mainAxisSize: MainAxisSize.min,
       children: [
-        // Label e icona
         Row(
           children: [
-            Icon(icon, color: color, size: 18),
-            const SizedBox(width: 8),
+            Icon(icon, color: color, size: 16),
+            const SizedBox(width: 6),
             Text(
               label,
               style: TextStyle(
                 color: color,
-                fontSize: 12,
+                fontSize: 11,
                 fontWeight: FontWeight.bold,
                 letterSpacing: 0.5,
               ),
             ),
             const Spacer(),
-            // Valore
             Container(
-              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
+              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
               decoration: BoxDecoration(
                 color: color.withOpacity(0.1),
-                borderRadius: BorderRadius.circular(20),
+                borderRadius: BorderRadius.circular(12),
                 border: Border.all(color: color.withOpacity(0.3)),
               ),
               child: Text(
@@ -127,23 +126,21 @@ class ChargingControls extends StatelessWidget {
                 style: TextStyle(
                   color: color,
                   fontWeight: FontWeight.bold,
-                  fontSize: 14,
+                  fontSize: 12,
                 ),
               ),
             ),
           ],
         ),
-        const SizedBox(height: 8),
-        // Slider e pulsanti
+        const SizedBox(height: 2), // 🔥 DA 4 A 2
         Row(
           children: [
-            // Pulsante -
             InkWell(
               onTap: onDecrement,
-              borderRadius: BorderRadius.circular(20),
+              borderRadius: BorderRadius.circular(16),
               child: Container(
-                width: 36,
-                height: 36,
+                width: 26, // 🔥 DA 28 A 26 (leggermente più piccoli)
+                height: 26, // 🔥 DA 28 A 26
                 decoration: BoxDecoration(
                   color: color.withOpacity(0.1),
                   shape: BoxShape.circle,
@@ -152,18 +149,17 @@ class ChargingControls extends StatelessWidget {
                 child: Icon(
                   Icons.remove,
                   color: color,
-                  size: 20,
+                  size: 14, // 🔥 DA 16 A 14
                 ),
               ),
             ),
-            const SizedBox(width: 12),
-            // Slider - FLUIDO senza divisions
+            const SizedBox(width: 6), // 🔥 DA 8 A 6
             Expanded(
               child: SliderTheme(
                 data: SliderThemeData(
-                  trackHeight: 4,
-                  thumbShape: const RoundSliderThumbShape(enabledThumbRadius: 10),
-                  overlayShape: const RoundSliderOverlayShape(overlayRadius: 20),
+                  trackHeight: 2, // 🔥 DA 3 A 2
+                  thumbShape: const RoundSliderThumbShape(enabledThumbRadius: 7), // 🔥 DA 8 A 7
+                  overlayShape: const RoundSliderOverlayShape(overlayRadius: 10), // 🔥 DA 12 A 10
                   activeTrackColor: color,
                   inactiveTrackColor: color.withOpacity(0.2),
                   thumbColor: color,
@@ -173,19 +169,18 @@ class ChargingControls extends StatelessWidget {
                   value: value,
                   min: min,
                   max: max,
-                  divisions: null, // 🔥 NESSUNA DIVISIONE = FLUIDO
+                  divisions: null,
                   onChanged: onChanged,
                 ),
               ),
             ),
-            const SizedBox(width: 12),
-            // Pulsante +
+            const SizedBox(width: 6), // 🔥 DA 8 A 6
             InkWell(
               onTap: onIncrement,
-              borderRadius: BorderRadius.circular(20),
+              borderRadius: BorderRadius.circular(16),
               child: Container(
-                width: 36,
-                height: 36,
+                width: 26, // 🔥 DA 28 A 26
+                height: 26, // 🔥 DA 28 A 26
                 decoration: BoxDecoration(
                   color: color.withOpacity(0.1),
                   shape: BoxShape.circle,
@@ -194,7 +189,7 @@ class ChargingControls extends StatelessWidget {
                 child: Icon(
                   Icons.add,
                   color: color,
-                  size: 20,
+                  size: 14, // 🔥 DA 16 A 14
                 ),
               ),
             ),

@@ -368,45 +368,33 @@ class _SettingsPageState extends State<SettingsPage> {
 
             const SizedBox(height: 25),
 
-            _buildSectionTitle("4 - ACCOUNT"),
-            _buildCard(
-              child: Column(
-                children: [
-                  ListTile(
-                    leading: const Icon(Icons.email, color: Colors.blueAccent),
-                    title: const Text(
-                      "Email",
-                      style: TextStyle(color: Colors.white38, fontSize: 10),
-                    ),
-                    subtitle: Text(
-                      widget.authProvider.userEmail ?? "Non disponibile",
-                      style: const TextStyle(color: Colors.white),
-                    ),
-                  ),
-                  const Divider(color: Colors.white10),
-                  ListTile(
-                    leading: const Icon(Icons.logout, color: Colors.redAccent),
-                    title: const Text(
-                      "Esci dall'account",
-                      style: TextStyle(color: Colors.redAccent),
-                    ),
-                    onTap: () async {
-                      final confirm = await _showLogoutConfirmDialog();
-                      if (confirm == true) {
-                        await widget.authProvider.signOut();
-                        if (context.mounted) {
-                          Navigator.pushAndRemoveUntil(
-                            context,
-                            MaterialPageRoute(builder: (_) => const LoginPage()),
-                            (route) => false,
-                          );
-                        }
-                      }
-                    },
-                  ),
-                ],
-              ),
-            ),
+            // ... (tutto il resto del file rimane uguale, ma modifica la sezione account)
+
+_buildSectionTitle("4 - ACCOUNT"),
+_buildCard(
+  child: Column(
+    children: [
+      ListTile(
+  leading: const Icon(Icons.logout, color: Colors.redAccent),
+  title: const Text(
+    "Esci dall'account",
+    style: TextStyle(color: Colors.redAccent),
+  ),
+  onTap: () async {
+    final confirm = await _showLogoutConfirmDialog();
+    if (confirm == true) {
+      await widget.authProvider.signOut();
+      if (context.mounted) {
+        // 🔥 Chiudi SettingsPage e torna al login
+        Navigator.pop(context); // Chiudi SettingsPage
+        // Il Consumer in main gestirà il resto
+      }
+    }
+  },
+),
+    ],
+  ),
+),
             
             const SizedBox(height: 30),
             if (_isSyncing) const Center(child: CircularProgressIndicator(color: Colors.blueAccent)),

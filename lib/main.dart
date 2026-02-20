@@ -1,8 +1,7 @@
 import 'package:flutter/material.dart';
-import 'package:intl/date_symbol_data_local.dart';
 import 'package:provider/provider.dart';
 import 'package:firebase_core/firebase_core.dart';
-import 'package:google_fonts/google_fonts.dart';
+import 'package:intl/date_symbol_data_local.dart';
 import 'package:smartcharge_v2/providers/auth_provider.dart';
 import 'package:smartcharge_v2/providers/home_provider.dart';
 import 'package:smartcharge_v2/screens/login_page.dart';
@@ -23,13 +22,14 @@ void main() async {
     ),
   );
 
-  await initializeDateFormatting('it_IT', null); 
+  // 🔥 Inizializza le date in italiano
+  await initializeDateFormatting('it_IT', null);
 
-  runApp(const SmartChargeApp());
+  runApp(const MyApp());
 }
 
-class SmartChargeApp extends StatelessWidget {
-  const SmartChargeApp({super.key});
+class MyApp extends StatelessWidget {
+  const MyApp({super.key});
 
   @override
   Widget build(BuildContext context) {
@@ -42,70 +42,29 @@ class SmartChargeApp extends StatelessWidget {
         title: 'Smart Charge',
         theme: ThemeData.dark().copyWith(
           scaffoldBackgroundColor: Colors.black,
-          textTheme: GoogleFonts.interTextTheme(ThemeData.dark().textTheme),
-          appBarTheme: AppBarTheme(
-            centerTitle: true,
-            backgroundColor: Colors.black.withOpacity(0.8),
+          appBarTheme: const AppBarTheme(
+            backgroundColor: Colors.transparent,
             elevation: 0,
-            titleTextStyle: GoogleFonts.inter(
-              fontSize: 17,
-              fontWeight: FontWeight.w600,
-              letterSpacing: -0.5,
+            titleTextStyle: TextStyle(
               color: Colors.white,
+              fontSize: 18,
+              fontWeight: FontWeight.bold,
             ),
-            iconTheme: const IconThemeData(color: Colors.blueAccent),
+            iconTheme: IconThemeData(color: Colors.blueAccent),
           ),
         ),
-        home: const AuthWrapper(),
+        home: Consumer<AuthProvider>(
+          builder: (_, auth, __) {
+            if (auth.isAuthenticated) {
+              return ChangeNotifierProvider(
+                create: (_) => HomeProvider()..init(),
+                child: const HomePage(),
+              );
+            }
+            return const LoginPage();
+          },
+        ),
       ),
-    );
-  }
-}
-
-class AuthWrapper extends StatelessWidget {
-  const AuthWrapper({super.key});
-
-  @override
-  Widget build(BuildContext context) {
-    return Consumer<AuthProvider>(
-      builder: (context, authProvider, child) {
-        if (authProvider.isLoading) {
-          return const Scaffold(
-            backgroundColor: Colors.black,
-            body: Center(child: CircularProgressIndicator()),
-          );
-        }
-        
-        if (authProvider.isAuthenticated) {
-          // 🔥 SE I DATI NON SONO ANCORA STATI SCARICATI, MOSTRA UN LOADING
-          if (!authProvider.dataDownloaded) {
-            return const Scaffold(
-              backgroundColor: Colors.black,
-              body: Center(
-                child: Column(
-                  mainAxisAlignment: MainAxisAlignment.center,
-                  children: [
-                    CircularProgressIndicator(),
-                    SizedBox(height: 20),
-                    Text(
-                      "Caricamento dati...",
-                      style: TextStyle(color: Colors.white70),
-                    ),
-                  ],
-                ),
-              ),
-            );
-          }
-          
-          // 🔥 DATI SCARICATI, MOSTRA LA HOME
-          return ChangeNotifierProvider(
-            create: (_) => HomeProvider()..init(),
-            child: const HomePage(),
-          );
-        }
-        
-        return const LoginPage();
-      },
     );
   }
 }

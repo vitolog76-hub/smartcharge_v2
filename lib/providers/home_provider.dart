@@ -49,17 +49,9 @@ class HomeProvider extends ChangeNotifier {
     );
   }
 
- Future<void> init() async {
-  debugPrint("🚀 HomeProvider: Inizializzazione...");
-  await _loadCarsFromJson();
-  await _loadHistory();
-  await _loadContract();
-  notifyListeners();
-}
-
-  // --- METODO PER REFRESH DOPO LOGIN ---
-  Future<void> refreshAfterLogin() async {
-    debugPrint("🔄 HomeProvider: Refresh dopo login...");
+  // --- METODO DI INIZIALIZZAZIONE ---
+  Future<void> init() async {
+    debugPrint("🚀 HomeProvider: Inizializzazione...");
     await _loadCarsFromJson();
     await _loadHistory();
     await _loadContract();
@@ -121,7 +113,6 @@ class HomeProvider extends ChangeNotifier {
       
       capacityController.text = selectedCar.batteryCapacity.toString();
       carsLoaded = true;
-      debugPrint("✅ Auto caricate: ${allCars.length} modelli");
     } catch (e) {
       debugPrint("❌ Errore caricamento auto: $e");
     }
@@ -134,14 +125,11 @@ class HomeProvider extends ChangeNotifier {
       if (historyData != null && historyData.isNotEmpty) {
         final List<dynamic> decodedData = jsonDecode(historyData);
         chargeHistory = decodedData.map((item) => ChargeSession.fromJson(item)).toList();
-        debugPrint("✅ Storico caricato: ${chargeHistory.length} sessioni");
       } else {
         chargeHistory = [];
-        debugPrint("📂 Nessuno storico trovato");
       }
     } catch (e) {
       debugPrint("❌ Errore caricamento storico: $e");
-      chargeHistory = [];
     }
   }
 
@@ -151,7 +139,6 @@ class HomeProvider extends ChangeNotifier {
       final String? contractData = prefs.getString('energy_contract');
       if (contractData != null && contractData.isNotEmpty) {
         myContract = EnergyContract.fromJson(jsonDecode(contractData));
-        debugPrint("✅ Contratto caricato: ${myContract.provider}");
       }
     } catch (e) {
       debugPrint("❌ Errore caricamento contratto: $e");
@@ -164,7 +151,6 @@ class HomeProvider extends ChangeNotifier {
       final prefs = await SharedPreferences.getInstance();
       final jsonData = jsonEncode(chargeHistory.map((s) => s.toJson()).toList());
       await prefs.setString('charge_history', jsonData);
-      debugPrint("💾 Storico salvato: ${chargeHistory.length} sessioni");
       
       final userId = prefs.getString('user_sync_id');
       if (userId != null && userId.isNotEmpty) {
@@ -175,12 +161,6 @@ class HomeProvider extends ChangeNotifier {
     }
   }
 
-  Future<void> saveSelectedCar(CarModel car) async {
-    final prefs = await SharedPreferences.getInstance();
-    await prefs.setString('selected_car_brand', car.brand);
-    await prefs.setString('selected_car_model', car.model);
-  }
-
   void selectCar(CarModel car) {
     selectedCar = car;
     capacityController.text = car.batteryCapacity.toString();
@@ -188,25 +168,16 @@ class HomeProvider extends ChangeNotifier {
     notifyListeners();
   }
 
-  void updateReadyTime(TimeOfDay time) { 
-    readyTime = time; 
-    notifyListeners(); 
+  Future<void> saveSelectedCar(CarModel car) async {
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setString('selected_car_brand', car.brand);
+    await prefs.setString('selected_car_model', car.model);
   }
-  
-  void updateWallboxPwr(double value) { 
-    wallboxPwr = value; 
-    notifyListeners(); 
-  }
-  
-  void updateCurrentSoc(double value) { 
-    currentSoc = value; 
-    notifyListeners(); 
-  }
-  
-  void updateTargetSoc(double value) { 
-    targetSoc = value; 
-    notifyListeners(); 
-  }
+
+  void updateReadyTime(TimeOfDay time) { readyTime = time; notifyListeners(); }
+  void updateWallboxPwr(double value) { wallboxPwr = value; notifyListeners(); }
+  void updateCurrentSoc(double value) { currentSoc = value; notifyListeners(); }
+  void updateTargetSoc(double value) { targetSoc = value; notifyListeners(); }
 
   void addChargeSession(ChargeSession session) {
     chargeHistory.add(session);
@@ -228,7 +199,6 @@ class HomeProvider extends ChangeNotifier {
   void stopSimulation() => simService.stopSimulation();
 
   Future<void> refreshAfterSettings() async {
-    debugPrint("⚙️ Refresh dopo settings...");
     await _loadHistory();
     await _loadContract();
     notifyListeners();

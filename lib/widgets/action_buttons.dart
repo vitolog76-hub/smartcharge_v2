@@ -14,7 +14,6 @@ class ActionButtons extends StatelessWidget {
   Widget build(BuildContext context) {
     return Row(
       children: [
-        // BOTTONE HOME
         Expanded(
           child: _buildBtn(
             "INSERISCI\nRICARICA HOME", 
@@ -24,7 +23,6 @@ class ActionButtons extends StatelessWidget {
           )
         ),
         const SizedBox(width: 12),
-        // BOTTONE PUBBLICA
         Expanded(
           child: _buildBtn(
             "INSERISCI\nRICARICA PUBBLICA", 
@@ -42,7 +40,8 @@ class ActionButtons extends StatelessWidget {
       onTap: onTap,
       borderRadius: BorderRadius.circular(15),
       child: Container(
-        padding: const EdgeInsets.symmetric(vertical: 10, horizontal: 8),
+        height: 50,
+        padding: const EdgeInsets.symmetric(vertical: 8, horizontal: 8),
         decoration: BoxDecoration(
           color: color.withOpacity(0.08),
           borderRadius: BorderRadius.circular(15),
@@ -51,17 +50,17 @@ class ActionButtons extends StatelessWidget {
         child: Row(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
-            Icon(icon, size: 20, color: color),
+            Icon(icon, size: 22, color: color),
             const SizedBox(width: 8),
-            Expanded( // Permette al testo di andare a capo se non c'è spazio
+            Expanded(
               child: Text(
                 label,
                 textAlign: TextAlign.left,
                 style: TextStyle(
                   color: color,
-                  fontSize: 9.5, // Leggermente più piccolo per stare su due righe
+                  fontSize: 11,
                   fontWeight: FontWeight.w900,
-                  height: 1.1, // Distanza tra le righe ridotta
+                  height: 1.2,
                 ),
               ),
             ),

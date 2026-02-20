@@ -1,108 +1,110 @@
-import 'dart:convert';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+import 'dart:convert';
 import 'package:smartcharge_v2/services/sync_service.dart';
+import 'package:smartcharge_v2/models/contract_model.dart';
 
 class AuthProvider extends ChangeNotifier {
   final FirebaseAuth _auth = FirebaseAuth.instance;
   User? _user;
   bool _isLoading = false;
-  String? _errorMessage;
-  
-  // 🔥 FLAG PER DIRE CHE I DATI SONO STATI SCARICATI
-  bool _dataDownloaded = false;
-  bool get dataDownloaded => _dataDownloaded;
 
-  // Getters
   User? get user => _user;
   bool get isLoading => _isLoading;
-  String? get errorMessage => _errorMessage;
   bool get isAuthenticated => _user != null;
   String? get userId => _user?.uid;
   String? get userEmail => _user?.email;
   String? get userName => _user?.displayName;
 
   AuthProvider() {
-    _checkCurrentUser();
+    _auth.authStateChanges().listen((User? user) async {
+      _user = user;
+      if (user != null) {
+        final prefs = await SharedPreferences.getInstance();
+        await prefs.setString('user_sync_id', user.uid);
+        // 🔥 Scarica i dati dal cloud appena l'utente si logga
+        await _downloadUserData(user.uid);
+      }
+      notifyListeners();
+    });
   }
 
-  Future<void> _checkCurrentUser() async {
-    _user = _auth.currentUser;
-    notifyListeners();
-    
-    if (_user != null) {
-      final prefs = await SharedPreferences.getInstance();
-      await prefs.setString('user_sync_id', _user!.uid);
-      await _downloadUserData(_user!.uid);
-    }
-  }
-
-  Future<bool> signIn(String email, String password) async {
+  Future<String?> signIn(String email, String password) async {
     _isLoading = true;
-    _errorMessage = null;
-    _dataDownloaded = false;
     notifyListeners();
 
     try {
       final userCredential = await _auth.signInWithEmailAndPassword(
-        email: email,
-        password: password,
+        email: email, 
+        password: password
       );
-
-      _user = userCredential.user;
       
       final prefs = await SharedPreferences.getInstance();
-      await prefs.setString('user_sync_id', _user!.uid);
+      await prefs.setString('user_sync_id', userCredential.user!.uid);
       
-      await _downloadUserData(_user!.uid);
+      // 🔥 Scarica i dati dopo il login
+      await _downloadUserData(userCredential.user!.uid);
       
       _isLoading = false;
       notifyListeners();
-      
-      return true;
+      return null;
     } on FirebaseAuthException catch (e) {
       _isLoading = false;
-      _errorMessage = _getErrorMessage(e.code);
       notifyListeners();
-      return false;
+      return e.message;
     }
   }
 
-  Future<bool> signUp(String email, String password, String displayName) async {
+  Future<String?> signUp(String email, String password, String name) async {
     _isLoading = true;
-    _errorMessage = null;
-    _dataDownloaded = false;
     notifyListeners();
 
     try {
       final userCredential = await _auth.createUserWithEmailAndPassword(
-        email: email,
-        password: password,
+        email: email, 
+        password: password
       );
-
-      await userCredential.user?.updateDisplayName(displayName);
-      await userCredential.user?.reload();
       
-      _user = _auth.currentUser;
+      await userCredential.user?.updateDisplayName(name);
       
       final prefs = await SharedPreferences.getInstance();
-      await prefs.setString('user_sync_id', _user!.uid);
+      await prefs.setString('user_sync_id', userCredential.user!.uid);
+      
+      // 🔥 Crea dati iniziali per il nuovo utente
+      await _createInitialUserData(userCredential.user!.uid, name);
       
       _isLoading = false;
       notifyListeners();
-      
-      return true;
+      return null;
     } on FirebaseAuthException catch (e) {
       _isLoading = false;
-      _errorMessage = _getErrorMessage(e.code);
       notifyListeners();
-      return false;
+      return e.message;
     }
   }
 
+  Future<void> _createInitialUserData(String userId, String displayName) async {
+    debugPrint("🆕 Creazione dati iniziali per nuovo utente: $displayName");
+    
+    final defaultContract = EnergyContract(
+      provider: "Gestore",
+      userName: displayName,
+      f1Price: 0.20,
+      f2Price: 0.18,
+      f3Price: 0.15,
+      isMonorario: false,
+    );
+    
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setString('energy_contract', jsonEncode(defaultContract.toJson()));
+    await prefs.setString('charge_history', jsonEncode([]));
+    
+    await SyncService().uploadData(userId, [], defaultContract);
+  }
+
   Future<void> _downloadUserData(String userId) async {
-    debugPrint("☁️ Auto-download dati per: $userId");
+    debugPrint("☁️ Download dati per utente: $userId");
     
     try {
       bool exists = await SyncService().checkIfUserExists(userId);
@@ -122,10 +124,6 @@ class AuthProvider extends ChangeNotifier {
             await prefs.setString('energy_contract', jsonEncode(data['contract']));
             debugPrint("✅ Contratto scaricato");
           }
-          
-          // 🔥 SEGNALA CHE I DATI SONO STATI SCARICATI
-          _dataDownloaded = true;
-          notifyListeners();
         }
       }
     } catch (e) {
@@ -135,49 +133,8 @@ class AuthProvider extends ChangeNotifier {
 
   Future<void> signOut() async {
     await _auth.signOut();
-    _user = null;
-    _dataDownloaded = false;
     
     final prefs = await SharedPreferences.getInstance();
-    await prefs.remove('user_sync_id');
-    
-    notifyListeners();
-  }
-
-  Future<bool> resetPassword(String email) async {
-    _isLoading = true;
-    _errorMessage = null;
-    notifyListeners();
-
-    try {
-      await _auth.sendPasswordResetEmail(email: email);
-      _isLoading = false;
-      notifyListeners();
-      return true;
-    } on FirebaseAuthException catch (e) {
-      _isLoading = false;
-      _errorMessage = _getErrorMessage(e.code);
-      notifyListeners();
-      return false;
-    }
-  }
-
-  String _getErrorMessage(String code) {
-    switch (code) {
-      case 'email-already-in-use':
-        return 'Email già registrata';
-      case 'invalid-email':
-        return 'Email non valida';
-      case 'weak-password':
-        return 'Password troppo debole (minimo 6 caratteri)';
-      case 'user-not-found':
-        return 'Utente non trovato';
-      case 'wrong-password':
-        return 'Password errata';
-      case 'network-request-failed':
-        return 'Errore di connessione';
-      default:
-        return 'Errore: $code';
-    }
+    await prefs.clear();  // Pulisce TUTTI i dati locali
   }
 }
