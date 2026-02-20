@@ -1,4 +1,4 @@
-import 'dart:ui'; // Fondamentale per l'effetto Glass/Blur
+import 'dart:ui';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:smartcharge_v2/providers/home_provider.dart';
@@ -23,7 +23,7 @@ class HomePage extends StatelessWidget {
       builder: (context, provider, child) {
         if (!provider.carsLoaded) {
           return const Scaffold(
-            backgroundColor: Colors.black,
+            backgroundColor: Color(0xFF050507),
             body: Center(child: CircularProgressIndicator(color: Colors.blueAccent)),
           );
         }
@@ -91,8 +91,17 @@ class HomePage extends StatelessWidget {
           ),
           body: Stack(
             children: [
-              Positioned(top: -50, left: -50, child: _buildGlowSphere(200, Colors.blueAccent.withOpacity(0.12))),
-              Positioned(bottom: 100, right: -80, child: _buildGlowSphere(250, Colors.amberAccent.withOpacity(0.07))),
+              // Bagliori ambientali di sfondo
+              Positioned(
+                top: -50,
+                left: -50,
+                child: _buildGlowSphere(200, Colors.blueAccent.withOpacity(0.12)),
+              ),
+              Positioned(
+                bottom: 100,
+                right: -80,
+                child: _buildGlowSphere(250, Colors.amberAccent.withOpacity(0.07)),
+              ),
 
               SafeArea(
                 child: Padding(
@@ -117,13 +126,12 @@ class HomePage extends StatelessWidget {
                       Row(
                         children: [
                           Expanded(
-                            flex: 1, // Mantiene il pulsante simulazione compatto
+                            flex: 12,
                             child: _glassContainer(child: SimulationButton(provider: provider)),
                           ),
                           const SizedBox(width: 12),
-                          // --- PULSANTE AUTO PIÙ GRANDE (Flex 3) ---
                           Expanded(
-                            flex: 3, 
+                            flex: 18,
                             child: _buildCarInfo(context, provider),
                           ),
                         ],
@@ -136,6 +144,8 @@ class HomePage extends StatelessWidget {
                           onPublicTap: provider.isSimulating ? () {} : () => _showAddDialog(context, provider, "Pubblica"),
                         ),
                       ),
+                      const SizedBox(height: 12),
+                      _buildEditCapacityTile(context, provider),
                     ],
                   ),
                 ),
@@ -147,6 +157,113 @@ class HomePage extends StatelessWidget {
     );
   }
 
+  // --- WIDGET RIGA CAPACITÀ CON EFFETTO NEON ---
+  Widget _buildEditCapacityTile(BuildContext context, HomeProvider provider) {
+    return GestureDetector(
+      onTap: () => _showEditCapacityDialog(context, provider),
+      child: _glassContainer(
+        opacity: 0.1,
+        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+        child: Row(
+          children: [
+            const _PulseIcon(
+              child: Icon(Icons.bolt_rounded, color: Colors.cyanAccent, size: 26),
+            ),
+            const SizedBox(width: 12),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    "${provider.capacityController.text} kWh",
+                    style: const TextStyle(
+                      color: Colors.white,
+                      fontSize: 16,
+                      fontWeight: FontWeight.w900,
+                      letterSpacing: 0.5,
+                      shadows: [Shadow(color: Colors.blueAccent, blurRadius: 8)],
+                    ),
+                  ),
+                  const Text(
+                    "CAPACITÀ BATTERIA ATTUALE",
+                    style: TextStyle(
+                      color: Colors.white38,
+                      fontSize: 8,
+                      fontWeight: FontWeight.bold,
+                      letterSpacing: 1.1,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            Icon(Icons.edit_note_rounded, color: Colors.white.withOpacity(0.3), size: 22),
+          ],
+        ),
+      ),
+    );
+  }
+
+  // --- DIALOG MODIFICA CAPACITÀ ---
+  void _showEditCapacityDialog(BuildContext context, HomeProvider provider) {
+    final TextEditingController tempController = TextEditingController(text: provider.capacityController.text);
+    showDialog(
+      context: context,
+      builder: (ctx) => BackdropFilter(
+        filter: ImageFilter.blur(sigmaX: 10, sigmaY: 10),
+        child: AlertDialog(
+          backgroundColor: Colors.white.withOpacity(0.05),
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(24),
+            side: BorderSide(color: Colors.white.withOpacity(0.1)),
+          ),
+          title: const Text(
+            "SET CAPACITÀ",
+            textAlign: TextAlign.center,
+            style: TextStyle(color: Colors.white, fontWeight: FontWeight.w900, fontSize: 16, letterSpacing: 1.5),
+          ),
+          content: TextField(
+            controller: tempController,
+            keyboardType: TextInputType.number,
+            textAlign: TextAlign.center,
+            style: const TextStyle(color: Colors.cyanAccent, fontSize: 24, fontWeight: FontWeight.bold),
+            decoration: InputDecoration(
+              suffixText: "kWh",
+              suffixStyle: const TextStyle(color: Colors.white38, fontSize: 14),
+              enabledBorder: UnderlineInputBorder(borderSide: BorderSide(color: Colors.white.withOpacity(0.1))),
+              focusedBorder: const UnderlineInputBorder(borderSide: BorderSide(color: Colors.cyanAccent)),
+            ),
+          ),
+          actionsAlignment: MainAxisAlignment.spaceEvenly,
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(ctx),
+              child: const Text("CHIUDI", style: TextStyle(color: Colors.white38, fontWeight: FontWeight.bold)),
+            ),
+            ElevatedButton(
+              onPressed: () {
+                if (tempController.text.isNotEmpty) {
+                  provider.capacityController.text = tempController.text;
+                  provider.notifyListeners();
+                }
+                Navigator.pop(ctx);
+              },
+              style: ElevatedButton.styleFrom(
+                backgroundColor: Colors.cyanAccent.withOpacity(0.2),
+                foregroundColor: Colors.cyanAccent,
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(12),
+                  side: const BorderSide(color: Colors.cyanAccent),
+                ),
+              ),
+              child: const Text("AGGIORNA", style: TextStyle(fontWeight: FontWeight.bold)),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  // --- HELPERS GRAFICI ---
   Widget _glassContainer({required Widget child, double blur = 15, double opacity = 0.05, EdgeInsets? padding}) {
     return ClipRRect(
       borderRadius: BorderRadius.circular(20),
@@ -183,21 +300,15 @@ class HomePage extends StatelessWidget {
         duration: const Duration(milliseconds: 300),
         decoration: BoxDecoration(
           borderRadius: BorderRadius.circular(22),
-          boxShadow: [
-            BoxShadow(
-              color: Colors.amberAccent.withOpacity(0.2),
-              blurRadius: 20,
-              spreadRadius: 2,
-            )
-          ],
+          boxShadow: [BoxShadow(color: Colors.amberAccent.withOpacity(0.15), blurRadius: 15, spreadRadius: 1)],
         ),
         child: _glassContainer(
-          opacity: 0.15,
-          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14), // Padding aumentato
+          opacity: 0.12,
+          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 14),
           child: Row(
             children: [
-              const Icon(Icons.electric_car_rounded, color: Colors.amberAccent, size: 28), // Icona più grande
-              const SizedBox(width: 12),
+              const Icon(Icons.electric_car_rounded, color: Colors.amberAccent, size: 24),
+              const SizedBox(width: 8),
               Expanded(
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
@@ -205,30 +316,15 @@ class HomePage extends StatelessWidget {
                   children: [
                     Text(
                       provider.selectedCar.model.toUpperCase(),
-                      style: const TextStyle(
-                        color: Colors.amberAccent, 
-                        fontSize: 14, // Font aumentato
-                        fontWeight: FontWeight.w900,
-                        letterSpacing: 0.8,
-                      ),
+                      overflow: TextOverflow.ellipsis,
+                      style: const TextStyle(color: Colors.amberAccent, fontSize: 12, fontWeight: FontWeight.w900, letterSpacing: 0.5),
                     ),
                     Text(
                       provider.selectedCar.brand,
-                      style: TextStyle(color: Colors.amberAccent.withOpacity(0.7), fontSize: 10, fontWeight: FontWeight.bold),
+                      overflow: TextOverflow.ellipsis,
+                      style: TextStyle(color: Colors.amberAccent.withOpacity(0.6), fontSize: 9),
                     ),
                   ],
-                ),
-              ),
-              Container(
-                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                decoration: BoxDecoration(
-                  color: Colors.amberAccent.withOpacity(0.1),
-                  border: Border.all(color: Colors.amberAccent.withOpacity(0.5)),
-                  borderRadius: BorderRadius.circular(8),
-                ),
-                child: Text(
-                  "${provider.capacityController.text} kWh",
-                  style: const TextStyle(color: Colors.amberAccent, fontSize: 11, fontWeight: FontWeight.bold),
                 ),
               ),
             ],
@@ -263,20 +359,9 @@ class HomePage extends StatelessWidget {
                     margin: const EdgeInsets.symmetric(vertical: 12),
                     width: 40,
                     height: 4,
-                    decoration: BoxDecoration(
-                      color: Colors.white24,
-                      borderRadius: BorderRadius.circular(2),
-                    ),
+                    decoration: BoxDecoration(color: Colors.white24, borderRadius: BorderRadius.circular(2)),
                   ),
-                  const Text(
-                    "SELEZIONA VEICOLO",
-                    style: TextStyle(
-                      color: Colors.amberAccent,
-                      fontSize: 16,
-                      fontWeight: FontWeight.bold,
-                      letterSpacing: 1.1,
-                    ),
-                  ),
+                  const Text("SELEZIONA VEICOLO", style: TextStyle(color: Colors.amberAccent, fontSize: 16, fontWeight: FontWeight.bold, letterSpacing: 1.1)),
                   const SizedBox(height: 10),
                   Expanded(
                     child: ListView.builder(
@@ -287,25 +372,12 @@ class HomePage extends StatelessWidget {
                         final car = provider.allCars[index];
                         return Container(
                           margin: const EdgeInsets.only(bottom: 8),
-                          decoration: BoxDecoration(
-                            color: Colors.white.withOpacity(0.05),
-                            borderRadius: BorderRadius.circular(15),
-                            border: Border.all(color: Colors.white.withOpacity(0.05)),
-                          ),
+                          decoration: BoxDecoration(color: Colors.white.withOpacity(0.05), borderRadius: BorderRadius.circular(15), border: Border.all(color: Colors.white.withOpacity(0.05))),
                           child: ListTile(
                             leading: const Icon(Icons.directions_car, color: Colors.white70),
-                            title: Text(
-                              "${car.brand} ${car.model}",
-                              style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w600),
-                            ),
-                            trailing: Text(
-                              "${car.batteryCapacity} kWh",
-                              style: const TextStyle(color: Colors.amberAccent, fontWeight: FontWeight.bold),
-                            ),
-                            onTap: () {
-                              provider.selectCar(car);
-                              Navigator.pop(context);
-                            },
+                            title: Text("${car.brand} ${car.model}", style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w600)),
+                            trailing: Text("${car.batteryCapacity} kWh", style: const TextStyle(color: Colors.amberAccent, fontWeight: FontWeight.bold)),
+                            onTap: () { provider.selectCar(car); Navigator.pop(context); },
                           ),
                         );
                       },
@@ -321,9 +393,29 @@ class HomePage extends StatelessWidget {
   }
 
   void _showAddDialog(BuildContext context, HomeProvider provider, String tipo) {
-    showDialog(
-      context: context,
-      builder: (_) => AddChargeDialog(provider: provider, tipo: tipo),
-    );
+    showDialog(context: context, builder: (_) => AddChargeDialog(provider: provider, tipo: tipo));
+  }
+}
+
+// --- WIDGET PER L'ANIMAZIONE DI PULSAZIONE ---
+class _PulseIcon extends StatefulWidget {
+  final Widget child;
+  const _PulseIcon({required this.child});
+  @override
+  State<_PulseIcon> createState() => _PulseIconState();
+}
+
+class _PulseIconState extends State<_PulseIcon> with SingleTickerProviderStateMixin {
+  late AnimationController _controller;
+  @override
+  void initState() {
+    super.initState();
+    _controller = AnimationController(vsync: this, duration: const Duration(seconds: 2))..repeat(reverse: true);
+  }
+  @override
+  void dispose() { _controller.dispose(); super.dispose(); }
+  @override
+  Widget build(BuildContext context) {
+    return FadeTransition(opacity: Tween(begin: 0.4, end: 1.0).animate(_controller), child: widget.child);
   }
 }

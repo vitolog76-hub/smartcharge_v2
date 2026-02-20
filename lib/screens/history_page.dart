@@ -67,20 +67,57 @@ class _HistoryPageState extends State<HistoryPage> {
   }
 
   Map<String, double> _getAggregatedMonthlyData() {
-    Map<String, double> aggregated = {};
+  Map<String, double> aggregated = {};
+  
+  // Trova il mese corrente
+  final now = DateTime.now();
+  final currentMonth = DateTime(now.year, now.month, 1);
+  
+  // Genera 5 mesi totali: corrente, 2 prima, 2 dopo
+  for (int i = -2; i <= 2; i++) {
+    final date = DateTime(currentMonth.year, currentMonth.month + i, 1);
+    final monthKey = DateFormat('MM-yyyy').format(date);
     
-    // 🔥 Aggiungi un mese fittizio precedente se non ci sono dati
-    final now = DateTime.now();
-    String lastMonthKey = DateFormat('MM-yyyy').format(DateTime(now.year, now.month - 1, 1));
-    aggregated[lastMonthKey] = 0;
+    // Suddividi in 1° e 15°
+    final firstDayKey = "01-$monthKey";  // 1° del mese
+    final fifteenthKey = "15-$monthKey"; // 15° del mese
     
-    var sortedHistory = List<ChargeSession>.from(_localHistory)..sort((a, b) => a.date.compareTo(b.date));
-    for (var session in sortedHistory) {
-      String key = DateFormat('MM-yyyy').format(session.date);
-      aggregated[key] = (aggregated[key] ?? 0) + session.kwh;
-    }
-    return aggregated;
+    aggregated[firstDayKey] = 0.0;
+    aggregated[fifteenthKey] = 0.0;
   }
+  
+  // Popola con i dati reali
+  for (var session in _localHistory) {
+    final day = session.date.day;
+    final monthKey = DateFormat('MM-yyyy').format(session.date);
+    
+    // Assegna al punto più vicino (1° o 15°)
+    if (day <= 15) {
+      final firstDayKey = "01-$monthKey";
+      aggregated[firstDayKey] = (aggregated[firstDayKey] ?? 0) + session.kwh;
+    } else {
+      final fifteenthKey = "15-$monthKey";
+      aggregated[fifteenthKey] = (aggregated[fifteenthKey] ?? 0) + session.kwh;
+    }
+  }
+  
+  // Ordina le chiavi cronologicamente
+  final sortedKeys = aggregated.keys.toList()..sort((a, b) {
+    final aParts = a.substring(3).split('-');
+    final bParts = b.substring(3).split('-');
+    final aDate = DateTime(int.parse(aParts[1]), int.parse(aParts[0]), int.parse(a.substring(0,2)));
+    final bDate = DateTime(int.parse(bParts[1]), int.parse(bParts[0]), int.parse(b.substring(0,2)));
+    return aDate.compareTo(bDate);
+  });
+  
+  // Ricostruisci la mappa ordinata
+  final Map<String, double> sortedAggregated = {};
+  for (var key in sortedKeys) {
+    sortedAggregated[key] = aggregated[key]!;
+  }
+  
+  return sortedAggregated;
+}
 
   Map<String, Map<String, List<ChargeSession>>> _getGroupedHistory() {
     Map<String, Map<String, List<ChargeSession>>> grouped = {};
@@ -430,110 +467,157 @@ class _HistoryPageState extends State<HistoryPage> {
   }
 
   Widget _buildHeaderChart(List<String> keys, List<double> values, double maxKwh, BuildContext context) {
-    double chartWidth = keys.length * 90.0;
-    if (chartWidth < MediaQuery.of(context).size.width) chartWidth = MediaQuery.of(context).size.width;
+  double chartWidth = keys.length * 60.0;
+  if (chartWidth < MediaQuery.of(context).size.width) chartWidth = MediaQuery.of(context).size.width;
 
-    return Container(
-      height: 220,
-      padding: const EdgeInsets.only(top: 25, bottom: 10),
-      child: SingleChildScrollView(
-        scrollDirection: Axis.horizontal,
-        reverse: true,
-        child: Container(
-          width: chartWidth,
-          padding: const EdgeInsets.only(right: 20, left: 10),
-          child: LineChart(
-            LineChartData(
-              minY: 0, 
-              maxY: maxKwh,
-              gridData: FlGridData(
-                show: true,
-                drawVerticalLine: false,
-                horizontalInterval: maxKwh / 4,
-                getDrawingHorizontalLine: (value) => FlLine(color: Colors.white.withOpacity(0.05), strokeWidth: 1),
+  return Container(
+    height: 220,
+    padding: const EdgeInsets.only(top: 25, bottom: 10),
+    child: SingleChildScrollView(
+      scrollDirection: Axis.horizontal,
+      reverse: true,
+      child: Container(
+        width: chartWidth,
+        padding: const EdgeInsets.only(right: 20, left: 10),
+        child: LineChart(
+          LineChartData(
+            minY: 0, 
+            maxY: maxKwh,
+            gridData: FlGridData(
+              show: true,
+              drawVerticalLine: false,
+              horizontalInterval: maxKwh / 4,
+              getDrawingHorizontalLine: (value) => FlLine(color: Colors.white.withOpacity(0.05), strokeWidth: 1),
+            ),
+            borderData: FlBorderData(show: false),
+            titlesData: FlTitlesData(
+              topTitles: const AxisTitles(sideTitles: SideTitles(showTitles: false)),
+              rightTitles: const AxisTitles(sideTitles: SideTitles(showTitles: false)),
+              leftTitles: AxisTitles(
+                sideTitles: SideTitles(
+                  showTitles: true,
+                  interval: maxKwh / 4,
+                  reservedSize: 40,
+                  getTitlesWidget: (value, meta) => SideTitleWidget(
+                    axisSide: meta.axisSide,
+                    child: Text("${value.toInt()}kWh", style: const TextStyle(color: Colors.white24, fontSize: 8, fontWeight: FontWeight.bold)),
+                  ),
+                ),
               ),
-              borderData: FlBorderData(show: false),
-              titlesData: FlTitlesData(
-                topTitles: const AxisTitles(sideTitles: SideTitles(showTitles: false)),
-                rightTitles: const AxisTitles(sideTitles: SideTitles(showTitles: false)),
-                leftTitles: AxisTitles(
-                  sideTitles: SideTitles(
-                    showTitles: true,
-                    interval: maxKwh / 4,
-                    reservedSize: 40,
-                    getTitlesWidget: (value, meta) => SideTitleWidget(
+              bottomTitles: AxisTitles(
+                sideTitles: SideTitles(
+                  showTitles: true,
+                  interval: 1,
+                  reservedSize: 45,
+                  getTitlesWidget: (value, meta) {
+                    int index = value.toInt();
+                    if (index < 0 || index >= keys.length) return const SizedBox();
+                    
+                    final key = keys[index];
+                    // Formato: "01-MM-yyyy" o "15-MM-yyyy"
+                    final day = key.substring(0, 2);
+                    final monthYear = key.substring(3);
+                    final parts = monthYear.split('-');
+                    final month = _getMonthAbbr(parts[0]);
+                    final yearShort = parts[1].substring(2);
+                    
+                    // Evidenzia il mese corrente
+                    final now = DateTime.now();
+                    final currentMonthKey = DateFormat('MM-yyyy').format(now);
+                    final isCurrentMonth = monthYear == currentMonthKey;
+                    
+                    return SideTitleWidget(
                       axisSide: meta.axisSide,
-                      child: Text("${value.toInt()}kWh", style: const TextStyle(color: Colors.white24, fontSize: 8, fontWeight: FontWeight.bold)),
-                    ),
-                  ),
-                ),
-                bottomTitles: AxisTitles(
-                  sideTitles: SideTitles(
-                    showTitles: true,
-                    interval: 1,
-                    reservedSize: 38,
-                    getTitlesWidget: (value, meta) {
-                      int index = value.toInt();
-                      if (index < 0 || index >= keys.length) return const SizedBox();
-                      List<String> parts = keys[index].split('-');
-                      String month = _getMonthAbbr(parts[0]);
-                      String yearShort = parts[1].substring(2);
-                      return SideTitleWidget(
-                        axisSide: meta.axisSide,
-                        space: 8,
-                        child: Column(
-                          mainAxisSize: MainAxisSize.min,
-                          children: [
-                            Text(month, style: const TextStyle(color: Colors.blueAccent, fontSize: 10, fontWeight: FontWeight.w600)),
-                            Text("'$yearShort", style: const TextStyle(color: Colors.white24, fontSize: 9)),
-                          ],
-                        ),
-                      );
-                    },
-                  ),
+                      space: 8,
+                      child: Column(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Text(
+                            day,
+                            style: TextStyle(
+                              color: isCurrentMonth ? Colors.blueAccent : Colors.white54,
+                              fontSize: 10,
+                              fontWeight: isCurrentMonth ? FontWeight.bold : FontWeight.normal,
+                            ),
+                          ),
+                          Text(
+                            month,
+                            style: TextStyle(
+                              color: isCurrentMonth ? Colors.blueAccent : Colors.white38,
+                              fontSize: 9,
+                              fontWeight: isCurrentMonth ? FontWeight.w600 : FontWeight.normal,
+                            ),
+                          ),
+                          Text(
+                            "'$yearShort",
+                            style: TextStyle(
+                              color: isCurrentMonth ? Colors.white54 : Colors.white24,
+                              fontSize: 7,
+                            ),
+                          ),
+                        ],
+                      ),
+                    );
+                  },
                 ),
               ),
-              lineBarsData: [
-                LineChartBarData(
-                  spots: List.generate(keys.length, (i) => FlSpot(i.toDouble(), values[i])),
-                  isCurved: true,
-                  color: Colors.blueAccent,
-                  barWidth: 3,
-                  isStrokeCapRound: true,
-                  dotData: FlDotData(
-                    show: true,
-                    getDotPainter: (spot, percent, barData, index) => FlDotCirclePainter(
-                      radius: 4, 
-                      color: Colors.black, 
-                      strokeWidth: 2, 
-                      strokeColor: Colors.blueAccent
-                    ),
-                  ),
-                  belowBarData: BarAreaData(
-                    show: true, 
-                    gradient: LinearGradient(
-                      colors: [Colors.blueAccent.withOpacity(0.2), Colors.blueAccent.withOpacity(0.0)], 
-                      begin: Alignment.topCenter, 
-                      end: Alignment.bottomCenter
-                    )
+            ),
+            lineBarsData: [
+              LineChartBarData(
+                spots: List.generate(keys.length, (i) => FlSpot(i.toDouble(), values[i])),
+                isCurved: false, // 🔥 LINEA DRITTA, NON SPLINE
+                color: Colors.blueAccent,
+                barWidth: 2,
+                isStrokeCapRound: true,
+                dotData: FlDotData(
+                  show: true,
+                  getDotPainter: (spot, percent, barData, index) => FlDotCirclePainter(
+                    radius: 3, 
+                    color: Colors.black, 
+                    strokeWidth: 2, 
+                    strokeColor: Colors.blueAccent
                   ),
                 ),
-              ],
-              lineTouchData: LineTouchData(
-                touchTooltipData: LineTouchTooltipData(
-                  tooltipBgColor: const Color(0xFF1C1C1E),
-                  getTooltipItems: (touchedSpots) => touchedSpots.map((s) => LineTooltipItem(
-                    "${s.y.toStringAsFixed(1)} kWh", 
-                    const TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 12)
-                  )).toList(),
+                belowBarData: BarAreaData(
+                  show: true, 
+                  gradient: LinearGradient(
+                    colors: [Colors.blueAccent.withOpacity(0.2), Colors.blueAccent.withOpacity(0.0)], 
+                    begin: Alignment.topCenter, 
+                    end: Alignment.bottomCenter
+                  )
                 ),
+              ),
+            ],
+            lineTouchData: LineTouchData(
+              touchTooltipData: LineTouchTooltipData(
+                tooltipBgColor: const Color(0xFF1C1C1E),
+                getTooltipItems: (touchedSpots) {
+                  return touchedSpots.map((touchedSpot) {
+                    final spotIndex = touchedSpot.spotIndex;
+                    if (spotIndex >= 0 && spotIndex < keys.length) {
+                      final key = keys[spotIndex];
+                      final day = key.substring(0, 2);
+                      final monthYear = key.substring(3);
+                      final parts = monthYear.split('-');
+                      final month = _getMonthAbbr(parts[0]);
+                      final year = parts[1];
+                      
+                      return LineTooltipItem(
+                        "${day} $month $year\n${touchedSpot.y.toStringAsFixed(1)} kWh",
+                        const TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 11),
+                      );
+                    }
+                    return null;
+                  }).toList();
+                },
               ),
             ),
           ),
         ),
       ),
-    );
-  }
+    ),
+  );
+}
 
   String _getMonthAbbr(String monthNum) {
     const months = ["GEN", "FEB", "MAR", "APR", "MAG", "GIU", "LUG", "AGO", "SET", "OTT", "NOV", "DIC"];
