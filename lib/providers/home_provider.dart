@@ -31,6 +31,13 @@ class HomeProvider extends ChangeNotifier {
   bool isSimulating = false;
   bool _showCompletionDialog = false;
 
+  // --- COSTANTI PER SHARED PREFERENCES ---
+  static const String KEY_SOC_INIZIALE = 'saved_current_soc';
+  static const String KEY_SOC_TARGET = 'saved_target_soc';
+  static const String KEY_WALLBOX_PWR = 'saved_wallbox_pwr';
+  static const String KEY_READY_TIME_HOUR = 'ready_time_hour';
+  static const String KEY_READY_TIME_MINUTE = 'ready_time_minute';
+
   // --- COSTRUTTORE ---
   HomeProvider() {
     simService.startChecking(
@@ -49,16 +56,64 @@ class HomeProvider extends ChangeNotifier {
     );
   }
 
-  // --- METODO DI INIZIALIZZAZIONE ---
+  // --- METODO DI INIZIALIZZAZIONE (MODIFICATO) ---
   Future<void> init() async {
     debugPrint("🚀 HomeProvider: Inizializzazione...");
     await _loadCarsFromJson();
     await _loadHistory();
     await _loadContract();
+    await _loadSimulationParameters(); // <-- NUOVO: carica i parametri di simulazione
     notifyListeners();
   }
 
-  // --- GETTERS CALCOLATI ---
+  // --- NUOVO METODO: Carica i parametri di simulazione ---
+  Future<void> _loadSimulationParameters() async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      
+      // Carica SOC iniziale
+      currentSoc = prefs.getDouble(KEY_SOC_INIZIALE) ?? 20.0;
+      
+      // Carica SOC target
+      targetSoc = prefs.getDouble(KEY_SOC_TARGET) ?? 80.0;
+      
+      // Carica potenza wallbox
+      wallboxPwr = prefs.getDouble(KEY_WALLBOX_PWR) ?? 3.7;
+      
+      // Carica ora ready (salvata come ora e minuti separati)
+      final savedHour = prefs.getInt(KEY_READY_TIME_HOUR);
+      final savedMinute = prefs.getInt(KEY_READY_TIME_MINUTE);
+      
+      if (savedHour != null && savedMinute != null) {
+        readyTime = TimeOfDay(hour: savedHour, minute: savedMinute);
+      } else {
+        readyTime = const TimeOfDay(hour: 7, minute: 0);
+      }
+      
+      debugPrint("✅ Parametri caricati: SOC=$currentSoc, Target=$targetSoc, Potenza=$wallboxPwr, Ora=$readyTime");
+    } catch (e) {
+      debugPrint("❌ Errore caricamento parametri: $e");
+    }
+  }
+
+  // --- NUOVO METODO: Salva i parametri di simulazione ---
+  Future<void> _saveSimulationParameters() async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      
+      await prefs.setDouble(KEY_SOC_INIZIALE, currentSoc);
+      await prefs.setDouble(KEY_SOC_TARGET, targetSoc);
+      await prefs.setDouble(KEY_WALLBOX_PWR, wallboxPwr);
+      await prefs.setInt(KEY_READY_TIME_HOUR, readyTime.hour);
+      await prefs.setInt(KEY_READY_TIME_MINUTE, readyTime.minute);
+      
+      debugPrint("✅ Parametri salvati");
+    } catch (e) {
+      debugPrint("❌ Errore salvataggio parametri: $e");
+    }
+  }
+
+  // --- GETTERS CALCOLATI (invariati) ---
   double get currentBatteryCap => 
       double.tryParse(capacityController.text) ?? (carsLoaded ? selectedCar.batteryCapacity : 50.0);
   
@@ -90,7 +145,7 @@ class HomeProvider extends ChangeNotifier {
   bool get shouldShowCompletionDialog => _showCompletionDialog;
   void resetCompletionDialog() => _showCompletionDialog = false;
 
-  // --- METODI PRIVATI DI CARICAMENTO ---
+  // --- METODI PRIVATI DI CARICAMENTO (invariati) ---
   Future<void> _loadCarsFromJson() async {
     try {
       final String response = await rootBundle.loadString('assets/cars.json');
@@ -145,7 +200,7 @@ class HomeProvider extends ChangeNotifier {
     }
   }
 
-  // --- AZIONI ---
+  // --- AZIONI (MODIFICATE con salvataggio automatico) ---
   Future<void> saveHistory() async {
     try {
       final prefs = await SharedPreferences.getInstance();
@@ -161,10 +216,12 @@ class HomeProvider extends ChangeNotifier {
     }
   }
 
+  // MODIFICATO: Aggiunto salvataggio parametri
   void selectCar(CarModel car) {
     selectedCar = car;
     capacityController.text = car.batteryCapacity.toString();
     saveSelectedCar(car);
+    _saveSimulationParameters(); // <-- AGGIUNTO
     notifyListeners();
   }
 
@@ -174,10 +231,30 @@ class HomeProvider extends ChangeNotifier {
     await prefs.setString('selected_car_model', car.model);
   }
 
-  void updateReadyTime(TimeOfDay time) { readyTime = time; notifyListeners(); }
-  void updateWallboxPwr(double value) { wallboxPwr = value; notifyListeners(); }
-  void updateCurrentSoc(double value) { currentSoc = value; notifyListeners(); }
-  void updateTargetSoc(double value) { targetSoc = value; notifyListeners(); }
+  // MODIFICATI: Tutti gli update ora salvano i parametri
+  void updateReadyTime(TimeOfDay time) { 
+    readyTime = time; 
+    _saveSimulationParameters(); // <-- AGGIUNTO
+    notifyListeners(); 
+  }
+  
+  void updateWallboxPwr(double value) { 
+    wallboxPwr = value; 
+    _saveSimulationParameters(); // <-- AGGIUNTO
+    notifyListeners(); 
+  }
+  
+  void updateCurrentSoc(double value) { 
+    currentSoc = value; 
+    _saveSimulationParameters(); // <-- AGGIUNTO
+    notifyListeners(); 
+  }
+  
+  void updateTargetSoc(double value) { 
+    targetSoc = value; 
+    _saveSimulationParameters(); // <-- AGGIUNTO
+    notifyListeners(); 
+  }
 
   void addChargeSession(ChargeSession session) {
     chargeHistory.add(session);
@@ -202,5 +279,21 @@ class HomeProvider extends ChangeNotifier {
     await _loadHistory();
     await _loadContract();
     notifyListeners();
+  }
+
+  // --- NUOVO METODO: Reset parametri ai valori predefiniti ---
+  Future<void> resetToDefaults() async {
+    currentSoc = 20.0;
+    targetSoc = 80.0;
+    wallboxPwr = 3.7;
+    readyTime = const TimeOfDay(hour: 7, minute: 0);
+    
+    await _saveSimulationParameters();
+    notifyListeners();
+  }
+
+  // --- NUOVO METODO: Salvataggio forzato (utile prima di chiudere l'app) ---
+  Future<void> salvaTuttiParametri() async {
+    await _saveSimulationParameters();
   }
 }

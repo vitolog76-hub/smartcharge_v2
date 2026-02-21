@@ -19,145 +19,157 @@ class HomePage extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final authProvider = Provider.of<AuthProvider>(context, listen: false);
-    return Consumer<HomeProvider>(
-      builder: (context, provider, child) {
-        if (!provider.carsLoaded) {
-          return const Scaffold(
-            backgroundColor: Color(0xFF050507),
-            body: Center(child: CircularProgressIndicator(color: Colors.blueAccent)),
-          );
-        }
-
-        return Scaffold(
-          backgroundColor: const Color(0xFF050507),
-          extendBodyBehindAppBar: true,
-          appBar: AppBar(
-            title: ShaderMask(
-              shaderCallback: (bounds) => const LinearGradient(
-                colors: [Colors.cyanAccent, Colors.blueAccent],
-                begin: Alignment.topLeft,
-                end: Alignment.bottomRight,
-              ).createShader(bounds),
-              child: const Text(
-                "SMART CHARGE",
-                style: TextStyle(
-                  fontWeight: FontWeight.w900,
-                  fontSize: 18,
-                  letterSpacing: 2.5,
-                  color: Colors.white,
-                ),
-              ),
-            ),
-            centerTitle: true,
-            backgroundColor: Colors.transparent,
-            elevation: 0,
-            toolbarHeight: 50,
-            leading: IconButton(
-              icon: const Icon(Icons.history, color: Colors.white70, size: 22),
-              onPressed: () => Navigator.push(
-                context,
-                MaterialPageRoute(
-                  builder: (_) => HistoryPage(
-                    history: provider.chargeHistory,
-                    contract: provider.myContract,
-                    selectedCar: provider.selectedCar,
-                    onHistoryChanged: (updatedHistory) {
-                      provider.chargeHistory = updatedHistory;
-                      provider.saveHistory();
-                    },
-                  ),
-                ),
-              ),
-            ),
-            actions: [
-              IconButton(
-                icon: const Icon(Icons.settings, color: Colors.white70, size: 22),
-                onPressed: () async {
-                  await Navigator.push(
-                    context,
-                    MaterialPageRoute(
-                      builder: (_) => SettingsPage(
-                        contract: provider.myContract,
-                        selectedCar: provider.selectedCar,
-                        batteryValue: provider.capacityController.text,
-                        authProvider: authProvider,
-                      ),
-                    ),
-                  );
-                },
-              ),
-              const SizedBox(width: 8),
-            ],
-          ),
-          body: Stack(
-            children: [
-              // Bagliori ambientali di sfondo
-              Positioned(
-                top: -50,
-                left: -50,
-                child: _buildGlowSphere(200, Colors.blueAccent.withOpacity(0.12)),
-              ),
-              Positioned(
-                bottom: 100,
-                right: -80,
-                child: _buildGlowSphere(250, Colors.amberAccent.withOpacity(0.07)),
-              ),
-
-              SafeArea(
-                child: Padding(
-                  padding: const EdgeInsets.all(12),
-                  child: Column(
-                    children: [
-                      _glassContainer(child: ReadyTimeCard(provider: provider)),
-                      const SizedBox(height: 12),
-                      BatteryStatusRow(provider: provider),
-                      const SizedBox(height: 12),
-                      StatsRow(provider: provider),
-                      const SizedBox(height: 12),
-                      Expanded(
-                        flex: 4,
-                        child: _glassContainer(
-                          blur: 20,
-                          opacity: 0.08,
-                          child: ChargingControls(provider: provider),
-                        ),
-                      ),
-                      const SizedBox(height: 12),
-                      Row(
-                        children: [
-                          Expanded(
-                            flex: 12,
-                            child: _glassContainer(child: SimulationButton(provider: provider)),
-                          ),
-                          const SizedBox(width: 12),
-                          Expanded(
-                            flex: 18,
-                            child: _buildCarInfo(context, provider),
-                          ),
-                        ],
-                      ),
-                      const SizedBox(height: 12),
-                      _glassContainer(
-                        padding: const EdgeInsets.symmetric(vertical: 4),
-                        child: ActionButtons(
-                          onHomeTap: provider.isSimulating ? () {} : () => _showAddDialog(context, provider, "Home"),
-                          onPublicTap: provider.isSimulating ? () {} : () => _showAddDialog(context, provider, "Pubblica"),
-                        ),
-                      ),
-                      const SizedBox(height: 12),
-                      _buildEditCapacityTile(context, provider),
-                    ],
-                  ),
-                ),
-              ),
-            ],
-          ),
-        );
+    
+    // AGGIUNGI IL WillPopScope QUI
+    return WillPopScope(
+      onWillPop: () async {
+        // Salva i parametri quando l'utente preme back
+        final provider = Provider.of<HomeProvider>(context, listen: false);
+        await provider.salvaTuttiParametri();
+        return true; // Permetti la chiusura
       },
+      child: Consumer<HomeProvider>(
+        builder: (context, provider, child) {
+          if (!provider.carsLoaded) {
+            return const Scaffold(
+              backgroundColor: Color(0xFF050507),
+              body: Center(child: CircularProgressIndicator(color: Colors.blueAccent)),
+            );
+          }
+
+          return Scaffold(
+            backgroundColor: const Color(0xFF050507),
+            extendBodyBehindAppBar: true,
+            appBar: AppBar(
+              title: ShaderMask(
+                shaderCallback: (bounds) => const LinearGradient(
+                  colors: [Colors.cyanAccent, Colors.blueAccent],
+                  begin: Alignment.topLeft,
+                  end: Alignment.bottomRight,
+                ).createShader(bounds),
+                child: const Text(
+                  "SMART CHARGE",
+                  style: TextStyle(
+                    fontWeight: FontWeight.w900,
+                    fontSize: 18,
+                    letterSpacing: 2.5,
+                    color: Colors.white,
+                  ),
+                ),
+              ),
+              centerTitle: true,
+              backgroundColor: Colors.transparent,
+              elevation: 0,
+              toolbarHeight: 50,
+              leading: IconButton(
+                icon: const Icon(Icons.history, color: Colors.white70, size: 22),
+                onPressed: () => Navigator.push(
+                  context,
+                  MaterialPageRoute(
+                    builder: (_) => HistoryPage(
+                      history: provider.chargeHistory,
+                      contract: provider.myContract,
+                      selectedCar: provider.selectedCar,
+                      onHistoryChanged: (updatedHistory) {
+                        provider.chargeHistory = updatedHistory;
+                        provider.saveHistory();
+                      },
+                    ),
+                  ),
+                ),
+              ),
+              actions: [
+                IconButton(
+                  icon: const Icon(Icons.settings, color: Colors.white70, size: 22),
+                  onPressed: () async {
+                    await Navigator.push(
+                      context,
+                      MaterialPageRoute(
+                        builder: (_) => SettingsPage(
+                          contract: provider.myContract,
+                          selectedCar: provider.selectedCar,
+                          batteryValue: provider.capacityController.text,
+                          authProvider: authProvider,
+                        ),
+                      ),
+                    );
+                    // Ricarica i dati quando torni dalle impostazioni
+                    await provider.refreshAfterSettings();
+                  },
+                ),
+                const SizedBox(width: 8),
+              ],
+            ),
+            body: Stack(
+              children: [
+                // Bagliori ambientali di sfondo
+                Positioned(
+                  top: -50,
+                  left: -50,
+                  child: _buildGlowSphere(200, Colors.blueAccent.withOpacity(0.12)),
+                ),
+                Positioned(
+                  bottom: 100,
+                  right: -80,
+                  child: _buildGlowSphere(250, Colors.amberAccent.withOpacity(0.07)),
+                ),
+
+                SafeArea(
+                  child: Padding(
+                    padding: const EdgeInsets.all(12),
+                    child: Column(
+                      children: [
+                        _glassContainer(child: ReadyTimeCard(provider: provider)),
+                        const SizedBox(height: 12),
+                        BatteryStatusRow(provider: provider),
+                        const SizedBox(height: 12),
+                        StatsRow(provider: provider),
+                        const SizedBox(height: 12),
+                        Expanded(
+                          flex: 4,
+                          child: _glassContainer(
+                            blur: 20,
+                            opacity: 0.08,
+                            child: ChargingControls(provider: provider),
+                          ),
+                        ),
+                        const SizedBox(height: 12),
+                        Row(
+                          children: [
+                            Expanded(
+                              flex: 12,
+                              child: _glassContainer(child: SimulationButton(provider: provider)),
+                            ),
+                            const SizedBox(width: 12),
+                            Expanded(
+                              flex: 18,
+                              child: _buildCarInfo(context, provider),
+                            ),
+                          ],
+                        ),
+                        const SizedBox(height: 12),
+                        _glassContainer(
+                          padding: const EdgeInsets.symmetric(vertical: 4),
+                          child: ActionButtons(
+                            onHomeTap: provider.isSimulating ? () {} : () => _showAddDialog(context, provider, "Home"),
+                            onPublicTap: provider.isSimulating ? () {} : () => _showAddDialog(context, provider, "Pubblica"),
+                          ),
+                        ),
+                        const SizedBox(height: 12),
+                        _buildEditCapacityTile(context, provider),
+                      ],
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          );
+        },
+      ),
     );
   }
 
-  // --- WIDGET RIGA CAPACITÀ CON EFFETTO NEON ---
+  // --- TUTTI I METODI ESISTENTI INVARIATI ---
   Widget _buildEditCapacityTile(BuildContext context, HomeProvider provider) {
     return GestureDetector(
       onTap: () => _showEditCapacityDialog(context, provider),
@@ -203,7 +215,6 @@ class HomePage extends StatelessWidget {
     );
   }
 
-  // --- DIALOG MODIFICA CAPACITÀ ---
   void _showEditCapacityDialog(BuildContext context, HomeProvider provider) {
     final TextEditingController tempController = TextEditingController(text: provider.capacityController.text);
     showDialog(
@@ -263,7 +274,6 @@ class HomePage extends StatelessWidget {
     );
   }
 
-  // --- HELPERS GRAFICI ---
   Widget _glassContainer({required Widget child, double blur = 15, double opacity = 0.05, EdgeInsets? padding}) {
     return ClipRRect(
       borderRadius: BorderRadius.circular(20),
@@ -377,7 +387,10 @@ class HomePage extends StatelessWidget {
                             leading: const Icon(Icons.directions_car, color: Colors.white70),
                             title: Text("${car.brand} ${car.model}", style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w600)),
                             trailing: Text("${car.batteryCapacity} kWh", style: const TextStyle(color: Colors.amberAccent, fontWeight: FontWeight.bold)),
-                            onTap: () { provider.selectCar(car); Navigator.pop(context); },
+                            onTap: () { 
+                              provider.selectCar(car); 
+                              Navigator.pop(context); 
+                            },
                           ),
                         );
                       },
