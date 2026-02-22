@@ -16,6 +16,8 @@ import 'package:smartcharge_v2/screens/settings_page.dart';
 class HomePage extends StatelessWidget {
   const HomePage({super.key});
 
+  static bool _completionDialogShown = false;
+
   @override
   Widget build(BuildContext context) {
     final authProvider = Provider.of<AuthProvider>(context, listen: false);
@@ -35,11 +37,11 @@ class HomePage extends StatelessWidget {
             );
           }
 
-          // 🔥 Mostra dialog quando simulazione completata
-          if (provider.shouldShowCompletionDialog) {
+          if (provider.shouldShowCompletionDialog && !_completionDialogShown) {
             WidgetsBinding.instance.addPostFrameCallback((_) {
-              _showCompletionDialog(context, provider);
-              provider.resetCompletionDialog();
+              if (context.mounted) {
+                _showCompletionDialog(context, provider);
+              }
             });
           }
 
@@ -107,7 +109,6 @@ class HomePage extends StatelessWidget {
             ),
             body: Stack(
               children: [
-                // Bagliori ambientali di sfondo
                 Positioned(
                   top: -50,
                   left: -50,
@@ -118,7 +119,6 @@ class HomePage extends StatelessWidget {
                   right: -80,
                   child: _buildGlowSphere(250, Colors.amberAccent.withOpacity(0.07)),
                 ),
-
                 SafeArea(
                   child: Padding(
                     padding: const EdgeInsets.all(12),
@@ -174,7 +174,6 @@ class HomePage extends StatelessWidget {
     );
   }
 
-  // --- WIDGET RIGA CAPACITÀ CON EFFETTO NEON ---
   Widget _buildEditCapacityTile(BuildContext context, HomeProvider provider) {
     return GestureDetector(
       onTap: () => _showEditCapacityDialog(context, provider),
@@ -220,7 +219,6 @@ class HomePage extends StatelessWidget {
     );
   }
 
-  // --- DIALOG MODIFICA CAPACITÀ ---
   void _showEditCapacityDialog(BuildContext context, HomeProvider provider) {
     final TextEditingController tempController = TextEditingController(text: provider.capacityController.text);
     showDialog(
@@ -280,48 +278,56 @@ class HomePage extends StatelessWidget {
     );
   }
 
-  // 🔥 DIALOG DI COMPLETAMENTO SIMULAZIONE
   void _showCompletionDialog(BuildContext context, HomeProvider provider) {
+    _completionDialogShown = true;
+    provider.saveCurrentCharge();
+    
     showDialog(
       context: context,
-      builder: (ctx) => AlertDialog(
-        backgroundColor: const Color(0xFF1E1E1E),
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
-        title: const Text(
-          '⚡ Ricarica Completata!',
-          style: TextStyle(color: Colors.cyanAccent, fontWeight: FontWeight.bold),
-          textAlign: TextAlign.center,
-        ),
-        content: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            const Icon(Icons.check_circle, color: Colors.green, size: 50),
-            const SizedBox(height: 16),
-            Text(
-              'SOC finale: ${provider.targetSoc.toStringAsFixed(0)}%',
-              style: const TextStyle(color: Colors.white70, fontSize: 16),
-            ),
-            Text(
-              'Energia: ${provider.energyNeeded.toStringAsFixed(1)} kWh',
-              style: const TextStyle(color: Colors.white70, fontSize: 16),
-            ),
-            Text(
-              'Durata: ${_formatDuration(provider.duration)}',
-              style: const TextStyle(color: Colors.white70, fontSize: 16),
+      barrierDismissible: false,
+      builder: (ctx) {
+        return AlertDialog(
+          backgroundColor: const Color(0xFF1E1E1E),
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+          title: const Text(
+            '⚡ Ricarica Completata!',
+            style: TextStyle(color: Colors.cyanAccent, fontWeight: FontWeight.bold),
+            textAlign: TextAlign.center,
+          ),
+          content: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              const Icon(Icons.check_circle, color: Colors.green, size: 50),
+              const SizedBox(height: 16),
+              Text(
+                'SOC finale: ${provider.targetSoc.toStringAsFixed(0)}%',
+                style: const TextStyle(color: Colors.white70, fontSize: 16),
+              ),
+              Text(
+                'Energia: ${provider.energyNeeded.toStringAsFixed(1)} kWh',
+                style: const TextStyle(color: Colors.white70, fontSize: 16),
+              ),
+              Text(
+                'Durata: ${_formatDuration(provider.duration)}',
+                style: const TextStyle(color: Colors.white70, fontSize: 16),
+              ),
+            ],
+          ),
+          actions: [
+            TextButton(
+              onPressed: () {
+                provider.resetCompletionDialog();
+                Navigator.of(ctx).pop();
+                _completionDialogShown = false;
+              },
+              child: const Text('OK', style: TextStyle(color: Colors.cyanAccent)),
             ),
           ],
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(ctx),
-            child: const Text('OK', style: TextStyle(color: Colors.cyanAccent)),
-          ),
-        ],
-      ),
+        );
+      },
     );
   }
 
-  // 🔥 FORMATTATORE DURATA
   String _formatDuration(Duration duration) {
     String twoDigits(int n) => n.toString().padLeft(2, '0');
     String hours = twoDigits(duration.inHours);
@@ -329,7 +335,6 @@ class HomePage extends StatelessWidget {
     return '$hours:$minutes h';
   }
 
-  // --- HELPERS GRAFICI ---
   Widget _glassContainer({required Widget child, double blur = 15, double opacity = 0.05, EdgeInsets? padding}) {
     return ClipRRect(
       borderRadius: BorderRadius.circular(20),
@@ -466,7 +471,6 @@ class HomePage extends StatelessWidget {
   }
 }
 
-// --- WIDGET PER L'ANIMAZIONE DI PULSAZIONE ---
 class _PulseIcon extends StatefulWidget {
   final Widget child;
   const _PulseIcon({required this.child});

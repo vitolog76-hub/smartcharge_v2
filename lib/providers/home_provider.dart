@@ -65,23 +65,24 @@ class HomeProvider extends ChangeNotifier {
   }
 
   Future<void> init() async {
-  debugPrint("🚀 HomeProvider: Inizializzazione...");
-  
-  // 1. Prima carica le auto (serve per selectedCar)
-  await _loadCarsFromJson();
-  
-  // 2. Poi carica i parametri (usa selectedCar)
-  await _loadSimulationParameters();
-  
-  // 3. Poi carica il contratto
-  await _loadContract();
-  
-  // 4. INFINE carica lo storico (ORA selectedCar è disponibile!)
-  await _loadHistory();
-  
-  notifyListeners();
-  debugPrint("✅ HomeProvider: Inizializzazione completata");
-}
+    debugPrint("🚀 HomeProvider: Inizializzazione...");
+    
+    // 1. Prima carica le auto (serve per selectedCar)
+    await _loadCarsFromJson();
+    
+    // 2. Poi carica i parametri (usa selectedCar)
+    await _loadSimulationParameters();
+    
+    // 3. Poi carica il contratto
+    await _loadContract();
+    
+    // 4. INFINE carica lo storico (ORA selectedCar è disponibile!)
+    await _loadHistory();
+    
+    notifyListeners();
+    debugPrint("✅ HomeProvider: Inizializzazione completata");
+  }
+
   // --- NUOVO METODO: Salva la ricarica completata ---
   void _saveCompletedCharge() {
     try {
@@ -101,7 +102,7 @@ class HomeProvider extends ChangeNotifier {
         endSoc: targetSoc,
         kwh: energyNeeded,
         cost: estimatedCost,
-        location: "Home", // Di default "Home", poi verrà modificato da AddChargeDialog
+        location: "Home",
         carBrand: selectedCar.brand,
         carModel: selectedCar.model,
         wallboxPower: wallboxPwr,
@@ -111,6 +112,13 @@ class HomeProvider extends ChangeNotifier {
       debugPrint('✅ Ricarica salvata nello storico con ID: ${session.id}');
     } catch (e) {
       debugPrint('❌ Errore nel salvataggio della ricarica: $e');
+    }
+  }
+
+  // --- METODO PER SALVARE LA RICARICA CORRENTE (chiamato da HomePage) ---
+  void saveCurrentCharge() {
+    if (_socAtStartOfSim < targetSoc) {
+      _saveCompletedCharge();
     }
   }
 
@@ -215,148 +223,147 @@ class HomeProvider extends ChangeNotifier {
     }
   }
 
-Future<void> _loadHistory() async {
-  try {
-    final prefs = await SharedPreferences.getInstance();
-    final String? historyData = prefs.getString('charge_history');
-    
-    if (historyData != null && historyData.isNotEmpty) {
-      debugPrint('📂 Trovato storico: ${historyData.length} caratteri');
-      final List<dynamic> decodedData = jsonDecode(historyData);
-      debugPrint('📊 Elementi trovati: ${decodedData.length}');
+  Future<void> _loadHistory() async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      final String? historyData = prefs.getString('charge_history');
       
-      // 🔥 MIGRAZIONE: Gestisci vecchi dati
-      final List<ChargeSession> migratedHistory = [];
-      int migratedCount = 0;
-      int keptCount = 0;
-      
-      for (var item in decodedData) {
-        try {
-          // Prova a parsare come nuovo formato
-          final session = ChargeSession.fromJson(item);
-          migratedHistory.add(session);
-          keptCount++;
-        } catch (e) {
-          debugPrint('🔄 Migrazione necessaria per un elemento: $e');
-          migratedCount++;
-          
-          // Se fallisce, è un vecchio formato - converti
+      if (historyData != null && historyData.isNotEmpty) {
+        debugPrint('📂 Trovato storico: ${historyData.length} caratteri');
+        final List<dynamic> decodedData = jsonDecode(historyData);
+        debugPrint('📊 Elementi trovati: ${decodedData.length}');
+        
+        // 🔥 MIGRAZIONE: Gestisci vecchi dati
+        final List<ChargeSession> migratedHistory = [];
+        int migratedCount = 0;
+        int keptCount = 0;
+        
+        for (var item in decodedData) {
           try {
-            // Estrai dati dal vecchio formato
-            final oldDate = DateTime.parse(item['date']);
-            final oldKwh = item['kwh'] is int 
-                ? (item['kwh'] as int).toDouble() 
-                : item['kwh'].toDouble();
-            final oldCost = item['cost'] is int 
-                ? (item['cost'] as int).toDouble() 
-                : item['cost'].toDouble();
-            final oldLocation = item['location'] ?? "Home";
+            // Prova a parsare come nuovo formato
+            final session = ChargeSession.fromJson(item);
+            migratedHistory.add(session);
+            keptCount++;
+          } catch (e) {
+            debugPrint('🔄 Migrazione necessaria per un elemento: $e');
+            migratedCount++;
             
-            // Recupera startHour/startMinute se esistono
-            int startHour = 8;
-            int startMinute = 0;
-            int endHour = TimeOfDay.now().hour;
-            int endMinute = TimeOfDay.now().minute;
-            
-            if (item.containsKey('startHour')) {
-              startHour = item['startHour'] is int 
-                  ? item['startHour'] 
-                  : int.tryParse(item['startHour'].toString()) ?? 8;
+            // Se fallisce, è un vecchio formato - converti
+            try {
+              // Estrai dati dal vecchio formato
+              final oldDate = DateTime.parse(item['date']);
+              final oldKwh = item['kwh'] is int 
+                  ? (item['kwh'] as int).toDouble() 
+                  : item['kwh'].toDouble();
+              final oldCost = item['cost'] is int 
+                  ? (item['cost'] as int).toDouble() 
+                  : item['cost'].toDouble();
+              final oldLocation = item['location'] ?? "Home";
+              
+              // Recupera startHour/startMinute se esistono
+              int startHour = 8;
+              int startMinute = 0;
+              int endHour = TimeOfDay.now().hour;
+              int endMinute = TimeOfDay.now().minute;
+              
+              if (item.containsKey('startHour')) {
+                startHour = item['startHour'] is int 
+                    ? item['startHour'] 
+                    : int.tryParse(item['startHour'].toString()) ?? 8;
+              }
+              
+              if (item.containsKey('startMinute')) {
+                startMinute = item['startMinute'] is int 
+                    ? item['startMinute'] 
+                    : int.tryParse(item['startMinute'].toString()) ?? 0;
+              }
+              
+              if (item.containsKey('endHour')) {
+                endHour = item['endHour'] is int 
+                    ? item['endHour'] 
+                    : int.tryParse(item['endHour'].toString()) ?? TimeOfDay.now().hour;
+              }
+              
+              if (item.containsKey('endMinute')) {
+                endMinute = item['endMinute'] is int 
+                    ? item['endMinute'] 
+                    : int.tryParse(item['endMinute'].toString()) ?? TimeOfDay.now().minute;
+              }
+              
+              final startDateTime = DateTime(
+                oldDate.year,
+                oldDate.month,
+                oldDate.day,
+                startHour,
+                startMinute,
+              );
+              
+              final endDateTime = DateTime(
+                oldDate.year,
+                oldDate.month,
+                oldDate.day,
+                endHour,
+                endMinute,
+              );
+              
+              // Stima SOC basato su kWh se possibile
+              double startSoc = 20.0;
+              double endSoc = 80.0;
+              
+              if (selectedCar.batteryCapacity > 0 && oldKwh > 0) {
+                final percentIncrease = (oldKwh / selectedCar.batteryCapacity) * 100;
+                endSoc = startSoc + percentIncrease;
+                if (endSoc > 100) endSoc = 100;
+                if (endSoc < 0) endSoc = 80;
+              }
+              
+              // Crea nuova sessione
+              final migratedSession = ChargeSession(
+                id: 'migrated_${DateTime.now().millisecondsSinceEpoch}_${migratedHistory.length}',
+                date: oldDate,
+                startDateTime: startDateTime,
+                endDateTime: endDateTime,
+                startSoc: startSoc,
+                endSoc: endSoc,
+                kwh: oldKwh,
+                cost: oldCost,
+                location: oldLocation,
+                carBrand: selectedCar.brand,
+                carModel: selectedCar.model,
+                wallboxPower: 3.7,
+              );
+              
+              migratedHistory.add(migratedSession);
+              debugPrint('✅ Migrata sessione del ${DateFormat('dd/MM/yyyy').format(oldDate)}');
+            } catch (migrationError) {
+              debugPrint('❌ Errore migrazione: $migrationError');
             }
-            
-            if (item.containsKey('startMinute')) {
-              startMinute = item['startMinute'] is int 
-                  ? item['startMinute'] 
-                  : int.tryParse(item['startMinute'].toString()) ?? 0;
-            }
-            
-            if (item.containsKey('endHour')) {
-              endHour = item['endHour'] is int 
-                  ? item['endHour'] 
-                  : int.tryParse(item['endHour'].toString()) ?? TimeOfDay.now().hour;
-            }
-            
-            if (item.containsKey('endMinute')) {
-              endMinute = item['endMinute'] is int 
-                  ? item['endMinute'] 
-                  : int.tryParse(item['endMinute'].toString()) ?? TimeOfDay.now().minute;
-            }
-            
-            final startDateTime = DateTime(
-              oldDate.year,
-              oldDate.month,
-              oldDate.day,
-              startHour,
-              startMinute,
-            );
-            
-            final endDateTime = DateTime(
-              oldDate.year,
-              oldDate.month,
-              oldDate.day,
-              endHour,
-              endMinute,
-            );
-            
-            // Stima SOC basato su kWh se possibile
-            double startSoc = 20.0;
-            double endSoc = 80.0;
-            
-            if (selectedCar.batteryCapacity > 0 && oldKwh > 0) {
-              // Stima: se ha caricato X kWh, quanta percentuale è?
-              final percentIncrease = (oldKwh / selectedCar.batteryCapacity) * 100;
-              endSoc = startSoc + percentIncrease;
-              if (endSoc > 100) endSoc = 100;
-              if (endSoc < 0) endSoc = 80;
-            }
-            
-            // Crea nuova sessione
-            final migratedSession = ChargeSession(
-              id: 'migrated_${DateTime.now().millisecondsSinceEpoch}_${migratedHistory.length}',
-              date: oldDate,
-              startDateTime: startDateTime,
-              endDateTime: endDateTime,
-              startSoc: startSoc,
-              endSoc: endSoc,
-              kwh: oldKwh,
-              cost: oldCost,
-              location: oldLocation,
-              carBrand: selectedCar.brand,
-              carModel: selectedCar.model,
-              wallboxPower: 3.7,
-            );
-            
-            migratedHistory.add(migratedSession);
-            debugPrint('✅ Migrata sessione del ${DateFormat('dd/MM/yyyy').format(oldDate)}');
-          } catch (migrationError) {
-            debugPrint('❌ Errore migrazione: $migrationError');
           }
         }
+        
+        chargeHistory = migratedHistory;
+        debugPrint('✅ Storico caricato: $keptCount mantenuti, $migratedCount migrati, totale ${chargeHistory.length} sessioni');
+        
+        // Salva il formato migrato se ci sono state conversioni
+        if (migratedCount > 0) {
+          debugPrint('💾 Salvataggio storico migrato...');
+          await saveHistory();
+        }
+      } else {
+        chargeHistory = [];
+        debugPrint('📭 Nessuno storico trovato');
       }
-      
-      chargeHistory = migratedHistory;
-      debugPrint('✅ Storico caricato: $keptCount mantenuti, $migratedCount migrati, totale ${chargeHistory.length} sessioni');
-      
-      // Salva il formato migrato se ci sono state conversioni
-      if (migratedCount > 0) {
-        debugPrint('💾 Salvataggio storico migrato...');
-        await saveHistory();
-      }
-    } else {
+    } catch (e) {
+      debugPrint("❌ Errore caricamento storico: $e");
       chargeHistory = [];
-      debugPrint('📭 Nessuno storico trovato');
     }
-  } catch (e) {
-    debugPrint("❌ Errore caricamento storico: $e");
-    chargeHistory = [];
   }
-}
 
-Future<void> forceMigrateHistory() async {
-  debugPrint('🔄 Forzatura migrazione storico...');
-  await _loadHistory();
-  debugPrint('✅ Migrazione completata: ${chargeHistory.length} sessioni');
-}
+  Future<void> forceMigrateHistory() async {
+    debugPrint('🔄 Forzatura migrazione storico...');
+    await _loadHistory();
+    debugPrint('✅ Migrazione completata: ${chargeHistory.length} sessioni');
+  }
 
   Future<void> _loadContract() async {
     try {
