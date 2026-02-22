@@ -9,11 +9,7 @@ class ChargingControls extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Container(
-      padding: const EdgeInsets.symmetric(vertical: 6, horizontal: 16), // 🔥 VERTICALE RIDOTTO
-      decoration: BoxDecoration(
-        color: const Color(0xFF111111),
-        borderRadius: BorderRadius.circular(20),
-      ),
+      padding: const EdgeInsets.symmetric(vertical: 6, horizontal: 16),
       child: Column(
         mainAxisAlignment: MainAxisAlignment.spaceEvenly,
         children: [
@@ -37,7 +33,7 @@ class ChargingControls extends StatelessWidget {
               }
             },
           ),
-          const SizedBox(height: 4), // 🔥 DA 8 A 4
+          const SizedBox(height: 4),
           _buildSliderRow(
             label: "SOC INIZIALE",
             value: provider.currentSoc,
@@ -58,7 +54,7 @@ class ChargingControls extends StatelessWidget {
               }
             },
           ),
-          const SizedBox(height: 4), // 🔥 DA 8 A 4
+          const SizedBox(height: 4),
           _buildSliderRow(
             label: "SOC FINALE",
             value: provider.targetSoc,
@@ -132,15 +128,15 @@ class ChargingControls extends StatelessWidget {
             ),
           ],
         ),
-        const SizedBox(height: 2), // 🔥 DA 4 A 2
+        const SizedBox(height: 2),
         Row(
           children: [
             InkWell(
               onTap: onDecrement,
               borderRadius: BorderRadius.circular(16),
               child: Container(
-                width: 26, // 🔥 DA 28 A 26 (leggermente più piccoli)
-                height: 26, // 🔥 DA 28 A 26
+                width: 26,
+                height: 26,
                 decoration: BoxDecoration(
                   color: color.withOpacity(0.1),
                   shape: BoxShape.circle,
@@ -149,17 +145,17 @@ class ChargingControls extends StatelessWidget {
                 child: Icon(
                   Icons.remove,
                   color: color,
-                  size: 14, // 🔥 DA 16 A 14
+                  size: 14,
                 ),
               ),
             ),
-            const SizedBox(width: 6), // 🔥 DA 8 A 6
+            const SizedBox(width: 6),
             Expanded(
               child: SliderTheme(
                 data: SliderThemeData(
-                  trackHeight: 2, // 🔥 DA 3 A 2
-                  thumbShape: const RoundSliderThumbShape(enabledThumbRadius: 7), // 🔥 DA 8 A 7
-                  overlayShape: const RoundSliderOverlayShape(overlayRadius: 10), // 🔥 DA 12 A 10
+                  trackHeight: 2,
+                  thumbShape: const RoundSliderThumbShape(enabledThumbRadius: 7),
+                  overlayShape: const RoundSliderOverlayShape(overlayRadius: 10),
                   activeTrackColor: color,
                   inactiveTrackColor: color.withOpacity(0.2),
                   thumbColor: color,
@@ -174,13 +170,13 @@ class ChargingControls extends StatelessWidget {
                 ),
               ),
             ),
-            const SizedBox(width: 6), // 🔥 DA 8 A 6
+            const SizedBox(width: 6),
             InkWell(
               onTap: onIncrement,
               borderRadius: BorderRadius.circular(16),
               child: Container(
-                width: 26, // 🔥 DA 28 A 26
-                height: 26, // 🔥 DA 28 A 26
+                width: 26,
+                height: 26,
                 decoration: BoxDecoration(
                   color: color.withOpacity(0.1),
                   shape: BoxShape.circle,
@@ -189,7 +185,7 @@ class ChargingControls extends StatelessWidget {
                 child: Icon(
                   Icons.add,
                   color: color,
-                  size: 14, // 🔥 DA 16 A 14
+                  size: 14,
                 ),
               ),
             ),

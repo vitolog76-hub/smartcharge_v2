@@ -440,16 +440,19 @@ class HomeProvider extends ChangeNotifier {
   }
 
   void startSimulation() {
-    debugPrint('🚀 Avvio simulazione - SOC iniziale: $currentSoc%, Target: $targetSoc%');
-    _socAtStartOfSim = currentSoc;
-    simService.initSimulation(
-      startDateTime: calculatedStartDateTime,
-      currentSoc: currentSoc,
-      targetSoc: targetSoc,
-      pwr: wallboxPwr,
-      cap: currentBatteryCap,
-    );
-  }
+  debugPrint('🚀 Avvio simulazione - SOC iniziale: $currentSoc%, Target: $targetSoc%');
+  _socAtStartOfSim = currentSoc;
+  simService.initSimulation(
+    startDateTime: calculatedStartDateTime,
+    currentSoc: currentSoc,
+    targetSoc: targetSoc,
+    pwr: wallboxPwr,
+    cap: currentBatteryCap,
+  );
+  // 🔥 MANCA QUESTA RIGA!
+  isSimulating = true;  // <-- DEVI AGGIUNGERE QUESTA
+  notifyListeners();
+}
 
   void stopSimulation() {
     debugPrint('⏹️ Simulazione fermata manualmente');

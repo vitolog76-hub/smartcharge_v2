@@ -32,7 +32,7 @@ class HomePage extends StatelessWidget {
         builder: (context, provider, child) {
           if (!provider.carsLoaded) {
             return const Scaffold(
-              backgroundColor: Color(0xFF050507),
+              backgroundColor: const Color(0xFF0A0F1E),
               body: Center(child: CircularProgressIndicator(color: Colors.blueAccent)),
             );
           }
@@ -46,7 +46,7 @@ class HomePage extends StatelessWidget {
           }
 
           return Scaffold(
-            backgroundColor: const Color(0xFF050507),
+            backgroundColor: const Color.fromARGB(255, 3, 3, 50),
             extendBodyBehindAppBar: true,
             appBar: AppBar(
               title: ShaderMask(
