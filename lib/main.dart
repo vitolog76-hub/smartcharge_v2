@@ -6,6 +6,7 @@ import 'package:smartcharge_v2/providers/auth_provider.dart';
 import 'package:smartcharge_v2/providers/home_provider.dart';
 import 'package:smartcharge_v2/screens/login_page.dart';
 import 'package:smartcharge_v2/screens/home_page.dart';
+import 'package:smartcharge_v2/services/notification_service.dart';  // <-- AGGIUNGI QUESTO IMPORT
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -24,6 +25,9 @@ void main() async {
 
   // 🔥 Inizializza le date in italiano
   await initializeDateFormatting('it_IT', null);
+  
+  // 🔥 Inizializza le notifiche (AGGIUNGI QUESTA RIGA)
+  await NotificationService().init();
 
   runApp(const MyApp());
 }

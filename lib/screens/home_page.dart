@@ -20,13 +20,11 @@ class HomePage extends StatelessWidget {
   Widget build(BuildContext context) {
     final authProvider = Provider.of<AuthProvider>(context, listen: false);
     
-    // AGGIUNGI IL WillPopScope QUI
     return WillPopScope(
       onWillPop: () async {
-        // Salva i parametri quando l'utente preme back
         final provider = Provider.of<HomeProvider>(context, listen: false);
         await provider.salvaTuttiParametri();
-        return true; // Permetti la chiusura
+        return true;
       },
       child: Consumer<HomeProvider>(
         builder: (context, provider, child) {
@@ -35,6 +33,14 @@ class HomePage extends StatelessWidget {
               backgroundColor: Color(0xFF050507),
               body: Center(child: CircularProgressIndicator(color: Colors.blueAccent)),
             );
+          }
+
+          // 🔥 Mostra dialog quando simulazione completata
+          if (provider.shouldShowCompletionDialog) {
+            WidgetsBinding.instance.addPostFrameCallback((_) {
+              _showCompletionDialog(context, provider);
+              provider.resetCompletionDialog();
+            });
           }
 
           return Scaffold(
@@ -93,7 +99,6 @@ class HomePage extends StatelessWidget {
                         ),
                       ),
                     );
-                    // Ricarica i dati quando torni dalle impostazioni
                     await provider.refreshAfterSettings();
                   },
                 ),
@@ -169,7 +174,7 @@ class HomePage extends StatelessWidget {
     );
   }
 
-  // --- TUTTI I METODI ESISTENTI INVARIATI ---
+  // --- WIDGET RIGA CAPACITÀ CON EFFETTO NEON ---
   Widget _buildEditCapacityTile(BuildContext context, HomeProvider provider) {
     return GestureDetector(
       onTap: () => _showEditCapacityDialog(context, provider),
@@ -215,6 +220,7 @@ class HomePage extends StatelessWidget {
     );
   }
 
+  // --- DIALOG MODIFICA CAPACITÀ ---
   void _showEditCapacityDialog(BuildContext context, HomeProvider provider) {
     final TextEditingController tempController = TextEditingController(text: provider.capacityController.text);
     showDialog(
@@ -274,6 +280,56 @@ class HomePage extends StatelessWidget {
     );
   }
 
+  // 🔥 DIALOG DI COMPLETAMENTO SIMULAZIONE
+  void _showCompletionDialog(BuildContext context, HomeProvider provider) {
+    showDialog(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        backgroundColor: const Color(0xFF1E1E1E),
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+        title: const Text(
+          '⚡ Ricarica Completata!',
+          style: TextStyle(color: Colors.cyanAccent, fontWeight: FontWeight.bold),
+          textAlign: TextAlign.center,
+        ),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            const Icon(Icons.check_circle, color: Colors.green, size: 50),
+            const SizedBox(height: 16),
+            Text(
+              'SOC finale: ${provider.targetSoc.toStringAsFixed(0)}%',
+              style: const TextStyle(color: Colors.white70, fontSize: 16),
+            ),
+            Text(
+              'Energia: ${provider.energyNeeded.toStringAsFixed(1)} kWh',
+              style: const TextStyle(color: Colors.white70, fontSize: 16),
+            ),
+            Text(
+              'Durata: ${_formatDuration(provider.duration)}',
+              style: const TextStyle(color: Colors.white70, fontSize: 16),
+            ),
+          ],
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx),
+            child: const Text('OK', style: TextStyle(color: Colors.cyanAccent)),
+          ),
+        ],
+      ),
+    );
+  }
+
+  // 🔥 FORMATTATORE DURATA
+  String _formatDuration(Duration duration) {
+    String twoDigits(int n) => n.toString().padLeft(2, '0');
+    String hours = twoDigits(duration.inHours);
+    String minutes = twoDigits(duration.inMinutes.remainder(60));
+    return '$hours:$minutes h';
+  }
+
+  // --- HELPERS GRAFICI ---
   Widget _glassContainer({required Widget child, double blur = 15, double opacity = 0.05, EdgeInsets? padding}) {
     return ClipRRect(
       borderRadius: BorderRadius.circular(20),
