@@ -2,8 +2,8 @@ import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 import 'package:smartcharge_v2/providers/home_provider.dart';
 import 'package:smartcharge_v2/models/charge_session.dart';
+import 'package:smartcharge_v2/models/contract_model.dart';
 import 'package:smartcharge_v2/services/charge_engine.dart';
-import 'package:smartcharge_v2/services/cost_calculator.dart';
 
 class AddChargeDialog extends StatefulWidget {
   final HomeProvider provider;
@@ -28,7 +28,6 @@ class _AddChargeDialogState extends State<AddChargeDialog> {
   late TextEditingController startSocCtrl;
   late TextEditingController endSocCtrl;
   late TextEditingController kwhCtrl;
-  late TextEditingController priceCtrl;
   late TextEditingController wallboxPowerCtrl;
 
   @override
@@ -42,12 +41,6 @@ class _AddChargeDialogState extends State<AddChargeDialog> {
     endSocCtrl = TextEditingController(text: widget.provider.targetSoc.toStringAsFixed(0));
     kwhCtrl = TextEditingController(text: "10.0");
     wallboxPowerCtrl = TextEditingController(text: widget.provider.wallboxPwr.toStringAsFixed(1));
-    
-    priceCtrl = TextEditingController(
-      text: widget.tipo == "Home" 
-          ? widget.provider.myContract.f1Price.toStringAsFixed(2)
-          : "0.65"
-    );
   }
 
   @override
@@ -55,7 +48,6 @@ class _AddChargeDialogState extends State<AddChargeDialog> {
     startSocCtrl.dispose();
     endSocCtrl.dispose();
     kwhCtrl.dispose();
-    priceCtrl.dispose();
     wallboxPowerCtrl.dispose();
     super.dispose();
   }
@@ -76,6 +68,95 @@ class _AddChargeDialogState extends State<AddChargeDialog> {
     if (calculated > 0) {
       kwhCtrl.text = calculated.toStringAsFixed(1);
     }
+  }
+
+  // 🔥 CALCOLO COSTO PER FASCE ORARIE
+  double _calculateCostByTariff(
+    double kwh,
+    DateTime startDateTime,
+    DateTime endDateTime,
+    EnergyContract contract,
+  ) {
+    debugPrint('💰 Calcolo costo con contratto:');
+    debugPrint('   isMonorario: ${contract.isMonorario}');
+    debugPrint('   f1Price: ${contract.f1Price}');
+    debugPrint('   f2Price: ${contract.f2Price}');
+    debugPrint('   f3Price: ${contract.f3Price}');
+    
+    if (contract.isMonorario) {
+      final cost = kwh * contract.f1Price;
+      debugPrint('   Monorario: $kwh kWh × ${contract.f1Price}€ = ${cost.toStringAsFixed(2)}€');
+      return cost;
+    }
+
+    double totalCost = 0;
+    DateTime current = startDateTime;
+    final totalHours = endDateTime.difference(startDateTime).inHours;
+    
+    // Se durata troppo breve, considera tutto in F3
+    if (totalHours < 1) {
+      return kwh * contract.f3Price;
+    }
+
+    while (current.isBefore(endDateTime)) {
+      final DateTime nextHour = current.add(const Duration(hours: 1));
+      final DateTime sliceEnd = nextHour.isBefore(endDateTime) ? nextHour : endDateTime;
+      
+      final double hoursInSlice = sliceEnd.difference(current).inMinutes / 60.0;
+      final double kwhInSlice = kwh * (hoursInSlice / totalHours);
+      
+      final String fascia = _getFasciaOraria(current);
+      double price = 0;
+      
+      switch (fascia) {
+        case "F1":
+          price = contract.f1Price;
+          break;
+        case "F2":
+          price = contract.f2Price;
+          break;
+        case "F3":
+          price = contract.f3Price;
+          break;
+      }
+      
+      totalCost += kwhInSlice * price;
+      current = nextHour;
+    }
+
+    debugPrint('   Totale calcolato: ${totalCost.toStringAsFixed(2)}€');
+    return totalCost;
+  }
+
+  String _getFasciaOraria(DateTime dateTime) {
+    final int hour = dateTime.hour;
+    final int weekday = dateTime.weekday;
+    final bool isWeekend = weekday == DateTime.saturday || weekday == DateTime.sunday;
+    
+    // Festività semplificate
+    final bool isHoliday = _isHoliday(dateTime);
+    
+    if (isWeekend || isHoliday) {
+      return "F3"; // Weekend e festivi sempre F3
+    }
+    
+    // Feriali
+    if (hour >= 8 && hour < 19) {
+      return "F1";
+    } else if ((hour >= 7 && hour < 8) || (hour >= 19 && hour < 23)) {
+      return "F2";
+    } else {
+      return "F3";
+    }
+  }
+
+  bool _isHoliday(DateTime date) {
+    final int day = date.day;
+    final int month = date.month;
+    
+    return (month == 1 && day == 1) ||   // Capodanno
+           (month == 12 && day == 25) || // Natale
+           (month == 12 && day == 26);   // Santo Stefano
   }
 
   @override
@@ -129,7 +210,7 @@ class _AddChargeDialogState extends State<AddChargeDialog> {
                       Expanded(
                         child: TextField(
                           controller: startSocCtrl,
-                          keyboardType: const TextInputType.numberWithOptions(decimal: true), // 🔥 PERMETTE DECIMALI
+                          keyboardType: const TextInputType.numberWithOptions(decimal: true),
                           style: const TextStyle(color: Colors.blueAccent),
                           decoration: const InputDecoration(
                             labelText: "SOC INIZIALE %",
@@ -144,7 +225,7 @@ class _AddChargeDialogState extends State<AddChargeDialog> {
                       Expanded(
                         child: TextField(
                           controller: endSocCtrl,
-                          keyboardType: const TextInputType.numberWithOptions(decimal: true), // 🔥 PERMETTE DECIMALI
+                          keyboardType: const TextInputType.numberWithOptions(decimal: true),
                           style: const TextStyle(color: Colors.greenAccent),
                           decoration: const InputDecoration(
                             labelText: "SOC FINALE %",
@@ -160,7 +241,7 @@ class _AddChargeDialogState extends State<AddChargeDialog> {
                   const SizedBox(height: 8),
                   TextField(
                     controller: kwhCtrl,
-                    keyboardType: const TextInputType.numberWithOptions(decimal: true), // 🔥 PERMETTE DECIMALI
+                    keyboardType: const TextInputType.numberWithOptions(decimal: true),
                     style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold),
                     decoration: InputDecoration(
                       labelText: "ENERGIA (kWh)",
@@ -176,39 +257,23 @@ class _AddChargeDialogState extends State<AddChargeDialog> {
             ),
             const SizedBox(height: 16),
             
-            // Potenza e Prezzo
+            // Potenza Wallbox
             Container(
               padding: const EdgeInsets.all(12),
               decoration: BoxDecoration(
                 color: Colors.white.withOpacity(0.05),
                 borderRadius: BorderRadius.circular(12),
               ),
-              child: Column(
-                children: [
-                  TextField(
-                    controller: wallboxPowerCtrl,
-                    keyboardType: const TextInputType.numberWithOptions(decimal: true), // 🔥 PERMETTE DECIMALI
-                    style: const TextStyle(color: Colors.orangeAccent),
-                    decoration: const InputDecoration(
-                      labelText: "POTENZA WALLBOX (kW)",
-                      labelStyle: TextStyle(color: Colors.white38, fontSize: 10),
-                      suffixText: "kW",
-                      suffixStyle: TextStyle(color: Colors.white38),
-                    ),
-                  ),
-                  const SizedBox(height: 8),
-                  TextField(
-                    controller: priceCtrl,
-                    keyboardType: const TextInputType.numberWithOptions(decimal: true), // 🔥 PERMETTE DECIMALI
-                    style: const TextStyle(color: Colors.greenAccent),
-                    decoration: InputDecoration(
-                      labelText: widget.tipo == "Home" ? "TARIFFA (€/kWh)" : "PREZZO (€/kWh)",
-                      labelStyle: const TextStyle(color: Colors.white38, fontSize: 10),
-                      suffixText: "€/kWh",
-                      suffixStyle: const TextStyle(color: Colors.white38),
-                    ),
-                  ),
-                ],
+              child: TextField(
+                controller: wallboxPowerCtrl,
+                keyboardType: const TextInputType.numberWithOptions(decimal: true),
+                style: const TextStyle(color: Colors.orangeAccent),
+                decoration: const InputDecoration(
+                  labelText: "POTENZA WALLBOX (kW)",
+                  labelStyle: TextStyle(color: Colors.white38, fontSize: 10),
+                  suffixText: "kW",
+                  suffixStyle: TextStyle(color: Colors.white38),
+                ),
               ),
             ),
             
@@ -360,97 +425,93 @@ class _AddChargeDialogState extends State<AddChargeDialog> {
   }
 
   void _handleSave() {
-    try {
-      // 🔥 SOSTITUISCE VIRGOLE CON PUNTI PER IL PARSING
-      final startSoc = double.tryParse(startSocCtrl.text.replaceAll(',', '.')) ?? widget.provider.currentSoc;
-      final endSoc = double.tryParse(endSocCtrl.text.replaceAll(',', '.')) ?? widget.provider.targetSoc;
-      final kwh = double.tryParse(kwhCtrl.text.replaceAll(',', '.')) ?? 10.0;
-      final wallboxPower = double.tryParse(wallboxPowerCtrl.text.replaceAll(',', '.')) ?? widget.provider.wallboxPwr;
-      final price = double.tryParse(priceCtrl.text.replaceAll(',', '.')) ?? 
-                    (widget.tipo == "Home" ? widget.provider.myContract.f1Price : 0.65);
-      
-      // Validazione base
-      if (kwh <= 0) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text("Inserisci un valore valido per kWh"),
-            backgroundColor: Colors.red,
-          ),
-        );
-        return;
-      }
-
-      double finalCost;
-      if (widget.tipo == "Home") {
-        finalCost = CostCalculator.calculate(
-          kwh,
-          selectedStartTime,
-          selectedDate,
-          widget.provider.myContract,
-        );
-      } else {
-        finalCost = kwh * price;
-      }
-
-      // Combina data e ora
-      final startDateTime = DateTime(
-        selectedDate.year,
-        selectedDate.month,
-        selectedDate.day,
-        selectedStartTime.hour,
-        selectedStartTime.minute,
-      );
-      
-      final endDateTime = DateTime(
-        selectedDate.year,
-        selectedDate.month,
-        selectedDate.day,
-        selectedEndTime.hour,
-        selectedEndTime.minute,
-      );
-
-      final session = ChargeSession(
-        id: DateTime.now().millisecondsSinceEpoch.toString(),
-        date: selectedDate,
-        startDateTime: startDateTime,
-        endDateTime: endDateTime,
-        startSoc: startSoc,
-        endSoc: endSoc,
-        kwh: kwh,
-        cost: finalCost,
-        location: widget.tipo,
-        carBrand: widget.provider.selectedCar.brand,
-        carModel: widget.provider.selectedCar.model,
-        wallboxPower: wallboxPower,
-      );
-
-      debugPrint('💾 Salvataggio sessione manuale:');
-      debugPrint('   ID: ${session.id}');
-      debugPrint('   Data: $selectedDate');
-      debugPrint('   Ora: ${selectedStartTime.format(context)} - ${selectedEndTime.format(context)}');
-      debugPrint('   SOC: $startSoc% → $endSoc%');
-      debugPrint('   kWh: $kwh');
-      debugPrint('   Costo: $finalCost €');
-      debugPrint('   Potenza: $wallboxPower kW');
-
-      widget.provider.addChargeSession(session);
-      
+  try {
+    // 🔥 VERIFICA CHE I PREZZI SIANO STATI CARICATI
+    final contract = widget.provider.myContract;
+    
+    debugPrint('🔍 VERIFICA PREZZI CONTRATTO:');
+    debugPrint('   isMonorario: ${contract.isMonorario}');
+    debugPrint('   f1Price: ${contract.f1Price}');
+    debugPrint('   f2Price: ${contract.f2Price}');
+    debugPrint('   f3Price: ${contract.f3Price}');
+    
+    // Se i prezzi sono 0, significa che il contratto non è stato caricato
+    if (contract.f1Price == 0 && contract.f2Price == 0 && contract.f3Price == 0) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
-          content: Text("Ricarica registrata con successo!"),
-          backgroundColor: Colors.green,
-        ),
-      );
-      
-      Navigator.pop(context);
-    } catch (e) {
-      debugPrint('❌ Errore salvataggio: $e');
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text("Errore: $e"),
+          content: Text("Errore: prezzi non configurati. Vai in Impostazioni"),
           backgroundColor: Colors.red,
+          duration: Duration(seconds: 3),
         ),
       );
+      return;
     }
+
+    final startSoc = double.tryParse(startSocCtrl.text.replaceAll(',', '.')) ?? widget.provider.currentSoc;
+    final endSoc = double.tryParse(endSocCtrl.text.replaceAll(',', '.')) ?? widget.provider.targetSoc;
+    final kwh = double.tryParse(kwhCtrl.text.replaceAll(',', '.')) ?? 10.0;
+    final wallboxPower = double.tryParse(wallboxPowerCtrl.text.replaceAll(',', '.')) ?? widget.provider.wallboxPwr;
+    
+    if (kwh <= 0) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text("Inserisci kWh validi"), backgroundColor: Colors.red),
+      );
+      return;
+    }
+
+    final startDateTime = DateTime(
+      selectedDate.year,
+      selectedDate.month,
+      selectedDate.day,
+      selectedStartTime.hour,
+      selectedStartTime.minute,
+    );
+    
+    final endDateTime = DateTime(
+      selectedDate.year,
+      selectedDate.month,
+      selectedDate.day,
+      selectedEndTime.hour,
+      selectedEndTime.minute,
+    );
+
+    // 🔥 USA IL CONTRATTO ORIGINALE (non inventato)
+    final double finalCost = _calculateCostByTariff(
+      kwh, 
+      startDateTime, 
+      endDateTime,
+      contract,
+    );
+    
+    debugPrint('💰 Costo finale calcolato: ${finalCost.toStringAsFixed(2)}€');
+
+    final session = ChargeSession(
+      id: DateTime.now().millisecondsSinceEpoch.toString(),
+      date: selectedDate,
+      startDateTime: startDateTime,
+      endDateTime: endDateTime,
+      startSoc: startSoc,
+      endSoc: endSoc,
+      kwh: kwh,
+      cost: finalCost,
+      location: widget.tipo,
+      carBrand: widget.provider.selectedCar.brand,
+      carModel: widget.provider.selectedCar.model,
+      wallboxPower: wallboxPower,
+    );
+
+    widget.provider.addChargeSession(session);
+    
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(content: Text("Ricarica registrata"), backgroundColor: Colors.green),
+    );
+    
+    Navigator.pop(context);
+  } catch (e) {
+    debugPrint('❌ Errore: $e');
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(content: Text("Errore: $e"), backgroundColor: Colors.red),
+    );
   }
+}
 }

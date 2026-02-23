@@ -23,6 +23,8 @@ dependencies:
   pdf: ^3.10.8
   printing: ^5.11.1
   path_provider: ^2.1.2
+  share_plus: ^7.2.0
+  universal_html: ^2.2.4
   
   # Firebase
   firebase_core: ^3.15.0
@@ -32,11 +34,10 @@ dependencies:
   # Effetti
   fluid_background: ^1.0.5
   
-  # 🔥 NOTIFICHE - AGGIUNGI QUESTE
+  # 🔥 NOTIFICHE
   flutter_local_notifications: ^17.1.0
   timezone: ^0.9.2
   permission_handler: ^11.3.0
-  # 🔥 FINE NOTIFICHE
 
 dev_dependencies:
   flutter_test:
@@ -54,8 +55,15 @@ flutter_launcher_icons:
 
 flutter:
   uses-material-design: true
+  
+  # 🔥 FONT
+  fonts:
+    - family: CourierNew
+      fonts:
+        - asset: fonts/Courier New.ttf
+  
+  # 🔥 ASSETS
   assets:
     - assets/cars.json
     - assets/images/logo.png
     - assets/images/logo_foreground.png
-  

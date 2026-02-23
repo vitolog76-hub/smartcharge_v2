@@ -6,8 +6,9 @@ import 'history_edit_dialog.dart';
 class HistorySessionCard extends StatelessWidget {
   final ChargeSession session;
   final int index;
-  final Function(ChargeSession, int) onEdit;
-  final Function(int) onDelete;
+  // 🔥 FIRME CORRETTE: onEdit riceve solo ChargeSession, onDelete riceve String (id)
+  final Function(ChargeSession) onEdit;
+  final Function(String) onDelete;
 
   const HistorySessionCard({
     super.key,
@@ -25,7 +26,7 @@ class HistorySessionCard extends StatelessWidget {
     final durationStr = '${hours}h ${minutes}m';
 
     return Dismissible(
-      key: Key('${session.id}_$index'),
+      key: Key(session.id), // 🔥 Usa solo l'id come chiave
       direction: DismissDirection.endToStart,
       background: Container(
         alignment: Alignment.centerRight,
@@ -58,7 +59,7 @@ class HistorySessionCard extends StatelessWidget {
           },
         );
       },
-      onDismissed: (direction) => onDelete(index),
+      onDismissed: (direction) => onDelete(session.id), // 🔥 Passa l'id
       child: Container(
         margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
         decoration: BoxDecoration(
@@ -129,18 +130,31 @@ class HistorySessionCard extends StatelessWidget {
           trailing: Row(
             mainAxisSize: MainAxisSize.min,
             children: [
-              IconButton(
-                icon: const Icon(Icons.edit, color: Colors.blueAccent, size: 18),
-                onPressed: () {
-                  showDialog(
-                    context: context,
-                    builder: (_) => HistoryEditDialog(
-                      session: session,
-                      onSave: (updated) => onEdit(updated, index),
-                    ),
-                  );
-                },
-              ),
+            IconButton(
+  icon: const Icon(Icons.edit, color: Colors.blueAccent, size: 18),
+  onPressed: () {
+    debugPrint('🔵 1. MATITA PREMUTA - contesto valido: ${context.mounted}');
+    debugPrint('   session id: ${session.id}');
+    
+    showDialog(
+      context: context,
+      builder: (BuildContext dialogContext) {
+        debugPrint('   🟢 2. DENTRO builder del dialog');
+        return HistoryEditDialog(
+          session: session,
+          onSave: (updated) {
+            debugPrint('   💾 3. DIALOG SALVATO - chiamo onEdit');
+            onEdit(updated);
+          },
+        );
+      },
+    ).then((_) {
+      debugPrint('   ✅ 4. Dialog chiuso');
+    }).catchError((e) {
+      debugPrint('   ❌ ERRORE: $e');
+    });
+  },
+),
               Text(
                 "${session.cost.toStringAsFixed(2)} €",
                 style: const TextStyle(fontSize: 15, fontWeight: FontWeight.w500, color: Colors.white),

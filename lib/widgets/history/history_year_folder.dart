@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 import 'package:smartcharge_v2/models/charge_session.dart';
+import 'history_edit_dialog.dart'; // 🔥 IMPORT AGGIUNTO
 
 class HistoryYearFolder extends StatelessWidget {
   final String year;
@@ -252,7 +253,16 @@ class HistoryYearFolder extends StatelessWidget {
             children: [
               IconButton(
                 icon: const Icon(Icons.edit, color: Colors.blueAccent, size: 20),
-                onPressed: () => onEdit(session), // Passiamo l'oggetto sessione intero
+                onPressed: () {
+                  debugPrint('🔵 MATITA PREMUTA - apro dialog');
+                  showDialog(
+                    context: context,
+                    builder: (_) => HistoryEditDialog(
+                      session: session,
+                      onSave: onEdit,
+                    ),
+                  );
+                },
               ),
               const SizedBox(width: 4),
               Text(
