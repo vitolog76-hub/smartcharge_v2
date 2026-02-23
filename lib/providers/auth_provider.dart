@@ -4,6 +4,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 import 'dart:convert';
 import 'package:smartcharge_v2/services/sync_service.dart';
 import 'package:smartcharge_v2/models/contract_model.dart';
+import 'package:google_sign_in/google_sign_in.dart'; // 🔥 IMPORT AGGIUNTO
 
 class AuthProvider extends ChangeNotifier {
   final FirebaseAuth _auth = FirebaseAuth.instance;
@@ -23,7 +24,6 @@ class AuthProvider extends ChangeNotifier {
       if (user != null) {
         final prefs = await SharedPreferences.getInstance();
         await prefs.setString('user_sync_id', user.uid);
-        // 🔥 Scarica i dati dal cloud appena l'utente si logga
         await _downloadUserData(user.uid);
       }
       notifyListeners();
@@ -43,7 +43,6 @@ class AuthProvider extends ChangeNotifier {
       final prefs = await SharedPreferences.getInstance();
       await prefs.setString('user_sync_id', userCredential.user!.uid);
       
-      // 🔥 Scarica i dati dopo il login
       await _downloadUserData(userCredential.user!.uid);
       
       _isLoading = false;
@@ -53,6 +52,44 @@ class AuthProvider extends ChangeNotifier {
       _isLoading = false;
       notifyListeners();
       return e.message;
+    }
+  }
+
+  // 🔥 METODO PER LOGIN CON GOOGLE (AGGIUNTO)
+  Future<bool> signInWithGoogle() async {
+    _isLoading = true;
+    notifyListeners();
+
+    try {
+      final GoogleSignInAccount? googleUser = await GoogleSignIn().signIn();
+      if (googleUser == null) {
+        _isLoading = false;
+        notifyListeners();
+        return false;
+      }
+
+      final GoogleSignInAuthentication googleAuth = 
+          await googleUser.authentication;
+
+      final credential = GoogleAuthProvider.credential(
+        accessToken: googleAuth.accessToken,
+        idToken: googleAuth.idToken,
+      );
+
+      final userCredential = await _auth.signInWithCredential(credential);
+      
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.setString('user_sync_id', userCredential.user!.uid);
+      
+      await _downloadUserData(userCredential.user!.uid);
+      
+      _isLoading = false;
+      notifyListeners();
+      return true;
+    } catch (e) {
+      _isLoading = false;
+      notifyListeners();
+      return false;
     }
   }
 
@@ -71,7 +108,6 @@ class AuthProvider extends ChangeNotifier {
       final prefs = await SharedPreferences.getInstance();
       await prefs.setString('user_sync_id', userCredential.user!.uid);
       
-      // 🔥 Crea dati iniziali per il nuovo utente
       await _createInitialUserData(userCredential.user!.uid, name);
       
       _isLoading = false;
@@ -133,8 +169,9 @@ class AuthProvider extends ChangeNotifier {
 
   Future<void> signOut() async {
     await _auth.signOut();
+    await GoogleSignIn().signOut(); // 🔥 AGGIUNTO ANCHE QUI
     
     final prefs = await SharedPreferences.getInstance();
-    await prefs.clear();  // Pulisce TUTTI i dati locali
+    await prefs.clear();
   }
 }
