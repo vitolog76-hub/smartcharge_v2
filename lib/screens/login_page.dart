@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:smartcharge_v2/providers/auth_provider.dart' as app;
+import 'package:smartcharge_v2/screens/register_page.dart';
 
 class LoginPage extends StatelessWidget {
   const LoginPage({super.key});
@@ -19,9 +20,9 @@ class LoginPage extends StatelessWidget {
             begin: Alignment.topLeft,
             end: Alignment.bottomRight,
             colors: [
-              const Color(0xFF0A0F1E), // Blu notte
-              const Color(0xFF1A1F2E), // Blu leggermente più chiaro
-              const Color(0xFF050507), // Quasi nero
+              const Color(0xFF0A0F1E),
+              const Color(0xFF1A1F2E),
+              const Color(0xFF050507),
             ],
           ),
         ),
@@ -32,7 +33,7 @@ class LoginPage extends StatelessWidget {
               child: Column(
                 mainAxisAlignment: MainAxisAlignment.center,
                 children: [
-                  // 🔥 LOGO VERO
+                  // Logo
                   Container(
                     width: 120,
                     height: 120,
@@ -52,7 +53,6 @@ class LoginPage extends StatelessWidget {
                         'assets/images/logo.png',
                         fit: BoxFit.contain,
                         errorBuilder: (context, error, stackTrace) {
-                          // Fallback se il logo non viene caricato
                           return Container(
                             color: Colors.blueAccent.withOpacity(0.1),
                             child: const Icon(
@@ -171,9 +171,7 @@ class LoginPage extends StatelessWidget {
                       style: TextButton.styleFrom(
                         foregroundColor: Colors.blueAccent,
                       ),
-                      child: const Text(
-                        "Password dimenticata?",
-                      ),
+                      child: const Text("Password dimenticata?"),
                     ),
                   ),
                   
@@ -229,52 +227,7 @@ class LoginPage extends StatelessWidget {
                   
                   const SizedBox(height: 20),
                   
-                  // Separatore
-                  Row(
-                    children: [
-                      Expanded(child: Divider(color: Colors.white.withOpacity(0.1))),
-                      Padding(
-                        padding: const EdgeInsets.symmetric(horizontal: 16),
-                        child: Text(
-                          "oppure",
-                          style: TextStyle(color: Colors.white.withOpacity(0.3)),
-                        ),
-                      ),
-                      Expanded(child: Divider(color: Colors.white.withOpacity(0.1))),
-                    ],
-                  ),
-                  const SizedBox(height: 20),
-                  
-                  // Bottone Google
-                  OutlinedButton.icon(
-                    onPressed: () async {
-                      final success = await authProvider.signInWithGoogle();
-                      if (!success && context.mounted) {
-                        ScaffoldMessenger.of(context).showSnackBar(
-                          const SnackBar(
-                            content: Text("Errore login con Google"),
-                            backgroundColor: Colors.red,
-                          ),
-                        );
-                      }
-                    },
-                    icon: const Icon(Icons.g_mobiledata, color: Colors.white),
-                    label: const Text(
-                      "Continua con Google",
-                      style: TextStyle(color: Colors.white),
-                    ),
-                    style: OutlinedButton.styleFrom(
-                      side: BorderSide(color: Colors.white.withOpacity(0.2)),
-                      padding: const EdgeInsets.symmetric(vertical: 16),
-                      shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(12),
-                      ),
-                    ),
-                  ),
-                  
-                  const SizedBox(height: 20),
-                  
-                  // Link per registrazione
+                  // 🔥 SOLO LINK REGISTRAZIONE (SENZA GOOGLE)
                   Row(
                     mainAxisAlignment: MainAxisAlignment.center,
                     children: [
@@ -284,14 +237,15 @@ class LoginPage extends StatelessWidget {
                       ),
                       TextButton(
                         onPressed: () {
-                          // Naviga alla pagina di registrazione
+                          Navigator.push(
+                            context,
+                            MaterialPageRoute(builder: (_) => const RegisterPage()),
+                          );
                         },
                         style: TextButton.styleFrom(
                           foregroundColor: Colors.blueAccent,
                         ),
-                        child: const Text(
-                          "Registrati",
-                        ),
+                        child: const Text("Registrati"),
                       ),
                     ],
                   ),
@@ -364,7 +318,6 @@ class LoginPage extends StatelessWidget {
     );
   }
 
-  // Funzione di reset password con Firebase
   void _resetPassword(
     BuildContext context, 
     String email, 
