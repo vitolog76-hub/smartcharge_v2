@@ -8,43 +8,47 @@ import 'package:smartcharge_v2/screens/login_page.dart';
 import 'package:smartcharge_v2/screens/home_page.dart';
 import 'package:smartcharge_v2/services/notification_service.dart';
 import 'package:flutter_dotenv/flutter_dotenv.dart';
+import 'package:flutter/foundation.dart' show kIsWeb;
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
-
-  // Carica .env solo se esiste (in locale funziona, in Vercel ignora)
+  
   try {
     await dotenv.load(fileName: ".env");
-    debugPrint('✅ .env caricato con successo');
   } catch (e) {
-    debugPrint('📢 .env non trovato - normale su Vercel, continuo comunque');
+    // Ignora
   }
 
-  // Inizializza Firebase
   try {
-    if (Firebase.apps.isEmpty) {
+    if (kIsWeb) {
+      // Per Vercel - prende le chiavi dalle environment variables
+      await Firebase.initializeApp(
+        options: FirebaseOptions(
+          apiKey: const String.fromEnvironment('GEMINIKEY'),
+          authDomain: const String.fromEnvironment('FIREBASE_AUTH_DOMAIN', 
+              defaultValue: 'smartcharge-c5b34.firebaseapp.com'),
+          projectId: const String.fromEnvironment('FIREBASE_PROJECT_ID',
+              defaultValue: 'smartcharge-c5b34'),
+          storageBucket: const String.fromEnvironment('FIREBASE_STORAGE_BUCKET',
+              defaultValue: 'smartcharge-c5b34.firebasestorage.app'),
+          messagingSenderId: const String.fromEnvironment('FIREBASE_SENDER_ID',
+              defaultValue: '25947690562'),
+          appId: const String.fromEnvironment('FIREBASE_APP_ID',
+              defaultValue: '1:25947690562:web:613953180d63919a677fdb'),
+          measurementId: const String.fromEnvironment('FIREBASE_MEASUREMENT_ID',
+              defaultValue: 'G-R35N994658'),
+        ),
+      );
+    } else {
+      // Per mobile - usa i file google-services.json e GoogleService-Info.plist
       await Firebase.initializeApp();
-      debugPrint('✅ Firebase inizializzato');
     }
   } catch (e) {
-    debugPrint('❌ Errore Firebase: $e');
+    debugPrint("Firebase error: $e");
   }
 
-  // Inizializza formati data
-  try {
-    await initializeDateFormatting('it_IT', null);
-    debugPrint('✅ Formati data inizializzati');
-  } catch (e) {
-    debugPrint('⚠️ Errore formati data: $e');
-  }
-
-  // Inizializza notifiche
-  try {
-    await NotificationService().init();
-    debugPrint('✅ Notifiche inizializzate');
-  } catch (e) {
-    debugPrint('⚠️ Errore notifiche: $e');
-  }
+  await initializeDateFormatting('it_IT', null);
+  await NotificationService().init();
 
   runApp(const MyApp());
 }
