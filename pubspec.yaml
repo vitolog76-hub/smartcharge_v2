@@ -75,4 +75,4 @@ flutter:
     - assets/cars.json
     - assets/images/logo.png
     - assets/images/logo_foreground.png
-    # .env è stato rimosso dagli asset
+    - assets/.env

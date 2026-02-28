@@ -13,38 +13,58 @@ import 'package:flutter/foundation.dart' show kIsWeb;
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
   
+  // Carica .env da assets/
   try {
-    await dotenv.load(fileName: ".env");
+    await dotenv.load(fileName: "assets/.env");
+    debugPrint('✅ .env caricato da assets/');
   } catch (e) {
-    // Ignora
+    debugPrint('📢 .env non trovato in assets/');
   }
 
   try {
     if (kIsWeb) {
-      // Per Vercel - prende le chiavi dalle environment variables
+      debugPrint('🌐 Inizializzazione Firebase per WEB...');
+      
+      String firebaseApiKey = '';
+      
+      // PRIORITÀ 1: .env (sviluppo locale)
+      if (dotenv.isInitialized && dotenv.env['FIREBASE_API_KEY'] != null && dotenv.env['FIREBASE_API_KEY']!.isNotEmpty) {
+        firebaseApiKey = dotenv.env['FIREBASE_API_KEY']!;
+        debugPrint('🔑 Usando FIREBASE_API_KEY da .env');
+      } 
+      // PRIORITÀ 2: environment variables (Vercel)
+      else {
+        firebaseApiKey = const String.fromEnvironment('FIREBASE_API_KEY');
+        debugPrint('🔑 Usando FIREBASE_API_KEY da environment variables');
+      }
+      
+      if (firebaseApiKey.isEmpty) {
+        debugPrint('❌ ERRORE: FIREBASE_API_KEY non trovata!');
+        debugPrint('💡 Crea assets/.env con: FIREBASE_API_KEY=AIzaSyBdZ7j1pMuabOd47xeBzCPq0g9wBi4jg3A');
+      } else {
+        debugPrint('🔑 Chiave: ${firebaseApiKey.substring(0, 10)}...');
+      }
+      
       await Firebase.initializeApp(
         options: FirebaseOptions(
-          apiKey: const String.fromEnvironment('FIREBASE_API_KEY'), // ✅ CORRETTO!
-          authDomain: const String.fromEnvironment('FIREBASE_AUTH_DOMAIN', 
-              defaultValue: 'smartcharge-c5b34.firebaseapp.com'),
-          projectId: const String.fromEnvironment('FIREBASE_PROJECT_ID',
-              defaultValue: 'smartcharge-c5b34'),
-          storageBucket: const String.fromEnvironment('FIREBASE_STORAGE_BUCKET',
-              defaultValue: 'smartcharge-c5b34.firebasestorage.app'),
-          messagingSenderId: const String.fromEnvironment('FIREBASE_SENDER_ID',
-              defaultValue: '25947690562'),
-          appId: const String.fromEnvironment('FIREBASE_APP_ID',
-              defaultValue: '1:25947690562:web:613953180d63919a677fdb'),
-          measurementId: const String.fromEnvironment('FIREBASE_MEASUREMENT_ID',
-              defaultValue: 'G-R35N994658'),
+          apiKey: firebaseApiKey,
+          authDomain: "smartcharge-c5b34.firebaseapp.com",
+          projectId: "smartcharge-c5b34",
+          storageBucket: "smartcharge-c5b34.firebasestorage.app",
+          messagingSenderId: "25947690562",
+          appId: "1:25947690562:web:613953180d63919a677fdb",
+          measurementId: "G-R35N994658",
         ),
       );
+      debugPrint('✅ Firebase WEB inizializzato');
     } else {
-      // Per mobile - usa i file google-services.json e GoogleService-Info.plist
+      debugPrint('📱 Inizializzazione Firebase per MOBILE...');
       await Firebase.initializeApp();
+      debugPrint('✅ Firebase MOBILE inizializzato');
     }
-  } catch (e) {
-    debugPrint("Firebase error: $e");
+  } catch (e, stack) {
+    debugPrint('❌ ERRORE Firebase: $e');
+    debugPrint('📍 Stack: $stack');
   }
 
   await initializeDateFormatting('it_IT', null);
