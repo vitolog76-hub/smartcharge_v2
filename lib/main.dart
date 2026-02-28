@@ -24,7 +24,7 @@ void main() async {
       // Per Vercel - prende le chiavi dalle environment variables
       await Firebase.initializeApp(
         options: FirebaseOptions(
-          apiKey: const String.fromEnvironment('GEMINIKEY'),
+          apiKey: const String.fromEnvironment('FIREBASE_API_KEY'), // ✅ CORRETTO!
           authDomain: const String.fromEnvironment('FIREBASE_AUTH_DOMAIN', 
               defaultValue: 'smartcharge-c5b34.firebaseapp.com'),
           projectId: const String.fromEnvironment('FIREBASE_PROJECT_ID',

@@ -6,7 +6,7 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter_dotenv/flutter_dotenv.dart';
 
 class AIBillingService {
-  final String _apiKey = dotenv.env['GEMINI_API_KEY'] ?? '';
+  final String _apiKey = dotenv.env['GEMINIKEY'] ?? '';
   final FirebaseFirestore _db = FirebaseFirestore.instance;
 
   /// Metodo principale che gestisce limiti e analisi
