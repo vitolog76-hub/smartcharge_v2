@@ -7,9 +7,11 @@ import 'package:smartcharge_v2/providers/home_provider.dart';
 import 'package:smartcharge_v2/screens/login_page.dart';
 import 'package:smartcharge_v2/screens/home_page.dart';
 import 'package:smartcharge_v2/services/notification_service.dart'; 
+import 'package:flutter_dotenv/flutter_dotenv.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
+  await dotenv.load(fileName: ".env");
   
   try {
     if (Firebase.apps.isEmpty) {

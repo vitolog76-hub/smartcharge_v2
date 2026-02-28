@@ -27,6 +27,7 @@ packages/
 .gradle/
 local.properties
 
+
 # iOS
 *.mode1v3
 *.mode2v3
@@ -58,3 +59,4 @@ GoogleService-Info.plist
 # IDE
 .vscode/
 .vscode-flutter.json
+

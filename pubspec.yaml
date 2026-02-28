@@ -12,6 +12,7 @@ dependencies:
   # UI & Fonts
   google_fonts: ^6.1.0
   cupertino_icons: ^1.0.8
+  flutter_dotenv: ^5.2.1
   
   # State Management & Storage
   provider: ^6.1.1
@@ -77,3 +78,4 @@ flutter:
     - assets/cars.json
     - assets/images/logo.png
     - assets/images/logo_foreground.png
+    - .env

@@ -3,9 +3,10 @@ import 'dart:convert';
 import 'package:http/http.dart' as http;
 import 'package:syncfusion_flutter_pdf/pdf.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:flutter_dotenv/flutter_dotenv.dart';
 
 class AIBillingService {
-  final String _apiKey = "AIzaSyAvHJBYDZ1Xody4295ExIrJKGZOJRFBm_U";
+  final String _apiKey = dotenv.env['GEMINI_API_KEY'] ?? '';
   final FirebaseFirestore _db = FirebaseFirestore.instance;
 
   /// Metodo principale che gestisce limiti e analisi
@@ -80,7 +81,7 @@ class AIBillingService {
       document.dispose();
 
       final prompt = '''
-Analizza questa bolletta E.ON con precisione assoluta. Non arrotondare i decimali.
+Analizza questa bolletta con precisione assoluta. Non arrotondare i decimali.
 1. IDENTIFICA: Energia F1, F2, F3 (usa 6 decimali se presenti, es. 0.118292).
 2. IDENTIFICA: Componente Omega (Spread), Dispacciamento, Oneri di sistema (€/kWh).
 3. IDENTIFICA: Quota Fissa Totale (€) e Quota Potenza (€/kW).
@@ -92,7 +93,7 @@ Analizza questa bolletta E.ON con precisione assoluta. Non arrotondare i decimal
 
 Restituisci SOLO questo JSON:
 {
-  "provider": "E.ON Energia",
+  "provider": "[Nome del fornitore trovato]",
   "f1": [calcolato], "f2": [calcolato], "f3": [calcolato],
   "f1_puro": [originale], "f2_puro": [originale], "f3_puro": [originale],
   "fixed_monthly_fee": [ivato], "power_fee": [ivato], "vat": 10
