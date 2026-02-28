@@ -1,6 +1,5 @@
 {
-  "buildCommand": "bash build.sh",
+  "buildCommand": "flutter build web --release --no-wasm-dry-run",
   "outputDirectory": "build/web",
-  "installCommand": "echo 'Installazione gestita da build.sh'",
-  "framework": null
+  "installCommand": "flutter pub get"
 }
