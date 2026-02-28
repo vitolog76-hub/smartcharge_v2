@@ -3,17 +3,24 @@ set -e
 
 echo "🚀 Starting Flutter web build for Vercel..."
 
+# Fix per l'errore root
+export FLUTTER_ROOT="$HOME/flutter"
+
 # Clean build
 echo "🧹 Cleaning previous builds..."
 rm -rf .dart_tool build
 
-# Install Flutter
+# Install Flutter (se non esiste)
 echo "📦 Installing Flutter..."
-FLUTTER_SDK_PATH="$HOME/flutter"
-if [ ! -d "$FLUTTER_SDK_PATH" ]; then
-  git clone --branch stable https://github.com/flutter/flutter.git $FLUTTER_SDK_PATH
+if [ ! -d "$FLUTTER_ROOT" ]; then
+  git clone --branch stable https://github.com/flutter/flutter.git $FLUTTER_ROOT
 fi
-export PATH="$FLUTTER_SDK_PATH/bin:$PATH"
+
+# Aggiungi al PATH
+export PATH="$FLUTTER_ROOT/bin:$PATH"
+
+# Ignora l'avviso root
+flutter config --no-analytics --disable-telemetry
 
 flutter config --enable-web
 echo "📌 Flutter version: $(flutter --version | head -1)"
