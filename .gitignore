@@ -1,6 +1,6 @@
 # Flutter
 .dart_tool/
-build/
+# build/
 *.dart.js
 *.dart.js.deps
 *.dart.js.map
