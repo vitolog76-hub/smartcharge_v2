@@ -1,5 +1,6 @@
 {
-  "buildCommand": "flutter build web --release --no-wasm-dry-run",
-  "outputDirectory": "build/web",
-  "installCommand": "flutter pub get"
+  "cleanUrls": true,
+  "rewrites": [
+    { "source": "/(.*)", "destination": "/index.html" }
+  ]
 }
