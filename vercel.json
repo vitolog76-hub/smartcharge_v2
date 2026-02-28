@@ -1,5 +1,6 @@
 {
-  "installCommand": "git clone https://github.com/flutter/flutter.git -b stable && ./flutter/bin/flutter doctor",
-  "buildCommand": "./flutter/bin/flutter build web --release",
-  "outputDirectory": "build/web"
+  "buildCommand": "bash build.sh",
+  "outputDirectory": "build/web",
+  "installCommand": "echo 'Installazione gestita da build.sh'",
+  "framework": null
 }

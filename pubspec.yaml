@@ -19,11 +19,12 @@ dependencies:
   shared_preferences: ^2.5.4
   intl: ^0.19.0
   image_picker: ^1.0.4
-  # 🔥 AI & FILE PICKER
+  
+  # AI & FILE PICKER
   google_generative_ai: ^0.4.0
   file_picker: ^8.0.0
   
-  # 🔥 ESTRAZIONE PDF (Syncfusion)
+  # ESTRAZIONE PDF
   syncfusion_flutter_pdf: ^24.2.3
   
   # Grafici e PDF
@@ -53,9 +54,7 @@ dev_dependencies:
     sdk: flutter
   flutter_lints: ^6.0.0
   flutter_launcher_icons: ^0.13.1
-  # 🔥 RIMOSSO pdf_text
 
-# Configurazione Icone App
 flutter_launcher_icons:
   android: true
   ios: true
@@ -67,15 +66,13 @@ flutter_launcher_icons:
 flutter:
   uses-material-design: true
   
-  # Font Personalizzati
   fonts:
     - family: CourierNew
       fonts:
         - asset: fonts/Courier New.ttf
   
-  # Asset di Progetto
   assets:
     - assets/cars.json
     - assets/images/logo.png
     - assets/images/logo_foreground.png
-    - .env
+    # .env è stato rimosso dagli asset

@@ -6,23 +6,45 @@ import 'package:smartcharge_v2/providers/auth_provider.dart';
 import 'package:smartcharge_v2/providers/home_provider.dart';
 import 'package:smartcharge_v2/screens/login_page.dart';
 import 'package:smartcharge_v2/screens/home_page.dart';
-import 'package:smartcharge_v2/services/notification_service.dart'; 
+import 'package:smartcharge_v2/services/notification_service.dart';
 import 'package:flutter_dotenv/flutter_dotenv.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
-  await dotenv.load(fileName: ".env");
-  
+
+  // Carica .env solo se esiste (in locale funziona, in Vercel ignora)
   try {
-    if (Firebase.apps.isEmpty) {
-      await Firebase.initializeApp(); 
-    }
+    await dotenv.load(fileName: ".env");
+    debugPrint('✅ .env caricato con successo');
   } catch (e) {
-    debugPrint("Errore inizializzazione Firebase: $e");
+    debugPrint('📢 .env non trovato - normale su Vercel, continuo comunque');
   }
 
-  await initializeDateFormatting('it_IT', null);
-  await NotificationService().init();
+  // Inizializza Firebase
+  try {
+    if (Firebase.apps.isEmpty) {
+      await Firebase.initializeApp();
+      debugPrint('✅ Firebase inizializzato');
+    }
+  } catch (e) {
+    debugPrint('❌ Errore Firebase: $e');
+  }
+
+  // Inizializza formati data
+  try {
+    await initializeDateFormatting('it_IT', null);
+    debugPrint('✅ Formati data inizializzati');
+  } catch (e) {
+    debugPrint('⚠️ Errore formati data: $e');
+  }
+
+  // Inizializza notifiche
+  try {
+    await NotificationService().init();
+    debugPrint('✅ Notifiche inizializzate');
+  } catch (e) {
+    debugPrint('⚠️ Errore notifiche: $e');
+  }
 
   runApp(const MyApp());
 }
@@ -35,7 +57,6 @@ class MyApp extends StatelessWidget {
     return MultiProvider(
       providers: [
         ChangeNotifierProvider(create: (_) => AuthProvider()),
-        // 🔥 SPOSTATO QUI: Ora HomeProvider è globale e non crasha più nulla!
         ChangeNotifierProvider(create: (_) => HomeProvider()..init()),
       ],
       child: MaterialApp(
@@ -46,17 +67,10 @@ class MyApp extends StatelessWidget {
           appBarTheme: const AppBarTheme(
             backgroundColor: Colors.transparent,
             elevation: 0,
-            titleTextStyle: TextStyle(
-              color: Colors.white,
-              fontSize: 18,
-              fontWeight: FontWeight.bold,
-            ),
-            iconTheme: IconThemeData(color: Colors.blueAccent),
           ),
         ),
         home: Consumer<AuthProvider>(
           builder: (_, auth, __) {
-            // Se autenticato vai alla Home, altrimenti Login
             return auth.isAuthenticated ? const HomePage() : const LoginPage();
           },
         ),
