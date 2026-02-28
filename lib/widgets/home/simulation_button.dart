@@ -11,36 +11,27 @@ class SimulationButton extends StatelessWidget {
   Widget build(BuildContext context) {
     final bool isSimulating = provider.isSimulating;
     
-    // Calcola direttamente se è in attesa
+    // Calcolo stato temporale
     final now = DateTime.now();
     final startTime = provider.calculatedStartDateTime;
     final bool isScheduled = isSimulating && startTime.isAfter(now);
 
-    // DEBUG: stampa i valori per capire
-    print('📊 SIM BUTTON - isSimulating: $isSimulating');
-    print('📊 SIM BUTTON - startTime: $startTime');
-    print('📊 SIM BUTTON - now: $now');
-    print('📊 SIM BUTTON - isScheduled: $isScheduled');
-
-    // --- LOGICA DI STATO PER IL FEEDBACK ---
+    // --- LOGICA DI STATO ---
     Color accentColor;
     String statusText;
     IconData statusIcon;
 
     if (!isSimulating) {
-      // Stato Spento (pronto per avviare)
       accentColor = Colors.cyanAccent;
       statusText = "AVVIA";
       statusIcon = Icons.play_arrow_rounded;
     } else if (isScheduled) {
-      // Stato IN ATTESA (programmato)
       accentColor = Colors.orangeAccent;
-      statusText = "⏰ ${provider.startTimeDisplay}";
+      statusText = provider.startTimeDisplay; // Solo orario per risparmiare spazio
       statusIcon = Icons.access_time_filled_rounded;
     } else {
-      // Stato In Carica (Attivo)
       accentColor = Colors.redAccent;
-      statusText = "⏹️ STOP";
+      statusText = "STOP";
       statusIcon = Icons.stop_rounded;
     }
 
@@ -53,17 +44,15 @@ class SimulationButton extends StatelessWidget {
         child: Stack(
           alignment: Alignment.center,
           children: [
-            // 1. NEON GLOW AMBIENTALE
+            // 1. NEON GLOW
             IgnorePointer(
               child: AnimatedContainer(
                 duration: const Duration(milliseconds: 400),
-                margin: const EdgeInsets.symmetric(horizontal: 20),
+                margin: const EdgeInsets.symmetric(horizontal: 10),
                 decoration: BoxDecoration(
                   borderRadius: BorderRadius.circular(25),
                   boxShadow: [
-                    BoxShadow(color: accentColor.withOpacity(0.9), blurRadius: 30, spreadRadius: 1),
-                    BoxShadow(color: accentColor.withOpacity(0.4), blurRadius: 60, spreadRadius: 10),
-                    BoxShadow(color: accentColor.withOpacity(0.2), blurRadius: 100, spreadRadius: 20),
+                    BoxShadow(color: accentColor.withOpacity(0.6), blurRadius: 20, spreadRadius: 1),
                   ],
                 ),
               ),
@@ -74,19 +63,18 @@ class SimulationButton extends StatelessWidget {
               child: ClipRRect(
                 borderRadius: BorderRadius.circular(25),
                 child: BackdropFilter(
-                  filter: ImageFilter.blur(sigmaX: 40, sigmaY: 40),
+                  filter: ImageFilter.blur(sigmaX: 20, sigmaY: 20),
                   child: AnimatedContainer(
                     duration: const Duration(milliseconds: 400),
                     decoration: BoxDecoration(
                       borderRadius: BorderRadius.circular(25),
-                      border: Border.all(color: Colors.white.withOpacity(0.5), width: 2.0),
+                      border: Border.all(color: Colors.white.withOpacity(0.2), width: 1.5),
                       gradient: LinearGradient(
                         begin: Alignment.topLeft,
                         end: Alignment.bottomRight,
                         colors: [
-                          Colors.white.withOpacity(0.3),
-                          Colors.transparent,
-                          accentColor.withOpacity(0.2),
+                          Colors.white.withOpacity(0.15),
+                          accentColor.withOpacity(0.05),
                         ],
                       ),
                     ),
@@ -95,54 +83,37 @@ class SimulationButton extends StatelessWidget {
               ),
             ),
 
-            // 3. RIFLESSO GLOSSY
-            IgnorePointer(
-              child: Container(
-                decoration: BoxDecoration(
-                  borderRadius: BorderRadius.circular(25),
-                  gradient: LinearGradient(
-                    begin: Alignment.topCenter,
-                    end: Alignment.bottomCenter,
-                    stops: const [0.0, 0.48, 0.52, 1.0],
-                    colors: [
-                      Colors.white.withOpacity(0.35),
-                      Colors.white.withOpacity(0.1),
-                      Colors.transparent,
-                      Colors.transparent,
-                    ],
-                  ),
-                ),
-              ),
-            ),
-
-            // 4. CONTENUTO (Testo e Icona)
-            Row(
-              mainAxisAlignment: MainAxisAlignment.center,
-              children: [
-                Icon(
-                  statusIcon,
-                  color: Colors.white,
-                  size: 32,
-                  shadows: [
-                    Shadow(color: accentColor, blurRadius: 20),
-                    const Shadow(color: Colors.white, blurRadius: 5),
-                  ],
-                ),
-                const SizedBox(width: 15),
-                Text(
-                  statusText,
-                  style: TextStyle(
+            // 3. CONTENUTO (Fix per l'overflow dei 140px)
+            Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 8.0),
+              child: Row(
+                mainAxisAlignment: MainAxisAlignment.center,
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Icon(
+                    statusIcon,
                     color: Colors.white,
-                    fontSize: 20,
-                    fontWeight: FontWeight.w900,
-                    letterSpacing: 4.0,
-                    shadows: [
-                      Shadow(color: accentColor, blurRadius: 15),
-                      Shadow(color: accentColor, blurRadius: 35),
-                    ],
+                    size: 22, // Ridotto da 32
+                    shadows: [Shadow(color: accentColor, blurRadius: 10)],
                   ),
-                ),
-              ],
+                  const SizedBox(width: 8), // Ridotto da 15
+                  Flexible(
+                    child: Text(
+                      statusText,
+                      overflow: TextOverflow.ellipsis,
+                      style: TextStyle(
+                        color: Colors.white,
+                        fontSize: 14, // Ridotto da 20
+                        fontWeight: FontWeight.w900,
+                        letterSpacing: 1.5, // Ridotto da 4.0
+                        shadows: [
+                          Shadow(color: accentColor, blurRadius: 10),
+                        ],
+                      ),
+                    ),
+                  ),
+                ],
+              ),
             ),
           ],
         ),
@@ -150,17 +121,16 @@ class SimulationButton extends StatelessWidget {
     );
   }
 
-  // --- LOGICA GESTIONE CLICK ---
   void _handleSimulation(BuildContext context) {
     if (provider.isSimulating) {
-      // Se è in simulazione (sia in carica che in attesa), ferma tutto
-      if (provider.isChargingReal && provider.currentSoc > 20) {
+      // Se sta caricando davvero (oltre il check temporale) chiediamo conferma
+      if (provider.isChargingReal) {
         _showInterruptDialog(context);
       } else {
+        // Se è solo programmata (arancione), ferma subito senza dialogo
         provider.stopSimulation();
       }
     } else {
-      // Avvia simulazione
       provider.startSimulation();
     }
   }
@@ -176,16 +146,29 @@ class SimulationButton extends StatelessWidget {
           backgroundColor: const Color(0xFF0A0A0A).withOpacity(0.95),
           shape: RoundedRectangleBorder(
               borderRadius: BorderRadius.circular(30),
-              side: BorderSide(color: Colors.white.withOpacity(0.2))
+              side: BorderSide(color: Colors.white.withOpacity(0.1))
           ),
-          title: const Text("INTERROMPI", style: TextStyle(color: Colors.orangeAccent, fontWeight: FontWeight.w900)),
-          content: Text("Hai caricato fino al ${captureSoc.toStringAsFixed(1)}%. Salvare?", style: const TextStyle(color: Colors.white70)),
+          title: const Text("INTERROMPI", style: TextStyle(color: Colors.orangeAccent, fontWeight: FontWeight.w900, fontSize: 16)),
+          content: Text("Ricarica al ${captureSoc.toStringAsFixed(1)}%. Vuoi salvare la sessione nello storico?", style: const TextStyle(color: Colors.white70, fontSize: 14)),
           actions: [
-            TextButton(onPressed: () { provider.stopSimulation(); Navigator.pop(ctx); }, child: const Text("SCARTA", style: TextStyle(color: Colors.redAccent))),
+            TextButton(
+              onPressed: () { 
+                provider.stopSimulation(); 
+                Navigator.pop(ctx); 
+              }, 
+              child: const Text("SCARTA", style: TextStyle(color: Colors.redAccent))
+            ),
             ElevatedButton(
-              style: ElevatedButton.styleFrom(backgroundColor: Colors.blueAccent.withOpacity(0.3), side: const BorderSide(color: Colors.blueAccent)),
-              onPressed: () { provider.stopSimulation(); Navigator.pop(ctx); _showAddDialog(context, "Home", captureSoc); },
-              child: const Text("SALVA", style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold))
+              style: ElevatedButton.styleFrom(
+                backgroundColor: Colors.blueAccent.withOpacity(0.2),
+                side: const BorderSide(color: Colors.blueAccent)
+              ),
+              onPressed: () { 
+                provider.stopSimulation(); 
+                Navigator.pop(ctx); 
+                _showAddDialog(context, "Home", captureSoc); 
+              },
+              child: const Text("SALVA", style: TextStyle(color: Colors.white))
             ),
           ],
         ),
@@ -194,6 +177,13 @@ class SimulationButton extends StatelessWidget {
   }
 
   void _showAddDialog(BuildContext context, String tipo, double customEndSoc) {
-    showDialog(context: context, builder: (_) => AddChargeDialog(provider: provider, tipo: tipo, customEndSoc: customEndSoc));
+    showDialog(
+      context: context, 
+      builder: (_) => AddChargeDialog(
+        provider: provider, 
+        tipo: tipo, 
+        customEndSoc: customEndSoc
+      )
+    );
   }
 }

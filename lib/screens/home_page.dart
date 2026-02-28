@@ -32,11 +32,12 @@ class HomePage extends StatelessWidget {
         builder: (context, provider, child) {
           if (!provider.carsLoaded) {
             return const Scaffold(
-              backgroundColor: const Color(0xFF0A0F1E),
+              backgroundColor: Color(0xFF0A0F1E),
               body: Center(child: CircularProgressIndicator(color: Colors.blueAccent)),
             );
           }
 
+          // Dialog di completamento sincronizzato
           if (provider.shouldShowCompletionDialog && !_completionDialogShown) {
             WidgetsBinding.instance.addPostFrameCallback((_) {
               if (context.mounted) {
@@ -98,6 +99,7 @@ class HomePage extends StatelessWidget {
                           selectedCar: provider.selectedCar,
                           batteryValue: provider.capacityController.text,
                           authProvider: authProvider,
+                          homeProvider: provider,
                         ),
                       ),
                     );
@@ -109,6 +111,7 @@ class HomePage extends StatelessWidget {
             ),
             body: Stack(
               children: [
+                // SFONDI GLOW
                 Positioned(
                   top: -50,
                   left: -50,
@@ -143,7 +146,7 @@ class HomePage extends StatelessWidget {
                           children: [
                             Expanded(
                               flex: 12,
-                              child: _glassContainer(child: SimulationButton(provider: provider)),
+                              child: SimulationButton(provider: provider), // Rimosso glassContainer esterno perché già nel widget
                             ),
                             const SizedBox(width: 12),
                             Expanded(
@@ -173,6 +176,8 @@ class HomePage extends StatelessWidget {
       ),
     );
   }
+
+  // --- WIDGETS DI SUPPORTO ---
 
   Widget _buildEditCapacityTile(BuildContext context, HomeProvider provider) {
     return GestureDetector(
@@ -248,7 +253,6 @@ class HomePage extends StatelessWidget {
               focusedBorder: const UnderlineInputBorder(borderSide: BorderSide(color: Colors.cyanAccent)),
             ),
           ),
-          actionsAlignment: MainAxisAlignment.spaceEvenly,
           actions: [
             TextButton(
               onPressed: () => Navigator.pop(ctx),
@@ -267,10 +271,9 @@ class HomePage extends StatelessWidget {
                 foregroundColor: Colors.cyanAccent,
                 shape: RoundedRectangleBorder(
                   borderRadius: BorderRadius.circular(12),
-                  side: const BorderSide(color: Colors.cyanAccent),
                 ),
               ),
-              child: const Text("AGGIORNA", style: TextStyle(fontWeight: FontWeight.bold)),
+              child: const Text("AGGIORNA"),
             ),
           ],
         ),
@@ -299,8 +302,9 @@ class HomePage extends StatelessWidget {
             children: [
               const Icon(Icons.check_circle, color: Colors.green, size: 50),
               const SizedBox(height: 16),
+              // 🔥 Fix decimali SOC
               Text(
-                'SOC finale: ${provider.targetSoc.toStringAsFixed(0)}%',
+                'SOC finale: ${provider.currentSoc.toStringAsFixed(1)}%',
                 style: const TextStyle(color: Colors.white70, fontSize: 16),
               ),
               Text(
@@ -330,9 +334,7 @@ class HomePage extends StatelessWidget {
 
   String _formatDuration(Duration duration) {
     String twoDigits(int n) => n.toString().padLeft(2, '0');
-    String hours = twoDigits(duration.inHours);
-    String minutes = twoDigits(duration.inMinutes.remainder(60));
-    return '$hours:$minutes h';
+    return "${twoDigits(duration.inHours)}:${twoDigits(duration.inMinutes.remainder(60))} h";
   }
 
   Widget _glassContainer({required Widget child, double blur = 15, double opacity = 0.05, EdgeInsets? padding}) {
@@ -414,50 +416,27 @@ class HomePage extends StatelessWidget {
         filter: ImageFilter.blur(sigmaX: 10, sigmaY: 10),
         child: DraggableScrollableSheet(
           initialChildSize: 0.7,
-          minChildSize: 0.5,
-          maxChildSize: 0.9,
-          expand: false,
           builder: (context, scrollController) {
             return Container(
               decoration: BoxDecoration(
                 color: const Color(0xFF121212).withOpacity(0.95),
                 borderRadius: const BorderRadius.vertical(top: Radius.circular(30)),
-                border: Border.all(color: Colors.white10),
               ),
-              child: Column(
-                children: [
-                  Container(
-                    margin: const EdgeInsets.symmetric(vertical: 12),
-                    width: 40,
-                    height: 4,
-                    decoration: BoxDecoration(color: Colors.white24, borderRadius: BorderRadius.circular(2)),
-                  ),
-                  const Text("SELEZIONA VEICOLO", style: TextStyle(color: Colors.amberAccent, fontSize: 16, fontWeight: FontWeight.bold, letterSpacing: 1.1)),
-                  const SizedBox(height: 10),
-                  Expanded(
-                    child: ListView.builder(
-                      controller: scrollController,
-                      itemCount: provider.allCars.length,
-                      padding: const EdgeInsets.symmetric(horizontal: 16),
-                      itemBuilder: (context, index) {
-                        final car = provider.allCars[index];
-                        return Container(
-                          margin: const EdgeInsets.only(bottom: 8),
-                          decoration: BoxDecoration(color: Colors.white.withOpacity(0.05), borderRadius: BorderRadius.circular(15), border: Border.all(color: Colors.white.withOpacity(0.05))),
-                          child: ListTile(
-                            leading: const Icon(Icons.directions_car, color: Colors.white70),
-                            title: Text("${car.brand} ${car.model}", style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w600)),
-                            trailing: Text("${car.batteryCapacity} kWh", style: const TextStyle(color: Colors.amberAccent, fontWeight: FontWeight.bold)),
-                            onTap: () { 
-                              provider.selectCar(car); 
-                              Navigator.pop(context); 
-                            },
-                          ),
-                        );
-                      },
-                    ),
-                  ),
-                ],
+              child: ListView.builder(
+                controller: scrollController,
+                itemCount: provider.allCars.length,
+                itemBuilder: (context, index) {
+                  final car = provider.allCars[index];
+                  return ListTile(
+                    title: Text(car.model, style: const TextStyle(color: Colors.white)),
+                    subtitle: Text(car.brand, style: const TextStyle(color: Colors.white70)),
+                    trailing: Text("${car.batteryCapacity} kWh", style: const TextStyle(color: Colors.amberAccent)),
+                    onTap: () {
+                      provider.selectCar(car);
+                      Navigator.pop(context);
+                    },
+                  );
+                },
               ),
             );
           },

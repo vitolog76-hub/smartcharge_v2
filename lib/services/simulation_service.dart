@@ -15,7 +15,7 @@ class SimulationService {
   double _capacity = 0;
   
   bool _isSimulating = false;
-  bool _hasNotifiedCompletion = false; // FLAG PER EVITARE LOOP POPUP
+  bool _hasNotifiedCompletion = false;
   
   // Callbacks
   Function(double)? onSocUpdate;
@@ -24,6 +24,9 @@ class SimulationService {
   
   // ID per notifiche
   int _notificationId = 0;
+  
+  // Getter per esporre _endTime
+  DateTime? get endTime => _endTime;
   
   void startChecking({
     required Function(double) onSocUpdate,
@@ -36,32 +39,80 @@ class SimulationService {
     this.onSimulationComplete = onSimulationComplete;
     
     _timer = Timer.periodic(const Duration(seconds: 1), _checkSimulation);
+    debugPrint('✅ SimulationService: timer avviato');
   }
   
   void initSimulation({
+  required DateTime startDateTime,
+  required double currentSoc,
+  required double targetSoc,
+  required double pwr,
+  required double cap,
+}) {
+  debugPrint('🎯 initSimulation - currentSoc: $currentSoc, targetSoc: $targetSoc');
+  debugPrint('🎯 initSimulation - startDateTime: $startDateTime');
+  
+  // 🔥 RESET TOTALE
+  _hasNotifiedCompletion = false;
+  scheduledStart = null;  // PRIMA NULL
+  _endTime = null;        // POI NULL
+  
+  // ORA assegna i nuovi valori
+  scheduledStart = startDateTime;
+  _currentSoc = currentSoc;
+  _targetSoc = targetSoc;
+  _power = pwr;
+  _capacity = cap;
+  
+  double energyNeeded = ((targetSoc - currentSoc) / 100) * cap;
+  double hours = energyNeeded / pwr;
+  _endTime = startDateTime.add(Duration(minutes: (hours * 60).round()));
+  
+  debugPrint('🎯 initSimulation - energyNeeded: $energyNeeded kWh');
+  debugPrint('🎯 initSimulation - hours: $hours h');
+  debugPrint('🎯 initSimulation - _endTime: $_endTime');
+  debugPrint('🎯 initSimulation - now: ${DateTime.now()}');
+  
+  // Reset flag simulazione
+  _isSimulating = false;
+  
+  if (startDateTime.isBefore(DateTime.now().add(const Duration(minutes: 1)))) {
+    debugPrint('🎯 initSimulation - partenza immediata!');
+    _startSimulation();
+  }
+}
+  
+  void restoreSimulation({
     required DateTime startDateTime,
+    required DateTime endDateTime,
     required double currentSoc,
     required double targetSoc,
     required double pwr,
     required double cap,
   }) {
-    _hasNotifiedCompletion = false; // RESET DEL FLAG ALL'INIZIO
+    debugPrint('🔄 restoreSimulation - currentSoc: $currentSoc, targetSoc: $targetSoc');
+    debugPrint('🔄 restoreSimulation - start: $startDateTime, end: $endDateTime');
+    
+    _hasNotifiedCompletion = false;
     scheduledStart = startDateTime;
+    _endTime = endDateTime;
     _currentSoc = currentSoc;
     _targetSoc = targetSoc;
     _power = pwr;
     _capacity = cap;
     
-    double energyNeeded = ((targetSoc - currentSoc) / 100) * cap;
-    double hours = energyNeeded / pwr;
-    _endTime = startDateTime.add(Duration(minutes: (hours * 60).round()));
-    
-    if (startDateTime.isBefore(DateTime.now().add(const Duration(minutes: 1)))) {
-      _startSimulation();
+    // Se l'orario di inizio è già passato, avvia subito la simulazione
+    if (DateTime.now().isAfter(startDateTime)) {
+      debugPrint('🔄 restoreSimulation - orario passato, avvio immediato');
+      _isSimulating = true;
+      onStatusChange?.call(true);
     }
+    
+    debugPrint('🔄 Simulazione ripristinata');
   }
   
   void _startSimulation() {
+    debugPrint('▶️ _startSimulation - chiamato');
     _isSimulating = true;
     onStatusChange?.call(true);
     
@@ -73,35 +124,54 @@ class SimulationService {
   }
   
   void _checkSimulation(Timer timer) {
-    final now = DateTime.now();
-    
-    if (scheduledStart != null && !_isSimulating) {
-      if (now.isAfter(scheduledStart!) || now.isAtSameMomentAs(scheduledStart!)) {
-        _startSimulation();
-      }
-    }
-    
-    if (_isSimulating && _endTime != null) {
-      if (now.isBefore(_endTime!)) {
-        double totalDuration = _endTime!.difference(scheduledStart!).inSeconds.toDouble();
-        double elapsed = now.difference(scheduledStart!).inSeconds.toDouble();
-        double progress = elapsed / totalDuration;
-        
-        double newSoc = _currentSoc + ((_targetSoc - _currentSoc) * progress);
-        onSocUpdate?.call(newSoc.clamp(_currentSoc, _targetSoc));
-      } else if (!_hasNotifiedCompletion) { // CONTROLLO FLAG
-        _hasNotifiedCompletion = true;    // BLOCCA ULTERIORI CHIAMATE
-        _completeSimulation();
-      }
+  final now = DateTime.now();
+  
+  // 1. Controllo Partenza Programmata
+  if (scheduledStart != null && !_isSimulating) {
+    if (now.isAfter(scheduledStart!)) {
+      debugPrint('⏰ Ora di iniziare la ricarica!');
+      _startSimulation();
     }
   }
   
+  // 2. Gestione Avanzamento Carica
+  if (_isSimulating && _endTime != null && scheduledStart != null) {
+    // Calcoliamo la durata totale prevista
+    final totalSeconds = _endTime!.difference(scheduledStart!).inSeconds;
+    if (totalSeconds <= 0) {
+       _completeSimulation();
+       return;
+    }
+
+    // Secondi passati dall'inizio REALE (scheduledStart)
+    final elapsedSeconds = now.difference(scheduledStart!).inSeconds;
+
+    if (now.isBefore(_endTime!)) {
+      // Calcolo progresso (0.0 a 1.0)
+      // Usiamo clamp per evitare valori negativi se 'now' è leggermente prima di 'scheduledStart'
+      double progress = (elapsedSeconds / totalSeconds).clamp(0.0, 1.0);
+      
+      double newSoc = _currentSoc + ((_targetSoc - _currentSoc) * progress);
+      
+      // Callback per aggiornare l'interfaccia
+      onSocUpdate?.call(newSoc);
+      
+      // Log ridotto per non intasare la console
+      if (elapsedSeconds % 10 == 0) { // Logga ogni 10 secondi
+         debugPrint('⚡ Carica in corso: ${newSoc.toStringAsFixed(2)}%');
+      }
+    } else if (!_hasNotifiedCompletion) {
+      _hasNotifiedCompletion = true;
+      _completeSimulation();
+    }
+  }
+}
   void _completeSimulation() {
+    debugPrint('✅ _completeSimulation - chiamato');
     _isSimulating = false;
     onStatusChange?.call(false);
     onSocUpdate?.call(_targetSoc);
     
-    // Questa chiamata ora avverrà una volta sola
     onSimulationComplete?.call();
     
     double energyNeeded = ((_targetSoc - _currentSoc) / 100) * _capacity;
@@ -112,9 +182,12 @@ class SimulationService {
       energia: energyNeeded,
       durata: duration,
     );
+    
+    debugPrint('✅ Simulazione completata!');
   }
   
   void stopSimulation() {
+    debugPrint('⏹️ stopSimulation - chiamato');
     _isSimulating = false;
     scheduledStart = null;
     _endTime = null;
@@ -123,6 +196,7 @@ class SimulationService {
   }
   
   void dispose() {
+    debugPrint('🧹 SimulationService: dispose chiamato');
     _timer?.cancel();
     NotificationService().cancelAllNotifications();
   }

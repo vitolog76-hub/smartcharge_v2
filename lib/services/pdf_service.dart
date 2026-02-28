@@ -9,8 +9,8 @@ import 'package:share_plus/share_plus.dart';
 import 'package:intl/intl.dart';
 import 'package:smartcharge_v2/models/charge_session.dart';
 
-// Import per web
-import 'dart:html' as html if (dart.library.io) 'dart:io';
+// --- CORREZIONE PER IOS: Usiamo universal_html per evitare errori di compilazione ---
+import 'package:universal_html/html.dart' as html;
 
 class PdfService {
   static Future<void> generateHistoryPdf(
@@ -72,7 +72,9 @@ class PdfService {
       final output = await getTemporaryDirectory();
       final file = File("${output.path}/report_ricariche_${DateTime.now().millisecondsSinceEpoch}.pdf");
       await file.writeAsBytes(pdfBytes);
-      await Share.shareFiles([file.path], text: 'Report Ricariche SmartCharge');
+      
+      // --- CORREZIONE PER IOS: Uso di XFile invece di file.path diretto ---
+      await Share.shareXFiles([XFile(file.path)], text: 'Report Ricariche SmartCharge');
     }
   }
 
@@ -171,15 +173,12 @@ class PdfService {
     );
   }
 
-  // 🔥 GRAFICO A LINEE SEMPLIFICATO (senza CustomPainter)
   static pw.Widget _buildLineChart(pw.Font ttf, List<ChargeSession> history, int? filterMonth, int? filterYear) {
     if (history.isEmpty) return pw.Container();
 
-    // Prepara i dati
     List<MapEntry<String, double>> dataPoints = [];
     
     if (filterMonth != null && filterYear != null) {
-      // Raggruppa per giorno
       final Map<int, double> dailyData = {};
       for (var s in history) {
         if (s.date.month == filterMonth && s.date.year == filterYear) {
@@ -191,7 +190,6 @@ class PdfService {
         dataPoints.add(MapEntry("$day", dailyData[day]!));
       }
     } else {
-      // Raggruppa per mese
       final Map<String, double> monthlyData = {};
       for (var session in history) {
         final monthKey = DateFormat('MM/yy').format(session.date);
@@ -205,7 +203,6 @@ class PdfService {
 
     if (dataPoints.isEmpty) return pw.Container();
 
-    // Prendi solo gli ultimi 12 punti se sono troppi
     if (dataPoints.length > 12) {
       dataPoints = dataPoints.sublist(dataPoints.length - 12);
     }
@@ -225,7 +222,7 @@ class PdfService {
           child: pw.Row(
             crossAxisAlignment: pw.CrossAxisAlignment.end,
             children: dataPoints.map((point) {
-              final barHeight = (point.value / maxValue) * 120;
+              final barHeight = (point.value / (maxValue == 0 ? 1 : maxValue)) * 120;
               return pw.Expanded(
                 child: pw.Column(
                   mainAxisAlignment: pw.MainAxisAlignment.end,

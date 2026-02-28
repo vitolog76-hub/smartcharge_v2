@@ -37,445 +37,261 @@ class HomeProvider extends ChangeNotifier {
   static const String KEY_WALLBOX_PWR = 'saved_wallbox_pwr';
   static const String KEY_READY_TIME_HOUR = 'ready_time_hour';
   static const String KEY_READY_TIME_MINUTE = 'ready_time_minute';
+  
+  static const String KEY_SIM_ACTIVE = 'simulation_active';
+  static const String KEY_SIM_START = 'simulation_start';
+  static const String KEY_SIM_END = 'simulation_end';
+  static const String KEY_SIM_START_SOC = 'simulation_start_soc';
 
   // --- COSTRUTTORE ---
   HomeProvider() {
     simService.startChecking(
       onSocUpdate: (newSoc) {
-        currentSoc = newSoc;
+        currentSoc = double.parse(newSoc.toStringAsFixed(1));
+        _saveSimulationProgress();
         notifyListeners();
       },
       onStatusChange: (status) {
         isSimulating = status;
+        if (!status) _clearSimulationProgress();
         notifyListeners();
       },
       onSimulationComplete: () {
-        debugPrint('🎯 Callback onSimulationComplete chiamato!');
-        
-        // 🔥 SALVA LA RICARICA NELLO STORICO
         _saveCompletedCharge();
-        
-        // 🔥 MOSTRA IL DIALOG
         _showCompletionDialog = true;
-        
-        debugPrint('🎯 _showCompletionDialog impostato a true');
+        _clearSimulationProgress();
         notifyListeners();
       },
     );
   }
 
+  // --- INIZIALIZZAZIONE ---
   Future<void> init() async {
-    debugPrint("🚀 HomeProvider: Inizializzazione...");
-    
-    // 1. Prima carica le auto (serve per selectedCar)
     await _loadCarsFromJson();
-    
-    // 2. Poi carica i parametri (usa selectedCar)
-    await _loadSimulationParameters();
-    
-    // 3. Poi carica il contratto
     await _loadContract();
-    
-    // 4. INFINE carica lo storico (ORA selectedCar è disponibile!)
     await _loadHistory();
-    
+    await _loadSimulationParameters(); // 🔥 Ora questo metodo esiste sotto e non darà più errore
+    await _loadSimulationProgress();
     notifyListeners();
-    debugPrint("✅ HomeProvider: Inizializzazione completata");
   }
 
-  // --- NUOVO METODO: Salva la ricarica completata ---
-  void _saveCompletedCharge() {
-    try {
-      debugPrint('💾 Salvataggio ricarica completata...');
-      debugPrint('   SOC iniziale: $_socAtStartOfSim%');
-      debugPrint('   SOC finale: $targetSoc%');
-      debugPrint('   Energia: $energyNeeded kWh');
-      debugPrint('   Costo: $estimatedCost €');
-      
-      final now = DateTime.now();
-      final session = ChargeSession(
-        id: DateTime.now().millisecondsSinceEpoch.toString(),
-        date: now,
-        startDateTime: simService.scheduledStart ?? now,
-        endDateTime: now,
-        startSoc: _socAtStartOfSim,
-        endSoc: targetSoc,
-        kwh: energyNeeded,
-        cost: estimatedCost,
-        location: "Home",
-        carBrand: selectedCar.brand,
-        carModel: selectedCar.model,
-        wallboxPower: wallboxPwr,
-      );
-      
-      addChargeSession(session);
-      debugPrint('✅ Ricarica salvata nello storico con ID: ${session.id}');
-    } catch (e) {
-      debugPrint('❌ Errore nel salvataggio della ricarica: $e');
-    }
-  }
+  // --- GETTERS PER CALCOLI ---
+  double get currentBatteryCap => double.tryParse(capacityController.text) ?? (carsLoaded ? selectedCar.batteryCapacity : 50.0);
+  double get energyNeeded => ChargeEngine.calculateEnergy(currentSoc, targetSoc, currentBatteryCap);
+  Duration get duration => ChargeEngine.calculateDuration(energyNeeded, wallboxPwr);
 
-  // --- METODO PER SALVARE LA RICARICA CORRENTE (chiamato da HomePage) ---
-  void saveCurrentCharge() {
-    if (_socAtStartOfSim < targetSoc) {
-      _saveCompletedCharge();
-    }
-  }
-
-  // --- NUOVO METODO: Carica i parametri di simulazione ---
-  Future<void> _loadSimulationParameters() async {
-    try {
-      final prefs = await SharedPreferences.getInstance();
-      
-      currentSoc = prefs.getDouble(KEY_SOC_INIZIALE) ?? 20.0;
-      targetSoc = prefs.getDouble(KEY_SOC_TARGET) ?? 80.0;
-      wallboxPwr = prefs.getDouble(KEY_WALLBOX_PWR) ?? 3.7;
-      
-      final savedHour = prefs.getInt(KEY_READY_TIME_HOUR);
-      final savedMinute = prefs.getInt(KEY_READY_TIME_MINUTE);
-      
-      if (savedHour != null && savedMinute != null) {
-        readyTime = TimeOfDay(hour: savedHour, minute: savedMinute);
-      } else {
-        readyTime = const TimeOfDay(hour: 7, minute: 0);
-      }
-      
-      debugPrint("✅ Parametri caricati: SOC=$currentSoc, Target=$targetSoc, Potenza=$wallboxPwr, Ora=$readyTime");
-    } catch (e) {
-      debugPrint("❌ Errore caricamento parametri: $e");
-    }
-  }
-
-  // --- NUOVO METODO: Salva i parametri di simulazione ---
-  Future<void> _saveSimulationParameters() async {
-    try {
-      final prefs = await SharedPreferences.getInstance();
-      
-      await prefs.setDouble(KEY_SOC_INIZIALE, currentSoc);
-      await prefs.setDouble(KEY_SOC_TARGET, targetSoc);
-      await prefs.setDouble(KEY_WALLBOX_PWR, wallboxPwr);
-      await prefs.setInt(KEY_READY_TIME_HOUR, readyTime.hour);
-      await prefs.setInt(KEY_READY_TIME_MINUTE, readyTime.minute);
-      
-      debugPrint("✅ Parametri salvati");
-    } catch (e) {
-      debugPrint("❌ Errore salvataggio parametri: $e");
-    }
-  }
-
-  // --- GETTERS CALCOLATI ---
-  double get currentBatteryCap => 
-      double.tryParse(capacityController.text) ?? (carsLoaded ? selectedCar.batteryCapacity : 50.0);
-  
-  double get energyNeeded => 
-      ChargeEngine.calculateEnergy(currentSoc, targetSoc, currentBatteryCap);
-  
-  Duration get duration => 
-      ChargeEngine.calculateDuration(energyNeeded, wallboxPwr);
-  
   DateTime get targetReadyDateTime {
     final now = DateTime.now();
     DateTime target = DateTime(now.year, now.month, now.day, readyTime.hour, readyTime.minute);
     if (target.isBefore(now)) target = target.add(const Duration(days: 1));
     return target;
   }
-  
+
   DateTime get calculatedStartDateTime => targetReadyDateTime.subtract(duration);
-  
   String get startTimeDisplay => DateFormat('HH:mm').format(calculatedStartDateTime);
-  
+  bool get isChargingReal => isSimulating && DateTime.now().isAfter(simService.scheduledStart ?? DateTime.now());
+
   double get estimatedCost {
     final startTimeOfDay = TimeOfDay.fromDateTime(calculatedStartDateTime);
+    // Usa il CostCalculator che abbiamo aggiornato per non ricalcolare l'IVA
     return CostCalculator.calculate(energyNeeded, startTimeOfDay, DateTime.now(), myContract);
   }
-  
-  bool get isChargingReal => 
-      isSimulating && DateTime.now().isAfter(simService.scheduledStart ?? DateTime.now());
 
-  bool get shouldShowCompletionDialog => _showCompletionDialog;
-  void resetCompletionDialog() => _showCompletionDialog = false;
+  // --- AZIONI SIMULAZIONE ---
+  void startSimulation() {
+    _clearSimulationProgress().then((_) {
+      _socAtStartOfSim = currentSoc.roundToDouble();
+      currentSoc = _socAtStartOfSim;
+      
+      DateTime startTime = calculatedStartDateTime;
+      final now = DateTime.now();
 
-  // --- METODI PRIVATI DI CARICAMENTO ---
-  Future<void> _loadCarsFromJson() async {
-    try {
-      final String response = await rootBundle.loadString('assets/cars.json');
-      final List<dynamic> data = json.decode(response);
-      allCars = data.map((item) => CarModel.fromJson(item)).toList();
-      
-      final prefs = await SharedPreferences.getInstance();
-      final savedBrand = prefs.getString('selected_car_brand');
-      final savedModel = prefs.getString('selected_car_model');
-      
-      if (savedBrand != null && savedModel != null) {
-        try {
-          selectedCar = allCars.firstWhere((c) => c.brand == savedBrand && c.model == savedModel);
-        } catch (e) {
-          selectedCar = allCars.first;
-        }
-      } else {
-        selectedCar = allCars.first;
+      if (startTime.isBefore(now)) {
+        startTime = now;
       }
-      
-      capacityController.text = selectedCar.batteryCapacity.toString();
-      carsLoaded = true;
-    } catch (e) {
-      debugPrint("❌ Errore caricamento auto: $e");
-    }
+
+      simService.initSimulation(
+        startDateTime: startTime,
+        currentSoc: _socAtStartOfSim,
+        targetSoc: targetSoc,
+        pwr: wallboxPwr,
+        cap: currentBatteryCap,
+      );
+
+      isSimulating = true;
+      _saveSimulationProgress();
+      notifyListeners();
+    });
   }
 
-  Future<void> _loadHistory() async {
-    try {
-      final prefs = await SharedPreferences.getInstance();
-      final String? historyData = prefs.getString('charge_history');
-      
-      if (historyData != null && historyData.isNotEmpty) {
-        debugPrint('📂 Trovato storico: ${historyData.length} caratteri');
-        final List<dynamic> decodedData = jsonDecode(historyData);
-        debugPrint('📊 Elementi trovati: ${decodedData.length}');
-        
-        // 🔥 MIGRAZIONE: Gestisci vecchi dati
-        final List<ChargeSession> migratedHistory = [];
-        int migratedCount = 0;
-        int keptCount = 0;
-        
-        for (var item in decodedData) {
-          try {
-            // Prova a parsare come nuovo formato
-            final session = ChargeSession.fromJson(item);
-            migratedHistory.add(session);
-            keptCount++;
-          } catch (e) {
-            debugPrint('🔄 Migrazione necessaria per un elemento: $e');
-            migratedCount++;
-            
-            // Se fallisce, è un vecchio formato - converti
-            try {
-              // Estrai dati dal vecchio formato
-              final oldDate = DateTime.parse(item['date']);
-              final oldKwh = item['kwh'] is int 
-                  ? (item['kwh'] as int).toDouble() 
-                  : item['kwh'].toDouble();
-              final oldCost = item['cost'] is int 
-                  ? (item['cost'] as int).toDouble() 
-                  : item['cost'].toDouble();
-              final oldLocation = item['location'] ?? "Home";
-              
-              // Recupera startHour/startMinute se esistono
-              int startHour = 8;
-              int startMinute = 0;
-              int endHour = TimeOfDay.now().hour;
-              int endMinute = TimeOfDay.now().minute;
-              
-              if (item.containsKey('startHour')) {
-                startHour = item['startHour'] is int 
-                    ? item['startHour'] 
-                    : int.tryParse(item['startHour'].toString()) ?? 8;
-              }
-              
-              if (item.containsKey('startMinute')) {
-                startMinute = item['startMinute'] is int 
-                    ? item['startMinute'] 
-                    : int.tryParse(item['startMinute'].toString()) ?? 0;
-              }
-              
-              if (item.containsKey('endHour')) {
-                endHour = item['endHour'] is int 
-                    ? item['endHour'] 
-                    : int.tryParse(item['endHour'].toString()) ?? TimeOfDay.now().hour;
-              }
-              
-              if (item.containsKey('endMinute')) {
-                endMinute = item['endMinute'] is int 
-                    ? item['endMinute'] 
-                    : int.tryParse(item['endMinute'].toString()) ?? TimeOfDay.now().minute;
-              }
-              
-              final startDateTime = DateTime(
-                oldDate.year,
-                oldDate.month,
-                oldDate.day,
-                startHour,
-                startMinute,
-              );
-              
-              final endDateTime = DateTime(
-                oldDate.year,
-                oldDate.month,
-                oldDate.day,
-                endHour,
-                endMinute,
-              );
-              
-              // Stima SOC basato su kWh se possibile
-              double startSoc = 20.0;
-              double endSoc = 80.0;
-              
-              if (selectedCar.batteryCapacity > 0 && oldKwh > 0) {
-                final percentIncrease = (oldKwh / selectedCar.batteryCapacity) * 100;
-                endSoc = startSoc + percentIncrease;
-                if (endSoc > 100) endSoc = 100;
-                if (endSoc < 0) endSoc = 80;
-              }
-              
-              // Crea nuova sessione
-              final migratedSession = ChargeSession(
-                id: 'migrated_${DateTime.now().millisecondsSinceEpoch}_${migratedHistory.length}',
-                date: oldDate,
-                startDateTime: startDateTime,
-                endDateTime: endDateTime,
-                startSoc: startSoc,
-                endSoc: endSoc,
-                kwh: oldKwh,
-                cost: oldCost,
-                location: oldLocation,
-                carBrand: selectedCar.brand,
-                carModel: selectedCar.model,
-                wallboxPower: 3.7,
-              );
-              
-              migratedHistory.add(migratedSession);
-              debugPrint('✅ Migrata sessione del ${DateFormat('dd/MM/yyyy').format(oldDate)}');
-            } catch (migrationError) {
-              debugPrint('❌ Errore migrazione: $migrationError');
-            }
-          }
-        }
-        
-        chargeHistory = migratedHistory;
-        debugPrint('✅ Storico caricato: $keptCount mantenuti, $migratedCount migrati, totale ${chargeHistory.length} sessioni');
-        
-        // Salva il formato migrato se ci sono state conversioni
-        if (migratedCount > 0) {
-          debugPrint('💾 Salvataggio storico migrato...');
-          await saveHistory();
-        }
-      } else {
-        chargeHistory = [];
-        debugPrint('📭 Nessuno storico trovato');
-      }
-    } catch (e) {
-      debugPrint("❌ Errore caricamento storico: $e");
-      chargeHistory = [];
-    }
-  }
-
-  Future<void> forceMigrateHistory() async {
-    debugPrint('🔄 Forzatura migrazione storico...');
-    await _loadHistory();
-    debugPrint('✅ Migrazione completata: ${chargeHistory.length} sessioni');
-  }
-
-  Future<void> _loadContract() async {
-    try {
-      final prefs = await SharedPreferences.getInstance();
-      final String? contractData = prefs.getString('energy_contract');
-      if (contractData != null && contractData.isNotEmpty) {
-        myContract = EnergyContract.fromJson(jsonDecode(contractData));
-      }
-    } catch (e) {
-      debugPrint("❌ Errore caricamento contratto: $e");
-    }
-  }
-
-  // --- AZIONI ---
-  Future<void> saveHistory() async {
-    try {
-      final prefs = await SharedPreferences.getInstance();
-      final jsonData = jsonEncode(chargeHistory.map((s) => s.toJson()).toList());
-      await prefs.setString('charge_history', jsonData);
-      debugPrint('✅ Storico salvato: ${chargeHistory.length} sessioni');
-      
-      final userId = prefs.getString('user_sync_id');
-      if (userId != null && userId.isNotEmpty) {
-        await SyncService().uploadData(userId, chargeHistory, myContract);
-      }
-    } catch (e) {
-      debugPrint("❌ Errore salvataggio: $e");
-    }
-  }
-
-  void selectCar(CarModel car) {
-    selectedCar = car;
-    capacityController.text = car.batteryCapacity.toString();
-    saveSelectedCar(car);
+  void stopSimulation() {
+    simService.stopSimulation();
+    isSimulating = false;
+    _clearSimulationProgress();
     _saveSimulationParameters();
     notifyListeners();
-  }
-
-  Future<void> saveSelectedCar(CarModel car) async {
-    final prefs = await SharedPreferences.getInstance();
-    await prefs.setString('selected_car_brand', car.brand);
-    await prefs.setString('selected_car_model', car.model);
-  }
-
-  void updateReadyTime(TimeOfDay time) { 
-    readyTime = time; 
-    _saveSimulationParameters();
-    notifyListeners(); 
-  }
-  
-  void updateWallboxPwr(double value) { 
-    wallboxPwr = value; 
-    _saveSimulationParameters();
-    notifyListeners(); 
-  }
-  
-  void updateCurrentSoc(double value) { 
-    currentSoc = value; 
-    _saveSimulationParameters();
-    notifyListeners(); 
-  }
-  
-  void updateTargetSoc(double value) { 
-    targetSoc = value; 
-    _saveSimulationParameters();
-    notifyListeners(); 
   }
 
   void addChargeSession(ChargeSession session) {
-    debugPrint('➕ Aggiunta sessione allo storico: ${session.id}');
     chargeHistory.add(session);
     saveHistory();
+    _syncHistoryIfPossible();
     notifyListeners();
   }
 
-  void startSimulation() {
-  debugPrint('🚀 Avvio simulazione - SOC iniziale: $currentSoc%, Target: $targetSoc%');
-  _socAtStartOfSim = currentSoc;
-  simService.initSimulation(
-    startDateTime: calculatedStartDateTime,
-    currentSoc: currentSoc,
-    targetSoc: targetSoc,
-    pwr: wallboxPwr,
-    cap: currentBatteryCap,
-  );
-  // 🔥 MANCA QUESTA RIGA!
-  isSimulating = true;  // <-- DEVI AGGIUNGERE QUESTA
-  notifyListeners();
-}
-
-  void stopSimulation() {
-    debugPrint('⏹️ Simulazione fermata manualmente');
-    simService.stopSimulation();
+  void saveCurrentCharge() {
+    if (_socAtStartOfSim < currentSoc) {
+      _saveCompletedCharge();
+    }
   }
 
-  Future<void> refreshAfterSettings() async {
-    await _loadHistory();
-    await _loadContract();
-    notifyListeners();
+  void _saveCompletedCharge() {
+    final now = DateTime.now();
+    final session = ChargeSession(
+      id: DateTime.now().millisecondsSinceEpoch.toString(),
+      date: now,
+      startDateTime: simService.scheduledStart ?? now,
+      endDateTime: now,
+      startSoc: _socAtStartOfSim,
+      endSoc: currentSoc,
+      kwh: ChargeEngine.calculateEnergy(_socAtStartOfSim, currentSoc, currentBatteryCap),
+      cost: estimatedCost,
+      location: "Home",
+      carBrand: selectedCar.brand,
+      carModel: selectedCar.model,
+      wallboxPower: wallboxPwr,
+    );
+    addChargeSession(session);
   }
 
-  Future<void> resetToDefaults() async {
-    currentSoc = 20.0;
-    targetSoc = 80.0;
-    wallboxPwr = 3.7;
-    readyTime = const TimeOfDay(hour: 7, minute: 0);
+  // --- PERSISTENZA ---
+  Future<void> saveHistory() async {
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setString('charge_history', jsonEncode(chargeHistory.map((s) => s.toJson()).toList()));
+  }
+
+  Future<void> _syncHistoryIfPossible() async {
+    final prefs = await SharedPreferences.getInstance();
+    final userId = prefs.getString('user_sync_id');
+    if (userId != null) {
+      await SyncService().uploadData(userId, chargeHistory, myContract);
+    }
+  }
+
+  // 🔥 SALVATAGGIO CONTRATTO CON NOTIFICA UI
+  Future<void> saveContract() async {
+    final prefs = await SharedPreferences.getInstance();
+    String jsonData = jsonEncode(myContract.toJson());
+    await prefs.setString('energy_contract', jsonData);
     
-    await _saveSimulationParameters();
-    notifyListeners();
+    // Fondamentale per aggiornare il "Resoconto Contratto" subito
+    notifyListeners(); 
+    
+    final userId = prefs.getString('user_sync_id');
+    if (userId != null) {
+      await SyncService().uploadData(userId, chargeHistory, myContract);
+    }
   }
 
-  Future<void> salvaTuttiParametri() async {
-    await _saveSimulationParameters();
+  Future<void> salvaTuttiParametri() async { 
+    await _saveSimulationParameters(); 
   }
+
+  // 🔥 METODO RECUPERATO (Risolve l'errore rosso)
+  Future<void> _loadSimulationParameters() async {
+    final prefs = await SharedPreferences.getInstance();
+    double savedSoc = prefs.getDouble(KEY_SOC_INIZIALE) ?? 20.0;
+    currentSoc = savedSoc.roundToDouble();
+    
+    targetSoc = prefs.getDouble(KEY_SOC_TARGET) ?? 80.0;
+    wallboxPwr = prefs.getDouble(KEY_WALLBOX_PWR) ?? 3.7;
+    
+    final h = prefs.getInt(KEY_READY_TIME_HOUR);
+    final m = prefs.getInt(KEY_READY_TIME_MINUTE);
+    if (h != null && m != null) readyTime = TimeOfDay(hour: h, minute: m);
+  }
+
+  Future<void> _saveSimulationParameters() async {
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setDouble(KEY_SOC_INIZIALE, currentSoc);
+    await prefs.setDouble(KEY_SOC_TARGET, targetSoc);
+    await prefs.setDouble(KEY_WALLBOX_PWR, wallboxPwr);
+    await prefs.setInt(KEY_READY_TIME_HOUR, readyTime.hour);
+    await prefs.setInt(KEY_READY_TIME_MINUTE, readyTime.minute);
+  }
+
+  Future<void> _saveSimulationProgress() async {
+    if (!isSimulating) return;
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setBool(KEY_SIM_ACTIVE, true);
+    await prefs.setString(KEY_SIM_START, simService.scheduledStart?.toIso8601String() ?? '');
+    await prefs.setString(KEY_SIM_END, simService.endTime?.toIso8601String() ?? '');
+    await prefs.setDouble(KEY_SIM_START_SOC, _socAtStartOfSim);
+  }
+
+  Future<void> _loadSimulationProgress() async {
+    final prefs = await SharedPreferences.getInstance();
+    if (!(prefs.getBool(KEY_SIM_ACTIVE) ?? false)) return;
+    final startStr = prefs.getString(KEY_SIM_START);
+    final endStr = prefs.getString(KEY_SIM_END);
+    final savedSoc = prefs.getDouble(KEY_SIM_START_SOC);
+    if (startStr != null && endStr != null && savedSoc != null) {
+      final start = DateTime.parse(startStr);
+      final end = DateTime.parse(endStr);
+      if (DateTime.now().isAfter(end)) { _clearSimulationProgress(); return; }
+      _socAtStartOfSim = savedSoc;
+      simService.restoreSimulation(startDateTime: start, endDateTime: end, currentSoc: _socAtStartOfSim, targetSoc: targetSoc, pwr: wallboxPwr, cap: currentBatteryCap);
+      isSimulating = true;
+    }
+  }
+
+  Future<void> _clearSimulationProgress() async {
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.remove(KEY_SIM_ACTIVE);
+    await prefs.remove(KEY_SIM_START);
+    await prefs.remove(KEY_SIM_END);
+    await prefs.remove(KEY_SIM_START_SOC);
+  }
+
+  Future<void> _loadCarsFromJson() async {
+    final String response = await rootBundle.loadString('assets/cars.json');
+    final List<dynamic> data = json.decode(response);
+    allCars = data.map((item) => CarModel.fromJson(item)).toList();
+    final prefs = await SharedPreferences.getInstance();
+    final b = prefs.getString('selected_car_brand');
+    final m = prefs.getString('selected_car_model');
+    selectedCar = allCars.firstWhere((c) => c.brand == b && c.model == m, orElse: () => allCars.first);
+    capacityController.text = selectedCar.batteryCapacity.toString();
+    carsLoaded = true;
+  }
+
+  Future<void> _loadContract() async {
+    final prefs = await SharedPreferences.getInstance();
+    final data = prefs.getString('energy_contract');
+    if (data != null) myContract = EnergyContract.fromJson(jsonDecode(data));
+  }
+
+  Future<void> _loadHistory() async {
+    final prefs = await SharedPreferences.getInstance();
+    final data = prefs.getString('charge_history');
+    if (data != null) {
+      final List<dynamic> list = jsonDecode(data);
+      chargeHistory = list.map((e) => ChargeSession.fromJson(e)).toList();
+    }
+  }
+
+  void selectCar(CarModel c) { selectedCar = c; capacityController.text = c.batteryCapacity.toString(); _saveSimulationParameters(); notifyListeners(); }
+  void updateReadyTime(TimeOfDay t) { readyTime = t; _saveSimulationParameters(); notifyListeners(); }
+  void updateWallboxPwr(double v) { wallboxPwr = v; _saveSimulationParameters(); notifyListeners(); }
+  
+  void updateCurrentSoc(double v) { 
+    currentSoc = v.roundToDouble(); 
+    _saveSimulationParameters(); 
+    notifyListeners(); 
+  }
+  
+  void updateTargetSoc(double v) { targetSoc = v; _saveSimulationParameters(); notifyListeners(); }
+  bool get shouldShowCompletionDialog => _showCompletionDialog;
+  void resetCompletionDialog() => _showCompletionDialog = false;
+  Future<void> refreshAfterSettings() async { await _loadHistory(); await _loadContract(); notifyListeners(); }
 }

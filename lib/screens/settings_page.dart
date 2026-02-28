@@ -6,13 +6,18 @@ import 'package:smartcharge_v2/models/charge_session.dart';
 import 'package:smartcharge_v2/models/car_model.dart';
 import 'package:smartcharge_v2/services/sync_service.dart';
 import 'package:smartcharge_v2/providers/auth_provider.dart';
-import 'package:smartcharge_v2/screens/login_page.dart';
+import 'package:smartcharge_v2/providers/home_provider.dart';
+import 'package:smartcharge_v2/screens/bill_scanner_page.dart';
+import 'package:smartcharge_v2/screens/contract_summary_page.dart';
+import 'package:provider/provider.dart';
+
 
 class SettingsPage extends StatefulWidget {
   final EnergyContract contract;
   final CarModel selectedCar;
   final String batteryValue;
   final AuthProvider authProvider;
+  final HomeProvider homeProvider;
 
   const SettingsPage({
     super.key,
@@ -20,6 +25,7 @@ class SettingsPage extends StatefulWidget {
     required this.selectedCar,
     required this.batteryValue,
     required this.authProvider,
+    required this.homeProvider,
   });
 
   @override
@@ -115,70 +121,30 @@ class _SettingsPageState extends State<SettingsPage> {
     if (mounted) Navigator.pop(context, true);
   }
 
-  void _importFromCloud(String userId) async {
-    if (userId.isEmpty) {
-      _showErrorDialog("ATTENZIONE", "Inserisci un ID prima di scaricare.");
-      return;
+  Future<void> _importFromCloud(String userId) async {
+  if (userId.isEmpty) return;
+
+  setState(() => _isSyncing = true);
+  try {
+    var data = await SyncService().downloadAllData(userId);
+    if (data != null) {
+      final prefs = await SharedPreferences.getInstance();
+      
+      // Salvataggio grezzo
+      if (data['history'] != null) await prefs.setString('charge_history', jsonEncode(data['history']));
+      if (data['contract'] != null) await prefs.setString('energy_contract', jsonEncode(data['contract']));
+
+      // 🔥 IL TRUCCO: forza l'aggiornamento senza errori di compilazione
+      await context.read<HomeProvider>().refreshAfterSettings();
+      
+      if (mounted) ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text("✅ Sincronizzato!")));
     }
-    setState(() => _isSyncing = true);
-    try {
-      bool exists = await SyncService().checkIfUserExists(userId);
-      if (exists) {
-        bool? confirm = await _showConfirmDialog();
-        if (confirm == true) {
-          var data = await SyncService().downloadAllData(userId);
-          if (data != null) {
-            final prefs = await SharedPreferences.getInstance();
-            
-            debugPrint("📥 Dati ricevuti dal cloud: $data");
-            
-            if (data['history'] != null) {
-              final historyList = data['history'] as List;
-              debugPrint("📊 Storico ricevuto: ${historyList.length} sessioni");
-              await prefs.setString('charge_history', jsonEncode(historyList));
-            } else {
-              debugPrint("⚠️ Nessuno storico nel cloud");
-            }
-            
-            if (data['contract'] != null) {
-              final contractMap = data['contract'] as Map<String, dynamic>;
-              await prefs.setString('energy_contract', jsonEncode(contractMap));
-              
-              EnergyContract imported = EnergyContract.fromJson(contractMap);
-              setState(() {
-                _providerController.text = imported.provider;
-                _nameController.text = imported.userName;
-                _f1Controller.text = imported.f1Price.toString();
-                _f2Controller.text = imported.f2Price.toString();
-                _f3Controller.text = imported.f3Price.toString();
-                _isMonorario = imported.isMonorario;
-              });
-              
-              widget.contract.provider = imported.provider;
-              widget.contract.userName = imported.userName;
-              widget.contract.f1Price = imported.f1Price;
-              widget.contract.f2Price = imported.f2Price;
-              widget.contract.f3Price = imported.f3Price;
-              widget.contract.isMonorario = imported.isMonorario;
-            }
-            
-            if (mounted) {
-              Navigator.pop(context, true);
-            }
-            
-            _showSuccessDialog("SUCCESSO", "Dati recuperati dal Cloud!");
-          }
-        }
-      } else {
-        _showErrorDialog("NON TROVATO", "Nessun dato per questo ID.");
-      }
-    } catch (e) { 
-      debugPrint("❌ ERRORE DOWNLOAD: $e");
-      _showErrorDialog("ERRORE", "$e");
-    } finally { 
-      setState(() => _isSyncing = false); 
-    }
+  } catch (e) {
+    print("Errore: $e");
+  } finally {
+    if (mounted) setState(() => _isSyncing = false);
   }
+}
 
   Future<bool?> _showLogoutConfirmDialog() {
     return showDialog<bool>(
@@ -188,14 +154,8 @@ class _SettingsPageState extends State<SettingsPage> {
         title: const Text("Conferma logout", style: TextStyle(color: Colors.white)),
         content: const Text("Vuoi davvero uscire?", style: TextStyle(color: Colors.white70)),
         actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(ctx, false),
-            child: const Text("ANNULLA"),
-          ),
-          TextButton(
-            onPressed: () => Navigator.pop(ctx, true),
-            child: const Text("ESCI", style: TextStyle(color: Colors.redAccent)),
-          ),
+          TextButton(onPressed: () => Navigator.pop(ctx, false), child: const Text("ANNULLA")),
+          TextButton(onPressed: () => Navigator.pop(ctx, true), child: const Text("ESCI", style: TextStyle(color: Colors.redAccent))),
         ],
       ),
     );
@@ -209,14 +169,8 @@ class _SettingsPageState extends State<SettingsPage> {
         title: const Text("CONFERMA", style: TextStyle(color: Colors.white)),
         content: const Text("Sovrascrivere i dati locali con quelli del Cloud?", style: TextStyle(color: Colors.white70)),
         actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(ctx, false),
-            child: const Text("ANNULLA"),
-          ),
-          TextButton(
-            onPressed: () => Navigator.pop(ctx, true),
-            child: const Text("OK"),
-          ),
+          TextButton(onPressed: () => Navigator.pop(ctx, false), child: const Text("ANNULLA")),
+          TextButton(onPressed: () => Navigator.pop(ctx, true), child: const Text("OK")),
         ],
       ),
     );
@@ -229,12 +183,7 @@ class _SettingsPageState extends State<SettingsPage> {
         backgroundColor: const Color(0xFF1C1C1E),
         title: Text(title, style: const TextStyle(color: Colors.white)),
         content: Text(message, style: const TextStyle(color: Colors.white70)),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(ctx),
-            child: const Text("OK"),
-          ),
-        ],
+        actions: [TextButton(onPressed: () => Navigator.pop(ctx), child: const Text("OK"))],
       ),
     );
   }
@@ -246,19 +195,12 @@ class _SettingsPageState extends State<SettingsPage> {
         backgroundColor: const Color(0xFF1C1C1E),
         title: Text(title, style: const TextStyle(color: Colors.greenAccent)),
         content: Text(message, style: const TextStyle(color: Colors.white70)),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(ctx),
-            child: const Text("OK"),
-          ),
-        ],
+        actions: [TextButton(onPressed: () => Navigator.pop(ctx), child: const Text("OK"))],
       ),
     );
   }
 
-  void _showInfoDialog(String title, String message) {
-    _showErrorDialog(title, message);
-  }
+  void _showInfoDialog(String title, String message) => _showErrorDialog(title, message);
 
   @override
   Widget build(BuildContext context) {
@@ -335,6 +277,97 @@ class _SettingsPageState extends State<SettingsPage> {
                 padding: const EdgeInsets.all(16.0),
                 child: Column(
                   children: [
+                    // 🔥 PULSANTE ANALIZZA BOLLETTA
+                    InkWell(
+                      onTap: () async {
+                        final result = await Navigator.push(
+                          context,
+                          MaterialPageRoute(
+                            builder: (_) => BillScannerPage(
+                              provider: widget.homeProvider,
+                            ),
+                          ),
+                        );
+                        
+                        if (result == true) {
+                          setState(() {
+                            _providerController.text = widget.homeProvider.myContract.provider;
+                            _f1Controller.text = widget.homeProvider.myContract.f1Price.toString();
+                            _f2Controller.text = widget.homeProvider.myContract.f2Price.toString();
+                            _f3Controller.text = widget.homeProvider.myContract.f3Price.toString();
+                            _isMonorario = widget.homeProvider.myContract.isMonorario;
+                          });
+                          
+                          ScaffoldMessenger.of(context).showSnackBar(
+                            const SnackBar(
+                              content: Text("✅ Tariffe aggiornate!"),
+                              backgroundColor: Colors.green,
+                            ),
+                          );
+                        }
+                      },
+                      child: Container(
+                        padding: const EdgeInsets.all(12),
+                        decoration: BoxDecoration(
+                          color: Colors.blueAccent.withOpacity(0.2),
+                          borderRadius: BorderRadius.circular(10),
+                          border: Border.all(color: Colors.blueAccent.withOpacity(0.3)),
+                        ),
+                        child: const Row(
+                          children: [
+                            Icon(Icons.receipt_long, color: Colors.blueAccent, size: 20),
+                            SizedBox(width: 12),
+                            Expanded(
+                              child: Text(
+                                "📄 ANALIZZA BOLLETTA",
+                                style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 12),
+                              ),
+                            ),
+                            Icon(Icons.arrow_forward, color: Colors.blueAccent, size: 16),
+                          ],
+                        ),
+                      ),
+                    ),
+                    
+                    const SizedBox(height: 12),
+                    
+                    // 🔥 PULSANTE RESOCONTO CONTRATTO (MODIFICATO)
+                    InkWell(
+                      onTap: () {
+                        Navigator.push(
+                          context,
+                          MaterialPageRoute(
+                            builder: (_) => ContractSummaryPage(
+                              
+                            ),
+                          ),
+                        );
+                      },
+                      child: Container(
+                        padding: const EdgeInsets.all(12),
+                        decoration: BoxDecoration(
+                          color: Colors.purple.withOpacity(0.2),
+                          borderRadius: BorderRadius.circular(10),
+                          border: Border.all(color: Colors.purple.withOpacity(0.3)),
+                        ),
+                        child: const Row(
+                          children: [
+                            Icon(Icons.pie_chart, color: Colors.purple, size: 20),
+                            SizedBox(width: 12),
+                            Expanded(
+                              child: Text(
+                                "📊 RESOCONTO CONTRATTO",
+                                style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 12),
+                              ),
+                            ),
+                            Icon(Icons.arrow_forward, color: Colors.purple, size: 16),
+                          ],
+                        ),
+                      ),
+                    ),
+                    
+                    const Divider(color: Colors.white10, height: 30),
+
                     _buildInput("GESTORE", _providerController, Icons.business),
                     const SizedBox(height: 15),
                     Row(
@@ -368,33 +401,24 @@ class _SettingsPageState extends State<SettingsPage> {
 
             const SizedBox(height: 25),
 
-            // ... (tutto il resto del file rimane uguale, ma modifica la sezione account)
-
-_buildSectionTitle("4 - ACCOUNT"),
-_buildCard(
-  child: Column(
-    children: [
-      ListTile(
-  leading: const Icon(Icons.logout, color: Colors.redAccent),
-  title: const Text(
-    "Esci dall'account",
-    style: TextStyle(color: Colors.redAccent),
-  ),
-  onTap: () async {
-    final confirm = await _showLogoutConfirmDialog();
-    if (confirm == true) {
-      await widget.authProvider.signOut();
-      if (context.mounted) {
-        // 🔥 Chiudi SettingsPage e torna al login
-        Navigator.pop(context); // Chiudi SettingsPage
-        // Il Consumer in main gestirà il resto
-      }
-    }
-  },
-),
-    ],
-  ),
-),
+            _buildSectionTitle("4 - ACCOUNT"),
+            _buildCard(
+              child: Column(
+                children: [
+                  ListTile(
+                    leading: const Icon(Icons.logout, color: Colors.redAccent),
+                    title: const Text("Esci dall'account", style: TextStyle(color: Colors.redAccent)),
+                    onTap: () async {
+                      final confirm = await _showLogoutConfirmDialog();
+                      if (confirm == true) {
+                        await widget.authProvider.signOut();
+                        if (context.mounted) Navigator.pop(context);
+                      }
+                    },
+                  ),
+                ],
+              ),
+            ),
             
             const SizedBox(height: 30),
             if (_isSyncing) const Center(child: CircularProgressIndicator(color: Colors.blueAccent)),

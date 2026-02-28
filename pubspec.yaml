@@ -1,5 +1,5 @@
 name: smartcharge_v2
-description: "A new Flutter project."
+description: "A new Flutter project for Smart EV Charging."
 version: 1.0.0+1
 
 environment:
@@ -8,16 +8,22 @@ environment:
 dependencies:
   flutter:
     sdk: flutter
-    
   
-  # UI
+  # UI & Fonts
   google_fonts: ^6.1.0
   cupertino_icons: ^1.0.8
   
-  # Utility
+  # State Management & Storage
   provider: ^6.1.1
-  intl: ^0.19.0
   shared_preferences: ^2.5.4
+  intl: ^0.19.0
+  image_picker: ^1.0.4
+  # 🔥 AI & FILE PICKER
+  google_generative_ai: ^0.4.0
+  file_picker: ^8.0.0
+  
+  # 🔥 ESTRAZIONE PDF (Syncfusion)
+  syncfusion_flutter_pdf: ^24.2.3
   
   # Grafici e PDF
   fl_chart: ^0.66.0
@@ -25,17 +31,17 @@ dependencies:
   printing: ^5.11.1
   path_provider: ^2.1.2
   share_plus: ^7.2.0
-  universal_html: ^2.2.4
+  universal_html: ^2.3.0
   
   # Firebase
   firebase_core: ^3.15.0
   cloud_firestore: ^5.6.5
   firebase_auth: ^5.5.2
   
-  # Effetti
+  # Effetti Visivi
   fluid_background: ^1.0.5
   
-  # 🔥 NOTIFICHE
+  # Notifiche & Permessi
   flutter_local_notifications: ^17.1.0
   timezone: ^0.9.2
   permission_handler: ^11.3.0
@@ -46,7 +52,9 @@ dev_dependencies:
     sdk: flutter
   flutter_lints: ^6.0.0
   flutter_launcher_icons: ^0.13.1
+  # 🔥 RIMOSSO pdf_text
 
+# Configurazione Icone App
 flutter_launcher_icons:
   android: true
   ios: true
@@ -58,13 +66,13 @@ flutter_launcher_icons:
 flutter:
   uses-material-design: true
   
-  # 🔥 FONT
+  # Font Personalizzati
   fonts:
     - family: CourierNew
       fonts:
         - asset: fonts/Courier New.ttf
   
-  # 🔥 ASSETS
+  # Asset di Progetto
   assets:
     - assets/cars.json
     - assets/images/logo.png

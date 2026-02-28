@@ -6,27 +6,20 @@ import 'package:smartcharge_v2/providers/auth_provider.dart';
 import 'package:smartcharge_v2/providers/home_provider.dart';
 import 'package:smartcharge_v2/screens/login_page.dart';
 import 'package:smartcharge_v2/screens/home_page.dart';
-import 'package:smartcharge_v2/services/notification_service.dart';  // <-- AGGIUNGI QUESTO IMPORT
+import 'package:smartcharge_v2/services/notification_service.dart'; 
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
   
-  await Firebase.initializeApp(
-    options: const FirebaseOptions(
-      apiKey: "AIzaSyBdZ7j1pMuabOd47xeBzCPq0g9wBi4jg3A",
-      authDomain: "smartcharge-c5b34.firebaseapp.com",
-      projectId: "smartcharge-c5b34",
-      storageBucket: "smartcharge-c5b34.firebasestorage.app",
-      messagingSenderId: "25947690562",
-      appId: "1:25947690562:web:613953180d63919a677fdb",
-      measurementId: "G-R35N994658",
-    ),
-  );
+  try {
+    if (Firebase.apps.isEmpty) {
+      await Firebase.initializeApp(); 
+    }
+  } catch (e) {
+    debugPrint("Errore inizializzazione Firebase: $e");
+  }
 
-  // 🔥 Inizializza le date in italiano
   await initializeDateFormatting('it_IT', null);
-  
-  // 🔥 Inizializza le notifiche (AGGIUNGI QUESTA RIGA)
   await NotificationService().init();
 
   runApp(const MyApp());
@@ -40,6 +33,8 @@ class MyApp extends StatelessWidget {
     return MultiProvider(
       providers: [
         ChangeNotifierProvider(create: (_) => AuthProvider()),
+        // 🔥 SPOSTATO QUI: Ora HomeProvider è globale e non crasha più nulla!
+        ChangeNotifierProvider(create: (_) => HomeProvider()..init()),
       ],
       child: MaterialApp(
         debugShowCheckedModeBanner: false,
@@ -59,13 +54,8 @@ class MyApp extends StatelessWidget {
         ),
         home: Consumer<AuthProvider>(
           builder: (_, auth, __) {
-            if (auth.isAuthenticated) {
-              return ChangeNotifierProvider(
-                create: (_) => HomeProvider()..init(),
-                child: const HomePage(),
-              );
-            }
-            return const LoginPage();
+            // Se autenticato vai alla Home, altrimenti Login
+            return auth.isAuthenticated ? const HomePage() : const LoginPage();
           },
         ),
       ),
