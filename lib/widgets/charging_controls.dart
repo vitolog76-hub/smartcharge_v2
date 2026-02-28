@@ -9,12 +9,12 @@ class ChargingControls extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Container(
-      // Aumentato il padding per non far toccare i bordi del vetro
-      padding: const EdgeInsets.symmetric(vertical: 16, horizontal: 20),
+      // Ridotto padding verticale da 16 a 8 per salvare spazio
+      padding: const EdgeInsets.symmetric(vertical: 8, horizontal: 20),
       child: LayoutBuilder(
         builder: (context, constraints) {
           return Column(
-            // spaceAround distribuisce le 3 sezioni occupando tutta l'altezza disponibile
+            // Manteniamo spaceAround per distribuire, ma con meno padding esterno respira meglio
             mainAxisAlignment: MainAxisAlignment.spaceAround,
             children: [
               _buildSliderRow(
@@ -107,13 +107,12 @@ class ChargingControls extends StatelessWidget {
               label,
               style: TextStyle(
                 color: color.withOpacity(0.9),
-                fontSize: 12, // Più leggibile
+                fontSize: 12,
                 fontWeight: FontWeight.w900,
                 letterSpacing: 1.2,
               ),
             ),
             const Spacer(),
-            // Badge valore più grande e visibile
             Container(
               padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
               decoration: BoxDecoration(
@@ -132,20 +131,19 @@ class ChargingControls extends StatelessWidget {
             ),
           ],
         ),
-        const SizedBox(height: 8),
+        const SizedBox(height: 4), // Ridotto da 8 a 4 per compattare verticalmente
         Row(
           children: [
             _buildSmallButton(Icons.remove, color, onDecrement),
             Expanded(
               child: SliderTheme(
                 data: SliderThemeData(
-                  trackHeight: 4.0, // Aumentato per dare "corpo" allo slider
-                  thumbShape: const RoundSliderThumbShape(enabledThumbRadius: 10), // Pallino più grande
-                  overlayShape: const RoundSliderOverlayShape(overlayRadius: 20),
+                  trackHeight: 2.5, // Ridotto da 4.0 a 2.5 (giusto compromesso)
+                  thumbShape: const RoundSliderThumbShape(enabledThumbRadius: 8), // Ridotto da 10 a 8
+                  overlayShape: const RoundSliderOverlayShape(overlayRadius: 16),
                   activeTrackColor: color,
                   inactiveTrackColor: color.withOpacity(0.1),
                   thumbColor: color,
-                  // Effetto glow sul pallino
                   valueIndicatorColor: color,
                 ),
                 child: Slider(
@@ -170,14 +168,14 @@ class ChargingControls extends StatelessWidget {
         onTap: onTap,
         borderRadius: BorderRadius.circular(12),
         child: Container(
-          width: 36, // Aumentato da 24 a 36 per facilità di click su Web
-          height: 36,
+          width: 32, // Ridotto da 36 a 32 per salvare altezza
+          height: 32,
           decoration: BoxDecoration(
             color: color.withOpacity(0.08),
             shape: BoxShape.circle,
             border: Border.all(color: color.withOpacity(0.2)),
           ),
-          child: Icon(icon, color: color, size: 18),
+          child: Icon(icon, color: color, size: 16), // Ridotto size da 18 a 16
         ),
       ),
     );
