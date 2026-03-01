@@ -18,32 +18,30 @@ void main() async {
     await dotenv.load(fileName: "assets/.env");
     debugPrint('✅ .env caricato da assets/');
   } catch (e) {
-    debugPrint('📢 .env non trovato in assets/');
+    debugPrint('📢 .env non trovato in assets/ (Normale in produzione)');
   }
 
   try {
     if (kIsWeb) {
       debugPrint('🌐 Inizializzazione Firebase per WEB...');
       
+      // RECUPERO CHIAVE DINAMICO
       String firebaseApiKey = '';
       
-      // PRIORITÀ 1: .env (sviluppo locale) - Usiamo il nuovo nome FIRESTORE_KEY
-      if (dotenv.isInitialized && dotenv.env['FIRESTORE_KEY'] != null && dotenv.env['FIRESTORE_KEY']!.isNotEmpty) {
-        firebaseApiKey = dotenv.env['FIRESTORE_KEY']!;
-        debugPrint('🔑 Usando FIRESTORE_KEY da .env');
-      } 
-      // PRIORITÀ 2: environment variables (Vercel) - Usiamo il nuovo nome FIRESTORE_KEY
-      else {
-        firebaseApiKey = const String.fromEnvironment('FIRESTORE_KEY');
-        debugPrint('🔑 Usando FIRESTORE_KEY da environment variables');
+      // 1. Prova da String.fromEnvironment (Passata durante il build)
+      firebaseApiKey = const String.fromEnvironment('FIRESTORE_KEY');
+
+      // 2. Se vuota, prova dal file .env (Sviluppo locale o se caricato)
+      if (firebaseApiKey.isEmpty && dotenv.isInitialized) {
+        firebaseApiKey = dotenv.env['FIRESTORE_KEY'] ?? '';
       }
       
       if (firebaseApiKey.isEmpty) {
         debugPrint('❌ ERRORE: FIRESTORE_KEY non trovata!');
-        debugPrint('💡 Controlla che il file assets/.env o Vercel abbiano la variabile FIRESTORE_KEY');
+        debugPrint('💡 Assicurati di aver impostato FIRESTORE_KEY su Vercel o nel file .env');
       } else {
-        // Stampa solo i primi 6 caratteri per sicurezza
-        debugPrint('🔑 Chiave caricata: ${firebaseApiKey.substring(0, 6)}...');
+        // Stampa di controllo sicura
+        debugPrint('🔑 Chiave caricata correttamente (inizia con: ${firebaseApiKey.substring(0, 6)})');
       }
       
       await Firebase.initializeApp(
