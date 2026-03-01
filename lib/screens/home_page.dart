@@ -122,53 +122,57 @@ class HomePage extends StatelessWidget {
                   right: -80,
                   child: _buildGlowSphere(250, Colors.amberAccent.withOpacity(0.07)),
                 ),
-                SafeArea(
-                  child: Padding(
-                    padding: const EdgeInsets.all(12),
-                    child: Column(
-                      children: [
-                        _glassContainer(child: ReadyTimeCard(provider: provider)),
-                        const SizedBox(height: 12),
-                        BatteryStatusRow(provider: provider),
-                        const SizedBox(height: 12),
-                        StatsRow(provider: provider),
-                        const SizedBox(height: 12),
-                        Expanded(
-                          flex: 4,
-                          child: _glassContainer(
-                            blur: 20,
-                            opacity: 0.08,
-                            child: ChargingControls(provider: provider),
-                          ),
-                        ),
-                        const SizedBox(height: 12),
-                        Row(
-                          children: [
-                            Expanded(
-                              flex: 12,
-                              child: SimulationButton(provider: provider), // Rimosso glassContainer esterno perché già nel widget
-                            ),
-                            const SizedBox(width: 12),
-                            Expanded(
-                              flex: 18,
-                              child: _buildCarInfo(context, provider),
-                            ),
-                          ],
-                        ),
-                        const SizedBox(height: 12),
-                        _glassContainer(
-                          padding: const EdgeInsets.symmetric(vertical: 4),
-                          child: ActionButtons(
-                            onHomeTap: provider.isSimulating ? () {} : () => _showAddDialog(context, provider, "Home"),
-                            onPublicTap: provider.isSimulating ? () {} : () => _showAddDialog(context, provider, "Pubblica"),
-                          ),
-                        ),
-                        const SizedBox(height: 12),
-                        _buildEditCapacityTile(context, provider),
-                      ],
-                    ),
-                  ),
-                ),
+                // ... nel metodo build di HomePage ...
+SafeArea(
+  child: Padding(
+    padding: const EdgeInsets.all(12),
+    child: SingleChildScrollView( // 🔥 Aggiungi questo per rendere tutto scorrevole
+      physics: const BouncingScrollPhysics(), // Opzionale: aggiunge un effetto fluido
+      child: Column(
+        children: [
+          _glassContainer(child: ReadyTimeCard(provider: provider)),
+          const SizedBox(height: 12),
+          BatteryStatusRow(provider: provider),
+          const SizedBox(height: 12),
+          StatsRow(provider: provider),
+          const SizedBox(height: 12),
+          
+          // 🔥 MODIFICA QUI: Rimuovi Expanded e usa un contenitore con altezza fissa o dinamica
+          _glassContainer(
+            blur: 20,
+            opacity: 0.08,
+            child: ChargingControls(provider: provider),
+          ),
+          
+          const SizedBox(height: 12),
+          Row(
+            children: [
+              Expanded(
+                flex: 12,
+                child: SimulationButton(provider: provider),
+              ),
+              const SizedBox(width: 12),
+              Expanded(
+                flex: 18,
+                child: _buildCarInfo(context, provider),
+              ),
+            ],
+          ),
+          const SizedBox(height: 12),
+          _glassContainer(
+            padding: const EdgeInsets.symmetric(vertical: 4),
+            child: ActionButtons(
+              onHomeTap: provider.isSimulating ? () {} : () => _showAddDialog(context, provider, "Home"),
+              onPublicTap: provider.isSimulating ? () {} : () => _showAddDialog(context, provider, "Pubblica"),
+            ),
+          ),
+          const SizedBox(height: 12),
+          _buildEditCapacityTile(context, provider),
+        ],
+      ),
+    ),
+  ),
+),
               ],
             ),
           );

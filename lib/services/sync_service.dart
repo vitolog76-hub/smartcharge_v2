@@ -21,43 +21,34 @@ class SyncService {
 
   // 2. Upload: Carica Cronologia e Contratto su Firestore
   Future<void> uploadData(String userId, List<ChargeSession> history, EnergyContract contract) async {
-    print("--- INIZIO UPLOAD SYNC ---");
-    if (userId.isEmpty) {
-      print("DEBUG SYNC: ID Utente vuoto, annullo upload.");
-      return;
-    }
+    if (userId.isEmpty) return;
 
     try {
-      // Prepariamo i dati
+      // 🔥 PROTEZIONE 1: Se la history passata è vuota, verifichiamo prima se sul server c'è già roba
+      if (history.isEmpty) {
+        DocumentSnapshot doc = await _db.collection("users").doc(userId).collection("versions").doc("v2").get();
+        if (doc.exists) {
+          Map<String, dynamic>? data = doc.data() as Map<String, dynamic>?;
+          List? remoteHistory = data?['history'] as List?;
+          if (remoteHistory != null && remoteHistory.isNotEmpty) {
+            print("⚠️ ATTENZIONE: Tentativo di upload history vuota su dati esistenti. ANNULLO PER SICUREZZA.");
+            return; // Blocca l'upload distruttivo
+          }
+        }
+      }
+
       List<Map<String, dynamic>> historyMap = history.map((s) => s.toJson()).toList();
       Map<String, dynamic> contractMap = contract.toJson();
 
-      print("DEBUG SYNC: Preparazione dati per $userId...");
-      print("DEBUG SYNC: Sessioni da inviare: ${historyMap.length}");
-      print("DEBUG SYNC: Dati contratto: $contractMap");
-
-      // Scrittura su Firestore (Percorso: users/ID/versions/v2)
-      await _db
-          .collection("users")
-          .doc(userId)
-          .collection("versions")
-          .doc("v2")
-          .set({
+      await _db.collection("users").doc(userId).collection("versions").doc("v2").set({
             'lastUpdate': FieldValue.serverTimestamp(),
             'history': historyMap,
             'contract': contractMap,
           }, SetOptions(merge: true));
 
-      // Aggiorniamo anche il timestamp nell'anagrafica principale
-      await _db.collection("users").doc(userId).set({
-        'active': true,
-        'lastAccess': FieldValue.serverTimestamp(),
-      }, SetOptions(merge: true));
-
-      print("--- SYNC COMPLETATO CON SUCCESSO SU FIREBASE ---");
+      // ... resto del codice ...
     } catch (e) {
-      print("!!! ERRORE CRITICO UPLOAD: $e");
-      // Se vedi "Permission Denied" qui, devi cambiare le Rules su Firebase Console
+      print("!!! ERRORE UPLOAD: $e");
     }
   }
 

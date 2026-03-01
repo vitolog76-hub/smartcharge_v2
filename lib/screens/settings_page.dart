@@ -10,7 +10,8 @@ import 'package:smartcharge_v2/providers/home_provider.dart';
 import 'package:smartcharge_v2/screens/bill_scanner_page.dart';
 import 'package:smartcharge_v2/screens/contract_summary_page.dart';
 import 'package:provider/provider.dart';
-
+import 'package:smartcharge_v2/pages/add_contract_page.dart';
+import 'package:smartcharge_v2/services/cost_calculator.dart';
 
 class SettingsPage extends StatefulWidget {
   final EnergyContract contract;
@@ -271,38 +272,24 @@ class _SettingsPageState extends State<SettingsPage> {
 
             const SizedBox(height: 25),
 
-            _buildSectionTitle("3 - CONTRATTO ENERGETICO"),
+            _buildSectionTitle("3 - GESTIONE CONTRATTI ENERGIA"),
             _buildCard(
               child: Padding(
                 padding: const EdgeInsets.all(16.0),
                 child: Column(
                   children: [
-                    // 🔥 PULSANTE ANALIZZA BOLLETTA
+                    // --- 📄 PULSANTE ANALIZZA BOLLETTA ---
                     InkWell(
                       onTap: () async {
                         final result = await Navigator.push(
                           context,
                           MaterialPageRoute(
-                            builder: (_) => BillScannerPage(
-                              provider: widget.homeProvider,
-                            ),
+                            builder: (_) => BillScannerPage(provider: widget.homeProvider),
                           ),
                         );
-                        
                         if (result == true) {
-                          setState(() {
-                            _providerController.text = widget.homeProvider.myContract.provider;
-                            _f1Controller.text = widget.homeProvider.myContract.f1Price.toString();
-                            _f2Controller.text = widget.homeProvider.myContract.f2Price.toString();
-                            _f3Controller.text = widget.homeProvider.myContract.f3Price.toString();
-                            _isMonorario = widget.homeProvider.myContract.isMonorario;
-                          });
-                          
                           ScaffoldMessenger.of(context).showSnackBar(
-                            const SnackBar(
-                              content: Text("✅ Tariffe aggiornate!"),
-                              backgroundColor: Colors.green,
-                            ),
+                            const SnackBar(content: Text("✅ Tariffe aggiornate!"), backgroundColor: Colors.green),
                           );
                         }
                       },
@@ -318,29 +305,22 @@ class _SettingsPageState extends State<SettingsPage> {
                             Icon(Icons.receipt_long, color: Colors.blueAccent, size: 20),
                             SizedBox(width: 12),
                             Expanded(
-                              child: Text(
-                                "📄 ANALIZZA BOLLETTA",
-                                style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 12),
-                              ),
+                              child: Text("📄 ANALIZZA BOLLETTA",
+                                style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 12)),
                             ),
                             Icon(Icons.arrow_forward, color: Colors.blueAccent, size: 16),
                           ],
                         ),
                       ),
                     ),
-                    
                     const SizedBox(height: 12),
-                    
-                    // 🔥 PULSANTE RESOCONTO CONTRATTO (MODIFICATO)
+
+                    // --- 📊 PULSANTE RESOCONTO CONTRATTO ---
                     InkWell(
                       onTap: () {
                         Navigator.push(
                           context,
-                          MaterialPageRoute(
-                            builder: (_) => ContractSummaryPage(
-                              
-                            ),
-                          ),
+                          MaterialPageRoute(builder: (_) => const ContractSummaryPage()),
                         );
                       },
                       child: Container(
@@ -355,50 +335,155 @@ class _SettingsPageState extends State<SettingsPage> {
                             Icon(Icons.pie_chart, color: Colors.purple, size: 20),
                             SizedBox(width: 12),
                             Expanded(
-                              child: Text(
-                                "📊 RESOCONTO CONTRATTO",
-                                style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 12),
-                              ),
+                              child: Text("📊 RESOCONTO CONTRATTO",
+                                style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 12)),
                             ),
                             Icon(Icons.arrow_forward, color: Colors.purple, size: 16),
                           ],
                         ),
                       ),
                     ),
-                    
+
                     const Divider(color: Colors.white10, height: 30),
 
-                    _buildInput("GESTORE", _providerController, Icons.business),
-                    const SizedBox(height: 15),
-                    Row(
-                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    // --- 📋 LISTA CONTRATTI SELEZIONABILI ---
+                    const Align(
+                      alignment: Alignment.centerLeft,
+                      child: Text("SELEZIONA CONTRATTO ATTIVO",
+                          style: TextStyle(color: Colors.white38, fontSize: 10, fontWeight: FontWeight.bold)),
+                    ),
+                    const SizedBox(height: 10),
+
+                   Consumer<HomeProvider>(
+  builder: (context, homeProv, child) {
+    return Column(
+      children: [
+        ...homeProv.allContracts.map((contratto) {
+          final isSelected = contratto.id == homeProv.activeContractId;
+          
+          // --- LOGICA DI COMPARAZIONE ---
+          double risparmioTotale = 0;
+          if (!isSelected && homeProv.chargeHistory.isNotEmpty) {
+            for (var sessione in homeProv.chargeHistory) {
+              double costoTeorico = CostCalculator.calculateComparison(
+                session: sessione, 
+                targetContract: contratto
+              );
+              risparmioTotale += (sessione.cost - costoTeorico);
+            }
+          }
+
+          return RadioListTile<String>(
+            contentPadding: EdgeInsets.zero,
+            title: Text(contratto.contractName.toUpperCase(),
+                style: const TextStyle(color: Colors.white, fontSize: 13, fontWeight: FontWeight.bold)),
+            subtitle: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text("${contratto.provider} • F1: ${contratto.f1Price}€",
+                    style: const TextStyle(color: Colors.white38, fontSize: 11)),
+                
+                // Mostra il risparmio solo se non è il contratto attivo
+                if (!isSelected && homeProv.chargeHistory.isNotEmpty)
+                  Padding(
+                    padding: const EdgeInsets.only(top: 4),
+                    child: Row(
                       children: [
-                        const Text("TARIFFA MONORARIA", style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 12)),
-                        Switch(
-                          value: _isMonorario,
-                          activeColor: Colors.blueAccent,
-                          onChanged: (val) => setState(() => _isMonorario = val),
+                        Icon(
+                          risparmioTotale >= 0 ? Icons.trending_down : Icons.trending_up,
+                          color: risparmioTotale >= 0 ? Colors.greenAccent : Colors.redAccent,
+                          size: 14,
+                        ),
+                        const SizedBox(width: 4),
+                        Text(
+                          risparmioTotale >= 0 
+                            ? "Risparmieresti ${risparmioTotale.toStringAsFixed(2)}€ totali"
+                            : "Spenderesti ${risparmioTotale.abs().toStringAsFixed(2)}€ in più",
+                          style: TextStyle(
+                            color: risparmioTotale >= 0 ? Colors.greenAccent : Colors.redAccent,
+                            fontSize: 10,
+                            fontWeight: FontWeight.bold
+                          ),
                         ),
                       ],
                     ),
-                    const SizedBox(height: 15),
-                    if (_isMonorario)
-                      _buildInput("COSTO kWh (€)", _f1Controller, Icons.euro)
-                    else
-                      Row(
-                        children: [
-                          Expanded(child: _buildInput("F1", _f1Controller, Icons.bolt)),
-                          const SizedBox(width: 10),
-                          Expanded(child: _buildInput("F2", _f2Controller, Icons.bolt)),
-                          const SizedBox(width: 10),
-                          Expanded(child: _buildInput("F3", _f3Controller, Icons.bolt)),
-                        ],
+                  ),
+              ],
+            ),
+            value: contratto.id,
+            groupValue: homeProv.activeContractId,
+            activeColor: Colors.blueAccent,
+            onChanged: (String? value) {
+              if (value != null) homeProv.selectActiveContract(value);
+            },
+            // 🔥 MODIFICA: Aggiunto Row con pulsanti Modifica ed Elimina
+            secondary: SizedBox(
+              width: 90, // Spazio per ospitare le due icone
+              child: Row(
+                mainAxisAlignment: MainAxisAlignment.end,
+                children: [
+                  // TASTO MODIFICA (Sempre visibile)
+                  IconButton(
+                    padding: EdgeInsets.zero,
+                    constraints: const BoxConstraints(),
+                    icon: const Icon(Icons.edit, color: Colors.blueAccent, size: 20),
+                    onPressed: () {
+                      Navigator.push(
+                        context,
+                        MaterialPageRoute(
+                          builder: (_) => AddContractPage(contractToEdit: contratto),
+                        ),
+                      );
+                    },
+                  ),
+                  const SizedBox(width: 8),
+                  // TASTO ELIMINA (Solo se NON è selezionato o se vuoi permetterlo comunque)
+                  isSelected 
+                    ? const Icon(Icons.check_circle, color: Colors.blueAccent, size: 22)
+                    : IconButton(
+                        padding: EdgeInsets.zero,
+                        constraints: const BoxConstraints(),
+                        icon: const Icon(Icons.delete_outline, color: Colors.redAccent, size: 20),
+                        onPressed: () => homeProv.deleteContract(contratto.id),
                       ),
+                ],
+              ),
+            ),
+          );
+        }).toList(),
+
+        const SizedBox(height: 15),
+
+        // --- TASTO AGGIUNGI MANUALE ---
+        InkWell(
+          onTap: () => Navigator.push(
+              context, MaterialPageRoute(builder: (_) => const AddContractPage())),
+          child: Container(
+            padding: const EdgeInsets.symmetric(vertical: 12),
+            decoration: BoxDecoration(
+              color: Colors.white.withOpacity(0.05),
+              borderRadius: BorderRadius.circular(10),
+              border: Border.all(color: Colors.white10),
+            ),
+            child: const Row(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                Icon(Icons.add_circle_outline, color: Colors.blueAccent, size: 18),
+                SizedBox(width: 8),
+                Text("AGGIUNGI NUOVO CONTRATTO",
+                    style: TextStyle(color: Colors.blueAccent, fontWeight: FontWeight.bold, fontSize: 11)),
+              ],
+            ),
+          ),
+        ),
+      ],
+    );
+  },
+),
                   ],
                 ),
               ),
             ),
-
             const SizedBox(height: 25),
 
             _buildSectionTitle("4 - ACCOUNT"),

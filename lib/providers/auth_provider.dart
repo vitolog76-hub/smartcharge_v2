@@ -124,7 +124,9 @@ class AuthProvider extends ChangeNotifier {
     debugPrint("🆕 Creazione dati iniziali per nuovo utente: $displayName");
     
     final defaultContract = EnergyContract(
-      provider: "Gestore",
+      id: "default_contract", // 🔥 AGGIUNGI QUESTO
+      contractName: "Contratto Base",
+      provider: "Esempio",
       userName: displayName,
       f1Price: 0.20,
       f2Price: 0.18,

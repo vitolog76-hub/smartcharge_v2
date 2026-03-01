@@ -32,7 +32,7 @@ class PdfService {
     final Uint8List logoBytes = logoData.buffer.asUint8List();
     final pw.MemoryImage logoImage = pw.MemoryImage(logoBytes);
     
-    // Filtra i dati
+    // --- 1. FILTRO E ORDINAMENTO CRONOLOGICO ---
     List<ChargeSession> filteredHistory;
     if (filterMonth != null && filterYear != null) {
       filteredHistory = history.where((s) => 
@@ -43,6 +43,10 @@ class PdfService {
     } else {
       filteredHistory = List<ChargeSession>.from(history);
     }
+
+    // Ordinamento: Dalla più vecchia alla più recente per il PDF (ordine di lettura naturale)
+    // Se preferisci la più recente in alto, usa: b.date.compareTo(a.date)
+    filteredHistory.sort((a, b) => a.date.compareTo(b.date));
 
     pdf.addPage(
       pw.MultiPage(
@@ -73,10 +77,11 @@ class PdfService {
       final file = File("${output.path}/report_ricariche_${DateTime.now().millisecondsSinceEpoch}.pdf");
       await file.writeAsBytes(pdfBytes);
       
-      // --- CORREZIONE PER IOS: Uso di XFile invece di file.path diretto ---
       await Share.shareXFiles([XFile(file.path)], text: 'Report Ricariche SmartCharge');
     }
   }
+
+  // ... (Metodi _buildHeader, _buildTitle, _buildStats, _buildLineChart rimangono uguali) ...
 
   static pw.Widget _buildHeader(pw.MemoryImage logoImage, pw.Font ttf, String userName, String provider, String carModel) {
     return pw.Row(
@@ -260,30 +265,31 @@ class PdfService {
     );
   }
 
+  // --- 2. AGGIORNAMENTO TABELLA CON COLONNA FASCIA ---
   static pw.Widget _buildTable(pw.Font ttf, List<ChargeSession> history) {
     if (history.isEmpty) {
       return pw.Center(child: pw.Text("Nessuna ricarica", style: pw.TextStyle(font: ttf)));
     }
 
     return pw.TableHelper.fromTextArray(
-      headers: ["Data", "kWh", "Costo", "Luogo", "SOC", "Durata"],
+      headers: ["DATA", "kWh", "COSTO", "FASCIA", "LUOGO", "DURATA"], // 🔥 Aggiunto FASCIA
       data: history.map((s) {
         final duration = s.endDateTime.difference(s.startDateTime);
         final hours = duration.inHours;
         final minutes = duration.inMinutes.remainder(60);
         
         return [
-          DateFormat('dd/MM/yyyy').format(s.date),
-          "${s.kwh.toStringAsFixed(1)} kWh",
-          "${s.cost.toStringAsFixed(2)} €",
+          DateFormat('dd/MM/yy').format(s.date),
+          "${s.kwh.toStringAsFixed(1)}",
+          "€ ${s.cost.toStringAsFixed(2)}",
+          s.fascia, // 🔥 Visualizza il campo Fascia
           s.location,
-          "${s.startSoc.toStringAsFixed(0)}% → ${s.endSoc.toStringAsFixed(0)}%",
           "${hours}h ${minutes}m",
         ];
       }).toList(),
-      headerStyle: pw.TextStyle(font: ttf, fontSize: 10, fontWeight: pw.FontWeight.bold, color: PdfColors.white),
+      headerStyle: pw.TextStyle(font: ttf, fontSize: 9, fontWeight: pw.FontWeight.bold, color: PdfColors.white),
       headerDecoration: const pw.BoxDecoration(color: PdfColors.blue),
-      cellStyle: pw.TextStyle(font: ttf, fontSize: 9),
+      cellStyle: pw.TextStyle(font: ttf, fontSize: 8),
       cellAlignments: {
         0: pw.Alignment.centerLeft,
         1: pw.Alignment.centerRight,

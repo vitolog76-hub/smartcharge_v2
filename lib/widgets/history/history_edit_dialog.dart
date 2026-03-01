@@ -320,6 +320,7 @@ class _HistoryEditDialogState extends State<HistoryEditDialog> {
         selectedEndTime.minute,
       );
 
+      // Creazione della sessione aggiornata includendo la fascia
       final updatedSession = ChargeSession(
         id: widget.session.id,
         date: selectedDate,
@@ -333,6 +334,7 @@ class _HistoryEditDialogState extends State<HistoryEditDialog> {
         carBrand: widget.session.carBrand,
         carModel: widget.session.carModel,
         wallboxPower: wallboxPower,
+        fascia: widget.session.fascia, // 🔥 AGGIUNTO: Manteniamo la fascia originale o potresti ricalcolarla qui
       );
 
       widget.onSave(updatedSession);
@@ -346,4 +348,5 @@ class _HistoryEditDialogState extends State<HistoryEditDialog> {
       );
     }
   }
+
 }

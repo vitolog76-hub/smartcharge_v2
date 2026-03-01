@@ -106,9 +106,8 @@ class _HistoryPageState extends State<HistoryPage> {
     return grouped;
   }
 
-  // --- GESTIONE AZIONI (FIXED) ---
+  // --- GESTIONE AZIONI ---
 
-  // Ora accettiamo l'oggetto sessione direttamente
   void _onEditSession(ChargeSession updatedSession) {
     setState(() {
       final index = _localHistory.indexWhere((s) => s.id == updatedSession.id);
@@ -119,12 +118,34 @@ class _HistoryPageState extends State<HistoryPage> {
     widget.onHistoryChanged?.call(_localHistory);
   }
 
-  // Ora accettiamo l'ID stringa, non più l'indice
   void _onDeleteSessionById(String sessionId) {
     setState(() {
       _localHistory.removeWhere((session) => session.id == sessionId);
     });
     widget.onHistoryChanged?.call(_localHistory);
+  }
+
+  // --- UI HELPERS ---
+
+  Widget _buildStatTile(String label, String value, Color color) {
+    return Expanded(
+      child: Container(
+        padding: const EdgeInsets.all(12),
+        decoration: BoxDecoration(
+          color: color.withOpacity(0.08),
+          borderRadius: BorderRadius.circular(15),
+          border: Border.all(color: color.withOpacity(0.2), width: 1),
+        ),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(label, style: const TextStyle(color: Colors.white38, fontSize: 9, fontWeight: FontWeight.bold)),
+            const SizedBox(height: 4),
+            Text(value, style: TextStyle(color: color, fontSize: 16, fontWeight: FontWeight.bold, letterSpacing: -0.5)),
+          ],
+        ),
+      ),
+    );
   }
 
   // --- PDF & EXPORT ---
@@ -139,8 +160,15 @@ class _HistoryPageState extends State<HistoryPage> {
   }
 
   void _generatePdf(int? month, int? year) {
+    // 1. Creiamo una copia della lista per non alterare quella visualizzata a schermo
+    List<ChargeSession> sortedHistory = List.from(_localHistory);
+
+    // 2. Ordiniamo la lista cronologicamente (dal più recente al più vecchio)
+    sortedHistory.sort((a, b) => b.date.compareTo(a.date));
+
+    // 3. Passiamo la lista ordinata al servizio PDF
     PdfService.generateHistoryPdf(
-      _localHistory,
+      sortedHistory, // 🔥 Passiamo la lista ordinata!
       filterMonth: month,
       filterYear: year,
       userName: widget.contract.userName.isEmpty ? "UTENTE" : widget.contract.userName.toUpperCase(),
@@ -151,11 +179,23 @@ class _HistoryPageState extends State<HistoryPage> {
 
   @override
   Widget build(BuildContext context) {
+    // Calcolo Dati Grafico
     final monthlyData = _getAggregatedMonthlyData();
     final chartKeys = monthlyData.keys.toList();
     final chartValues = monthlyData.values.toList();
+    
+    // Calcolo Gruppi e Totali Annuali
     final groupedHistory = _getGroupedHistory();
     final yearlyTotals = _getYearlyTotals();
+
+    // Calcolo Totali Mese Corrente
+    final ora = DateTime.now();
+    final ricaricheMese = _localHistory.where((s) => 
+      s.date.month == ora.month && s.date.year == ora.year
+    );
+    final kwhMese = ricaricheMese.fold(0.0, (sum, s) => sum + s.kwh);
+    final spesaMese = ricaricheMese.fold(0.0, (sum, s) => sum + s.cost);
+    final String nomeMese = DateFormat('MMMM', 'it_IT').format(ora).toUpperCase();
 
     double maxKwh = chartValues.isEmpty ? 50 : chartValues.reduce((a, b) => a > b ? a : b);
     maxKwh = (maxKwh / 10).ceil() * 10.0 + 20;
@@ -180,24 +220,39 @@ class _HistoryPageState extends State<HistoryPage> {
       ),
       body: Column(
         children: [
+          // 1. Grafico andamento
           HistoryChart(keys: chartKeys, values: chartValues, maxKwh: maxKwh),
+          
+          // 2. Riepilogo Statistico Mese Corrente
+          Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 15),
+            child: Row(
+              children: [
+                _buildStatTile("ENERGIA $nomeMese", "${kwhMese.toStringAsFixed(1)} kWh", Colors.blueAccent),
+                const SizedBox(width: 12),
+                _buildStatTile("SPESA $nomeMese", "€ ${spesaMese.toStringAsFixed(2)}", Colors.greenAccent),
+              ],
+            ),
+          ),
+          
           const Padding(
-            padding: EdgeInsets.symmetric(horizontal: 20, vertical: 10),
+            padding: EdgeInsets.symmetric(horizontal: 20),
             child: Divider(color: Colors.white10, thickness: 1),
           ),
+
+          // 3. Lista Storico Raggruppata
           Expanded(
             child: _localHistory.isEmpty
                 ? const Center(child: Text("Nessuna ricarica", style: TextStyle(color: Colors.white24)))
                 : ListView(
-                    padding: const EdgeInsets.symmetric(horizontal: 10),
+                    padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
                     children: groupedHistory.entries.map((entry) {
-                      // NOTA: yearIndex non serve più con la logica degli ID!
                       return HistoryYearFolder(
                         year: entry.key,
                         months: entry.value,
                         yearlyTotal: yearlyTotals[entry.key],
-                        onEdit: _onEditSession,           // Passiamo la nuova funzione
-                        onDelete: _onDeleteSessionById,  // Passiamo la nuova funzione
+                        onEdit: _onEditSession,
+                        onDelete: _onDeleteSessionById,
                       );
                     }).toList(),
                   ),

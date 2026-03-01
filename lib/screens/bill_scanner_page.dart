@@ -5,6 +5,8 @@ import 'package:file_picker/file_picker.dart';
 import 'package:smartcharge_v2/services/ai_billing_service.dart';
 import 'package:smartcharge_v2/providers/home_provider.dart';
 import 'package:firebase_auth/firebase_auth.dart'; // Aggiunto per l'ID utente
+import 'package:intl/intl.dart';
+import 'package:smartcharge_v2/models/contract_model.dart';
 
 class BillScannerPage extends StatefulWidget {
   final HomeProvider provider;
@@ -142,46 +144,46 @@ class _BillScannerPageState extends State<BillScannerPage> {
       final res = _analysisResult!;
       
       // 1. DETERMINA SE IL NUOVO CONTRATTO È MONORARIO O A FASCE
-      // Se F1, F2 e F3 sono diversi, allora è Bioraria/Trioraria
       double f1 = (res['f1'] ?? 0.0).toDouble();
       double f2 = (res['f2'] ?? 0.0).toDouble();
       double f3 = (res['f3'] ?? 0.0).toDouble();
-
-      // Se almeno una fascia è diversa dalle altre, isMonorario diventa false
       bool isRealmenteMonorario = (f1 == f2 && f2 == f3);
-      
-      // Se l'IA ha mandato esplicitamente il flag lo usiamo, 
-      // altrimenti decidiamo noi in base ai prezzi
-      provider.myContract.isMonorario = res['is_monorario'] ?? isRealmenteMonorario;
 
-      // 2. SALVATAGGIO TARIFFE FINITE
-      provider.myContract.f1Price = f1;
-      provider.myContract.f2Price = f2;
-      provider.myContract.f3Price = f3;
-      
-      // 3. SALVATAGGIO TARIFFE PURE
-      provider.myContract.f1Pure = (res['f1_puro'] ?? 0.0).toDouble();
-      provider.myContract.f2Pure = (res['f2_puro'] ?? 0.0).toDouble();
-      provider.myContract.f3Pure = (res['f3_puro'] ?? 0.0).toDouble();
-      
-      // 4. ALTRI DATI
-      provider.myContract.fixedMonthlyFee = (res['fixed_monthly_fee'] ?? 0.0).toDouble();
-      provider.myContract.powerFee = (res['power_fee'] ?? 0.0).toDouble();
-      provider.myContract.provider = res['provider']?.toString() ?? 'Gestore';
-      provider.myContract.vat = (res['vat'] ?? 10.0).toDouble();
+      // 2. CREA UN NUOVO OGGETTO CONTRATTO (Invece di modificare l'esistente)
+      final String newId = DateTime.now().millisecondsSinceEpoch.toString();
+      final String dateLabel = DateFormat('dd/MM').format(DateTime.now());
+      final String providerName = res['provider']?.toString() ?? 'Nuovo Gestore';
 
-      // Notifica e salva
-      provider.notifyListeners();
-      provider.saveContract(); 
+      final newContract = EnergyContract(
+        id: newId,
+        contractName: "Bolletta $providerName $dateLabel",
+        provider: providerName,
+        userName: "Utente", 
+        isMonorario: res['is_monorario'] ?? isRealmenteMonorario,
+        f1Price: (res['f1'] ?? 0.0).toDouble(),
+        f2Price: (res['f2'] ?? 0.0).toDouble(),
+        f3Price: (res['f3'] ?? 0.0).toDouble(),
+        f1Pure: (res['f1_puro'] ?? 0.0).toDouble(),
+        f2Pure: (res['f2_puro'] ?? 0.0).toDouble(),
+        f3Pure: (res['f3_puro'] ?? 0.0).toDouble(),
+        fixedMonthlyFee: (res['fixed_monthly_fee'] ?? 0.0).toDouble(),
+        powerFee: (res['power_fee'] ?? 0.0).toDouble(),
+        transportFee: (res['transport_fee'] ?? 0.0).toDouble(), // Aggiunto
+        systemCharges: (res['system_charges'] ?? 0.0).toDouble(), // Aggiunto
+        vat: (res['vat'] ?? 10.0).toDouble(),
+        createdAt: DateTime.now(),
+      );
+      // 3. SALVATAGGIO NELLA LISTA E ATTIVAZIONE
+      provider.addOrUpdateContract(newContract);
+      provider.selectActiveContract(newId);
       
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text(provider.myContract.isMonorario 
-            ? "✅ Impostata Tariffa Monoraria" 
-            : "✅ Impostata Tariffa a Fasce (F1/F2/F3)"),
-          backgroundColor: Colors.green
-        ),
-      );
+  SnackBar(
+    content: Text("✅ Contratto '${newContract.contractName}' aggiunto! Il vecchio contratto è stato salvato in archivio."),
+    backgroundColor: Colors.green,
+    duration: const Duration(seconds: 4),
+  ),
+);
       
       Navigator.pop(context, true);
     } catch (e) {

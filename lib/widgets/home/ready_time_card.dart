@@ -11,7 +11,7 @@ class ReadyTimeCard extends StatelessWidget {
     return GestureDetector(
       onTap: provider.isSimulating ? null : () => _selectTime(context),
       child: Container(
-        padding: const EdgeInsets.symmetric(vertical: 8, horizontal: 12), // 🔥 RIDOTTO
+        padding: const EdgeInsets.symmetric(vertical: 8, horizontal: 12),
         decoration: BoxDecoration(
           color: Colors.transparent,
           borderRadius: BorderRadius.circular(16),
@@ -41,7 +41,7 @@ class ReadyTimeCard extends StatelessWidget {
                     provider.readyTime.format(context),
                     style: TextStyle(
                       color: Colors.white,
-                      fontSize: 24, // 🔥 RIDOTTO da 32 a 24
+                      fontSize: 24,
                       fontWeight: FontWeight.w800,
                       shadows: [
                         Shadow(
@@ -55,11 +55,20 @@ class ReadyTimeCard extends StatelessWidget {
                       ],
                     ),
                   ),
+                  // 🔥 NUOVO: Piccolo indicatore della potenza utilizzata per il calcolo
+                  Text(
+                    "Calcolato su ${provider.wallboxPwr} kW",
+                    style: TextStyle(
+                      color: Colors.white.withOpacity(0.3),
+                      fontSize: 8,
+                      fontWeight: FontWeight.bold,
+                    ),
+                  ),
                 ],
               ),
             ),
             Container(
-              padding: const EdgeInsets.all(8), // 🔥 RIDOTTO
+              padding: const EdgeInsets.all(8),
               decoration: BoxDecoration(
                 color: provider.isSimulating
                     ? (provider.isChargingReal
@@ -77,7 +86,7 @@ class ReadyTimeCard extends StatelessWidget {
                         ? Colors.greenAccent
                         : Colors.orangeAccent)
                     : Colors.blueAccent,
-                size: 22, // 🔥 RIDOTTO
+                size: 22,
               ),
             ),
           ],
