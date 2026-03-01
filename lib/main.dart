@@ -40,7 +40,7 @@ void main() async {
       
       if (firebaseApiKey.isEmpty) {
         debugPrint('❌ ERRORE: FIREBASE_API_KEY non trovata!');
-        debugPrint('💡 Crea assets/.env con: FIREBASE_API_KEY=AIzaSyBdZ7j1pMuabOd47xeBzCPq0g9wBi4jg3A');
+        debugPrint('💡 FIREBASE_API_KEY mancante nel file .env!');
       } else {
         debugPrint('🔑 Chiave: ${firebaseApiKey.substring(0, 10)}...');
       }
