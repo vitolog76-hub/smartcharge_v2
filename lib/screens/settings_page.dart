@@ -7,7 +7,6 @@ import 'package:smartcharge_v2/models/car_model.dart';
 import 'package:smartcharge_v2/services/sync_service.dart';
 import 'package:smartcharge_v2/providers/auth_provider.dart';
 import 'package:smartcharge_v2/providers/home_provider.dart';
-import 'package:smartcharge_v2/screens/bill_scanner_page.dart';
 import 'package:smartcharge_v2/screens/contract_summary_page.dart';
 import 'package:provider/provider.dart';
 import 'package:smartcharge_v2/pages/add_contract_page.dart';
@@ -49,17 +48,12 @@ class _SettingsPageState extends State<SettingsPage> {
     super.initState();
     
     _providerController = TextEditingController(text: widget.contract.provider);
-    _nameController = TextEditingController(text: widget.contract.userName);
+    _nameController = TextEditingController(text: widget.homeProvider.globalUserName);
     _f1Controller = TextEditingController(text: widget.contract.f1Price.toString());
     _f2Controller = TextEditingController(text: widget.contract.f2Price.toString());
     _f3Controller = TextEditingController(text: widget.contract.f3Price.toString());
     _idController = TextEditingController();
     
-    _idController.addListener(() async {
-      final prefs = await SharedPreferences.getInstance();
-      await prefs.setString('user_sync_id', _idController.text.trim());
-    });
-
     _isMonorario = widget.contract.isMonorario;
     _loadSyncId();
   }
@@ -79,99 +73,115 @@ class _SettingsPageState extends State<SettingsPage> {
     final prefs = await SharedPreferences.getInstance();
     setState(() {
       _idController.text = prefs.getString('user_sync_id') ?? "";
+      String? savedName = prefs.getString('global_user_name');
+      if (savedName != null && savedName.isNotEmpty) {
+        _nameController.text = savedName;
+      }
     });
   }
 
   void _saveAll() async {
     String userId = _idController.text.trim();
+    String nuovoNomeProfilo = _nameController.text.trim(); 
+    final homeProv = context.read<HomeProvider>();
+
+    setState(() => _isSyncing = true);
+    
+    // 1. SALVATAGGIO PROFILO (Nome e ID)
+    // Questo metodo salva su MacBook e sincronizza col Cloud se l'ID esiste
+    await homeProv.syncUserProfile(nuovoNomeProfilo);
+
+    // 2. SALVATAGGIO ID SINCRONIZZAZIONE (Se cambiato manualmente)
+    if (userId.isNotEmpty) {
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.setString('user_sync_id', userId);
+    }
+
+    // 3. AGGIORNAMENTO DATI TECNICI CONTRATTO
+    // Nota: Abbiamo rimosso 'userName' dai parametri perché ora è globale
+    homeProv.updateActiveContractDetails(
+      provider: _providerController.text,
+      isMonorario: _isMonorario,
+      f1: double.tryParse(_f1Controller.text) ?? homeProv.myContract.f1Price,
+      f2: double.tryParse(_f2Controller.text),
+      f3: double.tryParse(_f3Controller.text),
+    );
+
+    // 4. SALVATAGGIO FINALE E SYNC
+    // Forza il rinfresco di tutto il pacchetto dati sul Cloud
+    await homeProv.saveAllContracts(); 
+
+    setState(() => _isSyncing = false);
+    
+    if (mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text("✅ Profilo e Impostazioni salvati con successo!"),
+          backgroundColor: Colors.green,
+        )
+      );
+      Navigator.pop(context, true);
+    }
+  }
+
+  Future<void> _importFromCloud(String userId) async {
     if (userId.isEmpty) {
-      _showInfoDialog("ATTENZIONE", "Inserisci un ID per la sincronizzazione.");
+      _showErrorDialog("Errore", "Inserisci un ID valido per importare i dati.");
       return;
     }
 
     setState(() => _isSyncing = true);
     
-    widget.contract.provider = _providerController.text;
-    widget.contract.userName = _nameController.text;
-    widget.contract.isMonorario = _isMonorario;
-    widget.contract.f1Price = double.tryParse(_f1Controller.text) ?? 0.0;
-    
-    if (_isMonorario) {
-      widget.contract.f2Price = widget.contract.f1Price;
-      widget.contract.f3Price = widget.contract.f1Price;
-    } else {
-      widget.contract.f2Price = double.tryParse(_f2Controller.text) ?? 0.0;
-      widget.contract.f3Price = double.tryParse(_f3Controller.text) ?? 0.0;
+    try {
+      // 1. Scarica i dati da Firebase
+      var data = await SyncService().downloadAllData(userId);
+      
+      if (data != null) {
+        // 2. Applica i dati scaricati al Provider (storia, contratti, nome)
+        await context.read<HomeProvider>().refreshAfterSettings();
+        
+        if (mounted) {
+          final homeProv = context.read<HomeProvider>();
+          final nuovoContrattoAttivo = homeProv.myContract;
+
+          // 3. Aggiorna l'interfaccia con i dati appena scaricati
+          setState(() {
+            // Ora il nome viene dal profilo globale scaricato, non dal contratto!
+            _nameController.text = homeProv.globalUserName; 
+            
+            _providerController.text = nuovoContrattoAttivo.provider;
+            _f1Controller.text = nuovoContrattoAttivo.f1Price.toString();
+            _f2Controller.text = nuovoContrattoAttivo.f2Price.toString();
+            _f3Controller.text = nuovoContrattoAttivo.f3Price.toString();
+            _isMonorario = nuovoContrattoAttivo.isMonorario;
+          });
+
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(content: Text("✅ Dati importati correttamente dal Cloud!"))
+          );
+        }
+      } else {
+        if (mounted) _showErrorDialog("Sync Fallito", "Nessun dato trovato per questo ID.");
+      }
+    } catch (e) {
+      debugPrint("Errore Import: $e");
+      if (mounted) _showErrorDialog("Errore Critico", "Impossibile scaricare i dati. Controlla la connessione.");
+    } finally {
+      if (mounted) setState(() => _isSyncing = false);
     }
-
-    final prefs = await SharedPreferences.getInstance();
-    await prefs.setString('energy_contract', jsonEncode(widget.contract.toJson()));
-    await prefs.setString('user_sync_id', userId);
-
-    List<ChargeSession> history = [];
-    final String? historyData = prefs.getString('charge_history');
-    if (historyData != null) {
-      try {
-        Iterable l = jsonDecode(historyData);
-        history = List<ChargeSession>.from(l.map((model) => ChargeSession.fromJson(model)));
-      } catch (e) { debugPrint("Errore: $e"); }
-    }
-
-    await SyncService().uploadData(userId, history, widget.contract);
-    setState(() => _isSyncing = false);
-    if (mounted) Navigator.pop(context, true);
   }
 
-  Future<void> _importFromCloud(String userId) async {
-  if (userId.isEmpty) return;
-
-  setState(() => _isSyncing = true);
-  try {
-    var data = await SyncService().downloadAllData(userId);
-    if (data != null) {
-      final prefs = await SharedPreferences.getInstance();
-      
-      // Salvataggio grezzo
-      if (data['history'] != null) await prefs.setString('charge_history', jsonEncode(data['history']));
-      if (data['contract'] != null) await prefs.setString('energy_contract', jsonEncode(data['contract']));
-
-      // 🔥 IL TRUCCO: forza l'aggiornamento senza errori di compilazione
-      await context.read<HomeProvider>().refreshAfterSettings();
-      
-      if (mounted) ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text("✅ Sincronizzato!")));
-    }
-  } catch (e) {
-    print("Errore: $e");
-  } finally {
-    if (mounted) setState(() => _isSyncing = false);
-  }
-}
-
+  // --- DIALOGS ---
   Future<bool?> _showLogoutConfirmDialog() {
     return showDialog<bool>(
       context: context,
       builder: (ctx) => AlertDialog(
         backgroundColor: const Color(0xFF1C1C1E),
         title: const Text("Conferma logout", style: TextStyle(color: Colors.white)),
-        content: const Text("Vuoi davvero uscire?", style: TextStyle(color: Colors.white70)),
+        content: const Text("Vuoi davvero uscire? I dati locali rimarranno sul MacBook.", style: TextStyle(color: Colors.white70)),
         actions: [
           TextButton(onPressed: () => Navigator.pop(ctx, false), child: const Text("ANNULLA")),
           TextButton(onPressed: () => Navigator.pop(ctx, true), child: const Text("ESCI", style: TextStyle(color: Colors.redAccent))),
-        ],
-      ),
-    );
-  }
-
-  Future<bool?> _showConfirmDialog() {
-    return showDialog<bool>(
-      context: context,
-      builder: (ctx) => AlertDialog(
-        backgroundColor: const Color(0xFF1C1C1E),
-        title: const Text("CONFERMA", style: TextStyle(color: Colors.white)),
-        content: const Text("Sovrascrivere i dati locali con quelli del Cloud?", style: TextStyle(color: Colors.white70)),
-        actions: [
-          TextButton(onPressed: () => Navigator.pop(ctx, false), child: const Text("ANNULLA")),
-          TextButton(onPressed: () => Navigator.pop(ctx, true), child: const Text("OK")),
         ],
       ),
     );
@@ -183,18 +193,6 @@ class _SettingsPageState extends State<SettingsPage> {
       builder: (ctx) => AlertDialog(
         backgroundColor: const Color(0xFF1C1C1E),
         title: Text(title, style: const TextStyle(color: Colors.white)),
-        content: Text(message, style: const TextStyle(color: Colors.white70)),
-        actions: [TextButton(onPressed: () => Navigator.pop(ctx), child: const Text("OK"))],
-      ),
-    );
-  }
-
-  void _showSuccessDialog(String title, String message) {
-    showDialog(
-      context: context,
-      builder: (ctx) => AlertDialog(
-        backgroundColor: const Color(0xFF1C1C1E),
-        title: Text(title, style: const TextStyle(color: Colors.greenAccent)),
         content: Text(message, style: const TextStyle(color: Colors.white70)),
         actions: [TextButton(onPressed: () => Navigator.pop(ctx), child: const Text("OK"))],
       ),
@@ -278,34 +276,21 @@ class _SettingsPageState extends State<SettingsPage> {
                 padding: const EdgeInsets.all(16.0),
                 child: Column(
                   children: [
-                    // --- 📄 PULSANTE ANALIZZA BOLLETTA ---
                     InkWell(
-                      onTap: () async {
-                        final result = await Navigator.push(
-                          context,
-                          MaterialPageRoute(
-                            builder: (_) => BillScannerPage(provider: widget.homeProvider),
-                          ),
-                        );
-                        if (result == true) {
-                          ScaffoldMessenger.of(context).showSnackBar(
-                            const SnackBar(content: Text("✅ Tariffe aggiornate!"), backgroundColor: Colors.green),
-                          );
-                        }
-                      },
+                      onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const ContractSummaryPage())),
                       child: Container(
                         padding: const EdgeInsets.all(12),
                         decoration: BoxDecoration(
-                          color: Colors.blueAccent.withOpacity(0.2),
+                          color: Colors.blueAccent.withOpacity(0.1),
                           borderRadius: BorderRadius.circular(10),
                           border: Border.all(color: Colors.blueAccent.withOpacity(0.3)),
                         ),
                         child: const Row(
                           children: [
-                            Icon(Icons.receipt_long, color: Colors.blueAccent, size: 20),
+                            Icon(Icons.pie_chart, color: Colors.blueAccent, size: 20),
                             SizedBox(width: 12),
                             Expanded(
-                              child: Text("📄 ANALIZZA BOLLETTA",
+                              child: Text("DETTAGLI E TRASPARENZA COSTI",
                                 style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 12)),
                             ),
                             Icon(Icons.arrow_forward, color: Colors.blueAccent, size: 16),
@@ -313,201 +298,186 @@ class _SettingsPageState extends State<SettingsPage> {
                         ),
                       ),
                     ),
-                    const SizedBox(height: 12),
-
-                    // --- 📊 PULSANTE RESOCONTO CONTRATTO ---
-                    InkWell(
-                      onTap: () {
-                        Navigator.push(
-                          context,
-                          MaterialPageRoute(builder: (_) => const ContractSummaryPage()),
-                        );
-                      },
-                      child: Container(
-                        padding: const EdgeInsets.all(12),
-                        decoration: BoxDecoration(
-                          color: Colors.purple.withOpacity(0.2),
-                          borderRadius: BorderRadius.circular(10),
-                          border: Border.all(color: Colors.purple.withOpacity(0.3)),
-                        ),
-                        child: const Row(
-                          children: [
-                            Icon(Icons.pie_chart, color: Colors.purple, size: 20),
-                            SizedBox(width: 12),
-                            Expanded(
-                              child: Text("📊 RESOCONTO CONTRATTO",
-                                style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 12)),
-                            ),
-                            Icon(Icons.arrow_forward, color: Colors.purple, size: 16),
-                          ],
-                        ),
-                      ),
-                    ),
-
                     const Divider(color: Colors.white10, height: 30),
-
-                    // --- 📋 LISTA CONTRATTI SELEZIONABILI ---
                     const Align(
                       alignment: Alignment.centerLeft,
-                      child: Text("SELEZIONA CONTRATTO ATTIVO",
+                      child: Text("I TUOI PIANI TARIFFARI",
                           style: TextStyle(color: Colors.white38, fontSize: 10, fontWeight: FontWeight.bold)),
                     ),
                     const SizedBox(height: 10),
 
-                   Consumer<HomeProvider>(
-  builder: (context, homeProv, child) {
-    return Column(
-      children: [
-        ...homeProv.allContracts.map((contratto) {
-          final isSelected = contratto.id == homeProv.activeContractId;
-          
-          // --- LOGICA DI COMPARAZIONE ---
-          double risparmioTotale = 0;
-          if (!isSelected && homeProv.chargeHistory.isNotEmpty) {
-            for (var sessione in homeProv.chargeHistory) {
-              double costoTeorico = CostCalculator.calculateComparison(
-                session: sessione, 
-                targetContract: contratto
-              );
-              risparmioTotale += (sessione.cost - costoTeorico);
-            }
-          }
+                    Consumer<HomeProvider>(
+                      builder: (context, homeProv, child) {
+                        return Column(
+                          children: [
+                            ...homeProv.allContracts.map((contratto) {
+  final isSelected = contratto.id == homeProv.activeContractId;
+  
+  double differenzaTotale = 0;
 
-          return RadioListTile<String>(
-            contentPadding: EdgeInsets.zero,
-            title: Text(contratto.contractName.toUpperCase(),
-                style: const TextStyle(color: Colors.white, fontSize: 13, fontWeight: FontWeight.bold)),
-            subtitle: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text("${contratto.provider} • F1: ${contratto.f1Price}€",
-                    style: const TextStyle(color: Colors.white38, fontSize: 11)),
-                
-                // Mostra il risparmio solo se non è il contratto attivo
-                if (!isSelected && homeProv.chargeHistory.isNotEmpty)
-                  Padding(
-                    padding: const EdgeInsets.only(top: 4),
-                    child: Row(
-                      children: [
-                        Icon(
-                          risparmioTotale >= 0 ? Icons.trending_down : Icons.trending_up,
-                          color: risparmioTotale >= 0 ? Colors.greenAccent : Colors.redAccent,
-                          size: 14,
-                        ),
-                        const SizedBox(width: 4),
-                        Text(
-                          risparmioTotale >= 0 
-                            ? "Risparmieresti ${risparmioTotale.toStringAsFixed(2)}€ totali"
-                            : "Spenderesti ${risparmioTotale.abs().toStringAsFixed(2)}€ in più",
-                          style: TextStyle(
-                            color: risparmioTotale >= 0 ? Colors.greenAccent : Colors.redAccent,
-                            fontSize: 10,
-                            fontWeight: FontWeight.bold
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
-              ],
-            ),
-            value: contratto.id,
-            groupValue: homeProv.activeContractId,
-            activeColor: Colors.blueAccent,
-            onChanged: (String? value) {
-              if (value != null) homeProv.selectActiveContract(value);
-            },
-            // 🔥 MODIFICA: Aggiunto Row con pulsanti Modifica ed Elimina
-            secondary: SizedBox(
-              width: 90, // Spazio per ospitare le due icone
-              child: Row(
-                mainAxisAlignment: MainAxisAlignment.end,
-                children: [
-                  // TASTO MODIFICA (Sempre visibile)
-                  IconButton(
-                    padding: EdgeInsets.zero,
-                    constraints: const BoxConstraints(),
-                    icon: const Icon(Icons.edit, color: Colors.blueAccent, size: 20),
-                    onPressed: () {
-                      Navigator.push(
-                        context,
-                        MaterialPageRoute(
-                          builder: (_) => AddContractPage(contractToEdit: contratto),
-                        ),
-                      );
-                    },
-                  ),
-                  const SizedBox(width: 8),
-                  // TASTO ELIMINA (Solo se NON è selezionato o se vuoi permetterlo comunque)
-                  isSelected 
-                    ? const Icon(Icons.check_circle, color: Colors.blueAccent, size: 22)
-                    : IconButton(
-                        padding: EdgeInsets.zero,
-                        constraints: const BoxConstraints(),
-                        icon: const Icon(Icons.delete_outline, color: Colors.redAccent, size: 20),
-                        onPressed: () => homeProv.deleteContract(contratto.id),
-                      ),
-                ],
-              ),
-            ),
-          );
-        }).toList(),
+  if (!isSelected && homeProv.chargeHistory.isNotEmpty) {
+    // 1. PARTE VARIABILE (Consumo kWh)
+    for (var sessione in homeProv.chargeHistory) {
+      double costoAttuale = CostCalculator.calculateComparison(
+        session: sessione, 
+        targetContract: homeProv.myContract
+      );
+      double costoAlternativo = CostCalculator.calculateComparison(
+        session: sessione, 
+        targetContract: contratto
+      );
+      differenzaTotale += (costoAttuale - costoAlternativo);
+    }
 
-        const SizedBox(height: 15),
+    // 2. PARTE FISSA (Quota Mensile)
+    // Calcoliamo quanti mesi copre lo storico (es: da Gennaio a Marzo = 3 mesi)
+    DateTime dataInizio = homeProv.chargeHistory.first.date;
+    DateTime dataFine = homeProv.chargeHistory.last.date;
+    
+    // Calcolo semplificato dei mesi trascorsi (minimo 1 mese)
+    int mesi = ((dataFine.year - dataInizio.year) * 12) + (dataFine.month - dataInizio.month);
+    if (mesi <= 0) mesi = 1; 
 
-        // --- TASTO AGGIUNGI MANUALE ---
-        InkWell(
-          onTap: () => Navigator.push(
-              context, MaterialPageRoute(builder: (_) => const AddContractPage())),
-          child: Container(
-            padding: const EdgeInsets.symmetric(vertical: 12),
-            decoration: BoxDecoration(
-              color: Colors.white.withOpacity(0.05),
-              borderRadius: BorderRadius.circular(10),
-              border: Border.all(color: Colors.white10),
-            ),
-            child: const Row(
-              mainAxisAlignment: MainAxisAlignment.center,
-              children: [
-                Icon(Icons.add_circle_outline, color: Colors.blueAccent, size: 18),
-                SizedBox(width: 8),
-                Text("AGGIUNGI NUOVO CONTRATTO",
-                    style: TextStyle(color: Colors.blueAccent, fontWeight: FontWeight.bold, fontSize: 11)),
-              ],
-            ),
-          ),
-        ),
-      ],
+    double quotaFissaAttuale = homeProv.myContract.fixedMonthlyFee ?? 0.0;
+    double quotaFissaAlternativa = contratto.fixedMonthlyFee ?? 0.0;
+
+    // Aggiungiamo la differenza dei costi fissi al totale
+    differenzaTotale += (quotaFissaAttuale - quotaFissaAlternativa) * mesi;
+  }
+
+                              return Container(
+                                margin: const EdgeInsets.only(bottom: 8),
+                                decoration: BoxDecoration(
+                                  color: isSelected ? Colors.blueAccent.withOpacity(0.05) : Colors.white.withOpacity(0.02),
+                                  borderRadius: BorderRadius.circular(10),
+                                  border: Border.all(color: isSelected ? Colors.blueAccent.withOpacity(0.4) : Colors.white10),
+                                ),
+                                child: RadioListTile<String>(
+                                  contentPadding: const EdgeInsets.symmetric(horizontal: 8),
+                                  title: Text(contratto.contractName.toUpperCase(),
+                                      style: TextStyle(color: isSelected ? Colors.blueAccent : Colors.white, fontSize: 13, fontWeight: FontWeight.bold)),
+                                  subtitle: Column(
+                                    crossAxisAlignment: CrossAxisAlignment.start,
+                                    children: [
+                                      Text("${contratto.provider} • F1: ${contratto.f1Price} €/kWh",
+                                          style: const TextStyle(color: Colors.white38, fontSize: 11)),
+                                      if (!isSelected && homeProv.chargeHistory.isNotEmpty)
+                                        Padding(
+                                          padding: const EdgeInsets.only(top: 6),
+                                          child: Row(
+                                            children: [
+                                              Icon(differenzaTotale >= 0 ? Icons.trending_down : Icons.trending_up,
+                                                   color: differenzaTotale >= 0 ? Colors.greenAccent : Colors.redAccent, size: 14),
+                                              const SizedBox(width: 4),
+                                              Text(
+                                                differenzaTotale >= 0 
+                                                  ? "RISPARMIERESTI ${differenzaTotale.toStringAsFixed(2)}€"
+                                                  : "SPENDERESTI ${differenzaTotale.abs().toStringAsFixed(2)}€ IN PIÙ",
+                                                style: TextStyle(color: differenzaTotale >= 0 ? Colors.greenAccent : Colors.redAccent, fontSize: 9, fontWeight: FontWeight.bold),
+                                              ),
+                                            ],
+                                          ),
+                                        ),
+                                    ],
+                                  ),
+                                  value: contratto.id,
+                                  groupValue: homeProv.activeContractId,
+                                  activeColor: Colors.blueAccent,
+                                  onChanged: (String? value) {
+                                    if (value != null) {
+                                      // 1. Cambia il contratto attivo nel Provider
+                                      homeProv.selectActiveContract(value);
+                                      
+                                      // 2. 🔥 AGGIORNA I BOX IN ALTO
+                                      // Usiamo setState per forzare i controller a mostrare i dati del nuovo contratto
+                                      setState(() {
+                                        
+                                        _providerController.text = contratto.provider;
+                                        // Se hai anche i prezzi in questa pagina, aggiorna anche quelli:
+                                        _f1Controller.text = contratto.f1Price.toString();
+                                        _isMonorario = contratto.isMonorario;
+                                      });
+                                    }
+                                  },
+                                  secondary: Row(
+                                    mainAxisSize: MainAxisSize.min,
+                                    children: [
+                                      IconButton(
+  icon: const Icon(Icons.edit, color: Colors.white24, size: 18),
+  onPressed: () async {
+    // 1. Aspettiamo che l'utente finisca di modificare e prema "Salva"
+    await Navigator.push(
+      context, 
+      MaterialPageRoute(builder: (_) => AddContractPage(contractToEdit: contratto))
     );
+    
+    // 2. Una volta tornati qui, forziamo la ricostruzione della pagina.
+    // Questo farà ripartire il ciclo 'for' con i nuovi prezzi appena salvati!
+    if (mounted) {
+      setState(() {});
+    }
   },
 ),
+                                      if (homeProv.allContracts.length > 1)
+                                        IconButton(
+                                          icon: const Icon(Icons.delete_outline, color: Colors.redAccent, size: 18),
+                                          onPressed: () => homeProv.deleteContract(contratto.id),
+                                        ),
+                                    ],
+                                  ),
+                                ),
+                              );
+                            }).toList(),
+                            const SizedBox(height: 15),
+                            InkWell(
+                              onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const AddContractPage())),
+                              child: Container(
+                                padding: const EdgeInsets.symmetric(vertical: 12),
+                                decoration: BoxDecoration(
+                                  color: Colors.white.withOpacity(0.05),
+                                  borderRadius: BorderRadius.circular(10),
+                                  border: Border.all(color: Colors.white10),
+                                ),
+                                child: const Row(
+                                  mainAxisAlignment: MainAxisAlignment.center,
+                                  children: [
+                                    Icon(Icons.add_circle_outline, color: Colors.blueAccent, size: 18),
+                                    SizedBox(width: 8),
+                                    Text("AGGIUNGI NUOVO CONTRATTO",
+                                        style: TextStyle(color: Colors.blueAccent, fontWeight: FontWeight.bold, fontSize: 11)),
+                                  ],
+                                ),
+                              ),
+                            ),
+                          ],
+                        );
+                      },
+                    ),
                   ],
                 ),
               ),
             ),
-            const SizedBox(height: 25),
 
+            const SizedBox(height: 25),
             _buildSectionTitle("4 - ACCOUNT"),
             _buildCard(
-              child: Column(
-                children: [
-                  ListTile(
-                    leading: const Icon(Icons.logout, color: Colors.redAccent),
-                    title: const Text("Esci dall'account", style: TextStyle(color: Colors.redAccent)),
-                    onTap: () async {
-                      final confirm = await _showLogoutConfirmDialog();
-                      if (confirm == true) {
-                        await widget.authProvider.signOut();
-                        if (context.mounted) Navigator.pop(context);
-                      }
-                    },
-                  ),
-                ],
+              child: ListTile(
+                leading: const Icon(Icons.logout, color: Colors.redAccent),
+                title: const Text("Esci dall'account", style: TextStyle(color: Colors.redAccent)),
+                onTap: () async {
+                  final confirm = await _showLogoutConfirmDialog();
+                  if (confirm == true) {
+                    await widget.authProvider.signOut();
+                    if (context.mounted) Navigator.pop(context);
+                  }
+                },
               ),
             ),
-            
             const SizedBox(height: 30),
-            if (_isSyncing) const Center(child: CircularProgressIndicator(color: Colors.blueAccent)),
-            
+            if (_isSyncing) const Center(child: Padding(
+              padding: EdgeInsets.only(bottom: 20),
+              child: CircularProgressIndicator(color: Colors.blueAccent),
+            )),
             SizedBox(
               width: double.infinity,
               height: 54,

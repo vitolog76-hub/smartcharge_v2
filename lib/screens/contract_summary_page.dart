@@ -2,56 +2,23 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:smartcharge_v2/models/contract_model.dart';
 import 'package:smartcharge_v2/providers/home_provider.dart';
+import 'package:smartcharge_v2/services/cost_calculator.dart'; 
 
 class ContractSummaryPage extends StatelessWidget {
   const ContractSummaryPage({super.key});
 
-  // --- LOGICA DI CALCOLO FISCALE ---
-  double _calculateVariablePrice(double basePrice, EnergyContract contract, double totalKwh, int giorni) {
-    if (basePrice > 0.20) return basePrice;
-
-    double imponibileSenzaAccise = basePrice;
-    if (contract.transportFee != null) imponibileSenzaAccise += contract.transportFee!;
-    if (contract.systemCharges != null) imponibileSenzaAccise += contract.systemCharges!;
-
-    double acciseMediePerKwh = 0;
-    double consumoMensileStimato = giorni > 0 ? (totalKwh / giorni) * 30 : totalKwh;
-
-    if (consumoMensileStimato > 150) {
-      double kwhEccedenti = consumoMensileStimato - 150;
-      double totaleAcciseMese = kwhEccedenti * 0.0227;
-      acciseMediePerKwh = totaleAcciseMese / consumoMensileStimato;
-    }
-    
-    double imponibileFinito = imponibileSenzaAccise + acciseMediePerKwh;
-    double prezzoFinito = imponibileFinito;
-    if (contract.vat != null) {
-      prezzoFinito = imponibileFinito * (1 + contract.vat! / 100);
-    }
-    return prezzoFinito;
-  }
-
   @override
   Widget build(BuildContext context) {
-    // 🔥 ASCOLTO ATTIVO: La pagina si ricostruisce ad ogni notifica del provider
     final provider = context.watch<HomeProvider>();
     final contract = provider.myContract;
     
+    // Dati storici
     final double totalKwh = provider.chargeHistory.fold(0.0, (sum, s) => sum + s.kwh);
     final double totalCost = provider.chargeHistory.fold(0.0, (sum, s) => sum + s.cost);
     
-    int totalDays = 30;
-    if (provider.chargeHistory.isNotEmpty) {
-      DateTime firstCharge = provider.chargeHistory.last.startDateTime;
-      DateTime lastCharge = provider.chargeHistory.first.startDateTime;
-      totalDays = lastCharge.difference(firstCharge).inDays;
-      if (totalDays < 1) totalDays = 1;
-    }
-
-    double fixedMonthlyCost = contract.fixedMonthlyFee ?? 0;
-    double powerCost = (contract.powerFee ?? 0) * 3;
-    double totalFixedMonthly = fixedMonthlyCost + powerCost;
-    double avgVariableCostPerKwh = totalKwh > 0 ? totalCost / totalKwh : 0;
+    // Recuperiamo i breakdown dal nuovo CostCalculator
+    final variableBreakdown = CostCalculator.getPriceBreakdown(contract);
+    final fixedBreakdown = CostCalculator.getFixedBreakdown(contract);
 
     return Scaffold(
       backgroundColor: Colors.black,
@@ -71,66 +38,43 @@ class ContractSummaryPage extends StatelessWidget {
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             _buildHeader(contract),
-            const SizedBox(height: 20),
-            _buildVariableTariffSection(contract, totalKwh, totalDays),
-            const SizedBox(height: 20),
-            _buildFixedCostsSection(totalFixedMonthly, totalFixedMonthly * 12, contract.fixedMonthlyFee, contract.powerFee),
-            const SizedBox(height: 20),
-            _buildConsumptionSummary(totalKwh, totalCost, avgVariableCostPerKwh),
+            const SizedBox(height: 24),
+            
+            // 1. SEZIONE TRASPARENZA ARERA (Costi Variabili)
+            _buildSectionTitle("SCOMPOSIZIONE COSTO VARIABILE", Icons.analytics_outlined),
+            _buildVariableDetailCard(variableBreakdown),
+            
+            const SizedBox(height: 24),
+            
+            // 2. SEZIONE CONFRONTO GESTORI (Costi Fissi)
+            _buildSectionTitle("COSTI FISSI E POTENZA", Icons.account_balance_wallet_outlined),
+            _buildFixedDetailCard(fixedBreakdown),
+            
+            const SizedBox(height: 24),
+            
+            // 3. RIEPILOGO CONSUMI REALI
+            _buildSectionTitle("RIEPILOGO STORICO", Icons.history),
+            _buildConsumptionSummary(totalKwh, totalCost),
           ],
         ),
       ),
     );
   }
 
-  Widget _buildVariableTariffSection(EnergyContract contract, double totalKwh, int giorni) {
-    return Container(
-      padding: const EdgeInsets.all(16),
-      decoration: BoxDecoration(
-        color: const Color(0xFF1C1C1E),
-        borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: contract.isMonorario ? Colors.blueAccent.withOpacity(0.2) : Colors.greenAccent.withOpacity(0.2)),
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Row(
-            children: [
-              Icon(Icons.bolt, color: contract.isMonorario ? Colors.blueAccent : Colors.yellowAccent, size: 18),
-              const SizedBox(width: 8),
-              Text(
-                contract.isMonorario ? "TARIFFA MONORARIA" : "TARIFFA A FASCE", 
-                style: const TextStyle(fontSize: 13, fontWeight: FontWeight.bold, color: Colors.white)
-              ),
-            ],
-          ),
-          const SizedBox(height: 16),
-          _buildTariffRow("F1", contract.f1Pure ?? contract.f1Price, _calculateVariablePrice(contract.f1Price, contract, totalKwh, giorni), Colors.blueAccent),
-          if (!contract.isMonorario) ...[
-            const Divider(color: Colors.white10),
-            _buildTariffRow("F2", contract.f2Pure ?? contract.f2Price, _calculateVariablePrice(contract.f2Price, contract, totalKwh, giorni), Colors.orangeAccent),
-            const Divider(color: Colors.white10),
-            _buildTariffRow("F3", contract.f3Pure ?? contract.f3Price, _calculateVariablePrice(contract.f3Price, contract, totalKwh, giorni), Colors.greenAccent),
-          ],
-        ],
-      ),
-    );
-  }
-
-  Widget _buildTariffRow(String label, double puro, double totale, Color color) {
+  Widget _buildSectionTitle(String title, IconData icon) {
     return Padding(
-      padding: const EdgeInsets.symmetric(vertical: 8),
+      padding: const EdgeInsets.only(left: 4, bottom: 8),
       child: Row(
         children: [
-          Expanded(child: Text(label, style: TextStyle(color: color, fontWeight: FontWeight.bold, fontSize: 14))),
-          Expanded(child: Text("${puro.toStringAsFixed(3)} €", style: const TextStyle(color: Colors.white38, fontSize: 12), textAlign: TextAlign.center)),
-          Expanded(child: Text("${totale.toStringAsFixed(3)} €", style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold), textAlign: TextAlign.center)),
+          Icon(icon, color: Colors.blueAccent, size: 14),
+          const SizedBox(width: 8),
+          Text(title, style: const TextStyle(color: Colors.white38, fontSize: 11, fontWeight: FontWeight.bold, letterSpacing: 1.1)),
         ],
       ),
     );
   }
 
-  Widget _buildFixedCostsSection(double monthly, double yearly, double? fixedMonthlyFee, double? powerFee) {
+  Widget _buildVariableDetailCard(Map<String, double> breakdown) {
     return Container(
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
@@ -139,38 +83,73 @@ class ContractSummaryPage extends StatelessWidget {
         border: Border.all(color: Colors.white.withOpacity(0.05)),
       ),
       child: Column(
-        children: [
-          _buildFixedRow("Quota Fissa Mensile", fixedMonthlyFee ?? 0),
-          _buildFixedRow("Quota Potenza (3kW)", (powerFee ?? 0) * 3),
-          const Divider(color: Colors.white10, height: 24),
-          Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-            children: [
-              _buildSmallStat("COSTO MENSILE", "${monthly.toStringAsFixed(2)} €"),
-              _buildSmallStat("COSTO ANNUALE", "${yearly.toStringAsFixed(2)} €"),
-            ],
-          )
-        ],
+        children: breakdown.entries.map((entry) {
+          final bool isTotal = entry.key.contains("FINITO");
+          final bool isIva = entry.key.contains("IVA"); // Identifica la riga IVA
+
+          return Padding(
+            padding: const EdgeInsets.symmetric(vertical: 6),
+            child: Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                Text(
+                  entry.key, 
+                  style: TextStyle(
+                    color: isTotal ? Colors.white : (isIva ? Colors.white70 : Colors.white54), 
+                    fontSize: 13, 
+                    fontWeight: isTotal ? FontWeight.bold : FontWeight.normal,
+                    fontStyle: isIva ? FontStyle.italic : FontStyle.normal,
+                  )
+                ),
+                Text(
+                  "${entry.value.toStringAsFixed(4)} €/kWh",
+                  style: TextStyle(
+                    color: isTotal 
+                        ? Colors.greenAccent 
+                        : (isIva ? Colors.amberAccent.withOpacity(0.8) : Colors.white), 
+                    fontWeight: isTotal ? FontWeight.bold : FontWeight.normal, 
+                    fontSize: 13
+                  ),
+                ),
+              ],
+            ),
+          );
+        }).toList(),
       ),
     );
   }
 
-  Widget _buildFixedRow(String label, double value) {
-    return Padding(
-      padding: const EdgeInsets.symmetric(vertical: 4),
-      child: Row(
-        mainAxisAlignment: MainAxisAlignment.spaceBetween,
-        children: [
-          Text(label, style: const TextStyle(color: Colors.white54, fontSize: 12)),
-          Text("${value.toStringAsFixed(2)} €", style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
-        ],
+  Widget _buildFixedDetailCard(Map<String, double> breakdown) {
+    return Container(
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: const Color(0xFF1C1C1E),
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: Colors.white.withOpacity(0.05)),
+      ),
+      child: Column(
+        children: breakdown.entries.map((entry) {
+          final bool isTotal = entry.key.contains("TOTALE");
+          return Padding(
+            padding: const EdgeInsets.symmetric(vertical: 6),
+            child: Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                Text(entry.key, style: TextStyle(color: isTotal ? Colors.white : Colors.white54, fontSize: 13, fontWeight: isTotal ? FontWeight.bold : FontWeight.normal)),
+                Text(
+                  "${entry.value.toStringAsFixed(2)} €/mese",
+                  style: TextStyle(color: isTotal ? Colors.blueAccent : Colors.white, fontWeight: isTotal ? FontWeight.bold : FontWeight.normal, fontSize: 13),
+                ),
+              ],
+            ),
+          );
+        }).toList(),
       ),
     );
   }
 
-  Widget _buildConsumptionSummary(double kwh, double cost, double avgCost) {
-    String displayAvg = kwh > 0 ? "${avgCost.toStringAsFixed(3)} €/kWh" : "---";
-
+  Widget _buildConsumptionSummary(double kwh, double cost) {
+    double avgCost = kwh > 0 ? cost / kwh : 0;
     return Container(
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
@@ -182,7 +161,8 @@ class ContractSummaryPage extends StatelessWidget {
         children: [
           _buildSummaryRow("Energia Ricaricata", "${kwh.toStringAsFixed(1)} kWh"),
           _buildSummaryRow("Spesa Variabile Totale", "${cost.toStringAsFixed(2)} €"),
-          _buildSummaryRow("Costo Reale Medio", displayAvg, isBold: true),
+          const Divider(color: Colors.white10, height: 20),
+          _buildSummaryRow("Costo Reale Medio", "${avgCost.toStringAsFixed(3)} €/kWh", isBold: true),
         ],
       ),
     );
@@ -190,24 +170,14 @@ class ContractSummaryPage extends StatelessWidget {
 
   Widget _buildSummaryRow(String label, String value, {bool isBold = false}) {
     return Padding(
-      padding: const EdgeInsets.symmetric(vertical: 6),
+      padding: const EdgeInsets.symmetric(vertical: 4),
       child: Row(
         mainAxisAlignment: MainAxisAlignment.spaceBetween,
         children: [
-          Text(label, style: const TextStyle(color: Colors.white54, fontSize: 12)),
+          Text(label, style: const TextStyle(color: Colors.white54, fontSize: 13)),
           Text(value, style: TextStyle(color: isBold ? Colors.greenAccent : Colors.white, fontWeight: isBold ? FontWeight.bold : FontWeight.normal, fontSize: 14)),
         ],
       ),
-    );
-  }
-
-  Widget _buildSmallStat(String label, String value) {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Text(label, style: const TextStyle(color: Colors.white38, fontSize: 9, fontWeight: FontWeight.bold)),
-        Text(value, style: const TextStyle(color: Colors.blueAccent, fontSize: 16, fontWeight: FontWeight.bold)),
-      ],
     );
   }
 
@@ -218,16 +188,22 @@ class ContractSummaryPage extends StatelessWidget {
         Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Text(contract.provider.toUpperCase(), style: const TextStyle(fontSize: 20, fontWeight: FontWeight.bold, color: Colors.white)),
+            Text(contract.provider.toUpperCase(), style: const TextStyle(fontSize: 22, fontWeight: FontWeight.bold, color: Colors.white)),
             const SizedBox(height: 4),
-            Text(contract.userName.toUpperCase(), style: const TextStyle(color: Colors.white38, fontSize: 10, letterSpacing: 1.2)),
+            Row(
+              children: [
+                Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                  decoration: BoxDecoration(color: Colors.blueAccent.withOpacity(0.1), borderRadius: BorderRadius.circular(4)),
+                  child: Text(contract.isMonorario ? "MONORARIO" : "FASCE", style: const TextStyle(color: Colors.blueAccent, fontSize: 9, fontWeight: FontWeight.bold)),
+                ),
+                const SizedBox(width: 8),
+                Text("Q1 2026", style: const TextStyle(color: Colors.white24, fontSize: 10, fontWeight: FontWeight.bold)),
+              ],
+            ),
           ],
         ),
-        Icon(
-          contract.isMonorario ? Icons.looks_one : Icons.looks_3, 
-          color: Colors.white10, 
-          size: 40
-        )
+        const Icon(Icons.electric_bolt, color: Colors.white10, size: 48)
       ],
     );
   }

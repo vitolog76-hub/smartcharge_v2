@@ -8,6 +8,8 @@ import 'package:smartcharge_v2/services/pdf_service.dart';
 import 'package:smartcharge_v2/widgets/history/history_chart.dart';
 import 'package:smartcharge_v2/widgets/history/history_year_folder.dart';
 import 'package:smartcharge_v2/widgets/history/history_export_dialog.dart';
+import 'package:provider/provider.dart';
+import 'package:smartcharge_v2/providers/home_provider.dart';
 
 class HistoryPage extends StatefulWidget {
   final List<ChargeSession> history;
@@ -171,7 +173,7 @@ class _HistoryPageState extends State<HistoryPage> {
       sortedHistory, // 🔥 Passiamo la lista ordinata!
       filterMonth: month,
       filterYear: year,
-      userName: widget.contract.userName.isEmpty ? "UTENTE" : widget.contract.userName.toUpperCase(),
+      userName: Provider.of<HomeProvider>(context, listen: false).globalUserName.toUpperCase(),
       provider: widget.contract.provider.isEmpty ? "PRIVATO" : widget.contract.provider.toUpperCase(),
       carModel: "${widget.selectedCar.brand} ${widget.selectedCar.model}".toUpperCase(),
     );

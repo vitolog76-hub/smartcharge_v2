@@ -124,10 +124,10 @@ class AuthProvider extends ChangeNotifier {
     debugPrint("🆕 Creazione dati iniziali per nuovo utente: $displayName");
     
     final defaultContract = EnergyContract(
-      id: "default_contract", // 🔥 AGGIUNGI QUESTO
+      id: "default_contract_${DateTime.now().millisecondsSinceEpoch}", 
       contractName: "Contratto Base",
       provider: "Esempio",
-      userName: displayName,
+      // userName: displayName, // Possiamo anche smettere di passarlo qui se vuoi pulire il modello
       f1Price: 0.20,
       f2Price: 0.18,
       f3Price: 0.15,
@@ -135,10 +135,23 @@ class AuthProvider extends ChangeNotifier {
     );
     
     final prefs = await SharedPreferences.getInstance();
-    await prefs.setString('energy_contract', jsonEncode(defaultContract.toJson()));
+    
+    // 1. Salviamo il nome globale nelle SharedPreferences (quello che userà HomeProvider)
+    await prefs.setString('global_user_name', displayName);
+    
+    // 2. Salvataggio locale MacBook
+    await prefs.setString('energy_contracts_list', jsonEncode([defaultContract.toJson()]));
+    await prefs.setString('active_contract_id', defaultContract.id);
     await prefs.setString('charge_history', jsonEncode([]));
     
-    await SyncService().uploadData(userId, [], defaultContract);
+    // 🔥 FIX: Passiamo i 5 argomenti richiesti dal nuovo SyncService
+    await SyncService().uploadData(
+      userId,               // 1. ID Utente
+      [],                   // 2. History vuota
+      [defaultContract],    // 3. Lista con il contratto di default
+      defaultContract.id,   // 4. ID del contratto attivo
+      displayName           // 5. Nome Globale (Aggiunto!)
+    );
   }
 
   Future<void> _downloadUserData(String userId) async {
@@ -153,14 +166,22 @@ class AuthProvider extends ChangeNotifier {
         if (data != null) {
           final prefs = await SharedPreferences.getInstance();
           
-          if (data['history'] != null) {
-            await prefs.setString('charge_history', jsonEncode(data['history']));
-            debugPrint("✅ Storico scaricato: ${(data['history'] as List).length} sessioni");
+          // --- RECUPERO NOME GLOBALE DAL CLOUD ---
+          if (data['globalUserName'] != null) {
+            await prefs.setString('global_user_name', data['globalUserName']);
+            debugPrint("✅ Nome globale scaricato: ${data['globalUserName']}");
           }
           
-          if (data['contract'] != null) {
-            await prefs.setString('energy_contract', jsonEncode(data['contract']));
-            debugPrint("✅ Contratto scaricato");
+          if (data['history'] != null) {
+            await prefs.setString('charge_history', jsonEncode(data['history']));
+          }
+          
+          if (data['allContracts'] != null) {
+            await prefs.setString('energy_contracts_list', jsonEncode(data['allContracts']));
+          }
+
+          if (data['activeContractId'] != null) {
+            await prefs.setString('active_contract_id', data['activeContractId']);
           }
         }
       }

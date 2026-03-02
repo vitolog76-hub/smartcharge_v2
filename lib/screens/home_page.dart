@@ -122,57 +122,120 @@ class HomePage extends StatelessWidget {
                   right: -80,
                   child: _buildGlowSphere(250, Colors.amberAccent.withOpacity(0.07)),
                 ),
-                // ... nel metodo build di HomePage ...
-SafeArea(
-  child: Padding(
-    padding: const EdgeInsets.all(12),
-    child: SingleChildScrollView( // 🔥 Aggiungi questo per rendere tutto scorrevole
-      physics: const BouncingScrollPhysics(), // Opzionale: aggiunge un effetto fluido
-      child: Column(
-        children: [
-          _glassContainer(child: ReadyTimeCard(provider: provider)),
-          const SizedBox(height: 12),
-          BatteryStatusRow(provider: provider),
-          const SizedBox(height: 12),
-          StatsRow(provider: provider),
-          const SizedBox(height: 12),
-          
-          // 🔥 MODIFICA QUI: Rimuovi Expanded e usa un contenitore con altezza fissa o dinamica
-          _glassContainer(
-            blur: 20,
-            opacity: 0.08,
-            child: ChargingControls(provider: provider),
-          ),
-          
-          const SizedBox(height: 12),
-          Row(
-            children: [
-              Expanded(
-                flex: 12,
-                child: SimulationButton(provider: provider),
-              ),
-              const SizedBox(width: 12),
-              Expanded(
-                flex: 18,
-                child: _buildCarInfo(context, provider),
-              ),
-            ],
-          ),
-          const SizedBox(height: 12),
-          _glassContainer(
-            padding: const EdgeInsets.symmetric(vertical: 4),
-            child: ActionButtons(
-              onHomeTap: provider.isSimulating ? () {} : () => _showAddDialog(context, provider, "Home"),
-              onPublicTap: provider.isSimulating ? () {} : () => _showAddDialog(context, provider, "Pubblica"),
-            ),
-          ),
-          const SizedBox(height: 12),
-          _buildEditCapacityTile(context, provider),
-        ],
-      ),
-    ),
-  ),
-),
+                
+                // CONTENUTO PRINCIPALE
+                SafeArea(
+                  child: Padding(
+                    padding: const EdgeInsets.symmetric(horizontal: 12),
+                    child: SingleChildScrollView(
+                      physics: const BouncingScrollPhysics(),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          const SizedBox(height: 10),
+
+                          // --- SEZIONE SALUTO PERSONALE (UNICA E CORRETTA) ---
+                          Padding(
+                            padding: const EdgeInsets.only(left: 8.0, bottom: 20.0),
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Text(
+                                  "CIAO, ${provider.globalUserName.toUpperCase()}!", // 🔥 USA IL NOME GLOBALE
+                                  style: const TextStyle(
+                                    color: Colors.white,
+                                    fontSize: 24,
+                                    fontWeight: FontWeight.w900,
+                                    letterSpacing: 1.5,
+                                    shadows: [
+                                      Shadow(color: Colors.blueAccent, blurRadius: 15),
+                                    ],
+                                  ),
+                                ),
+                                const SizedBox(height: 6),
+                                Row(
+                                  children: [
+                                    Icon(
+                                      Icons.electric_bolt_rounded, 
+                                      color: Colors.cyanAccent.withOpacity(0.6), 
+                                      size: 14
+                                    ),
+                                    const SizedBox(width: 6),
+                                    Text(
+                                      "CONTRATTO: ${provider.myContract.contractName.toUpperCase()}",
+                                      style: TextStyle(
+                                        color: Colors.white.withOpacity(0.4),
+                                        fontSize: 10,
+                                        fontWeight: FontWeight.bold,
+                                        letterSpacing: 0.8,
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                              ],
+                            ),
+                          ),
+
+                          // --- CARDS PRINCIPALI (UNA SOLA VOLTA) ---
+                          _glassContainer(child: ReadyTimeCard(provider: provider)),
+                          const SizedBox(height: 12),
+                          
+                          BatteryStatusRow(provider: provider),
+                          const SizedBox(height: 12),
+                          
+                          StatsRow(provider: provider),
+                          const SizedBox(height: 12),
+                          
+                          // CONTROLLI RICARICA
+                          _glassContainer(
+                            blur: 20,
+                            opacity: 0.08,
+                            child: ChargingControls(provider: provider),
+                          ),
+                          
+                          const SizedBox(height: 12),
+                          
+                          // RIGA SIMULAZIONE E INFO AUTO
+                          Row(
+                            children: [
+                              Expanded(
+                                flex: 12,
+                                child: SimulationButton(provider: provider),
+                              ),
+                              const SizedBox(width: 12),
+                              Expanded(
+                                flex: 18,
+                                child: _buildCarInfo(context, provider),
+                              ),
+                            ],
+                          ),
+                          
+                          const SizedBox(height: 12),
+                          
+                          // PULSANTI AZIONE RAPIDA
+                          _glassContainer(
+                            padding: const EdgeInsets.symmetric(vertical: 4),
+                            child: ActionButtons(
+                              onHomeTap: provider.isSimulating 
+                                  ? () {} 
+                                  : () => _showAddDialog(context, provider, "Home"),
+                              onPublicTap: provider.isSimulating 
+                                  ? () {} 
+                                  : () => _showAddDialog(context, provider, "Pubblica"),
+                            ),
+                          ),
+                          
+                          const SizedBox(height: 12),
+                          
+                          // TILE CAPACITÀ BATTERIA
+                          _buildEditCapacityTile(context, provider),
+                          
+                          const SizedBox(height: 30), // Padding finale per lo scroll
+                        ],
+                      ),
+                    ),
+                  ),
+                ),
               ],
             ),
           );

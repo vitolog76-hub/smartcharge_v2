@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:smartcharge_v2/models/contract_model.dart';
 import 'package:smartcharge_v2/providers/home_provider.dart';
+import 'package:smartcharge_v2/services/cost_calculator.dart'; // Import necessario per le costanti
 
 class AddContractPage extends StatefulWidget {
   final EnergyContract? contractToEdit;
@@ -73,7 +74,6 @@ class _AddContractPageState extends State<AddContractPage> {
         child: ListView(
           padding: const EdgeInsets.all(20),
           children: [
-            // 🔥 MODIFICATI: Aggiunto isNumeric: false
             _buildInput("NOME CONTRATTO (es. Casa Octopus)", _nameController, Icons.edit, isNumeric: false),
             _buildInput("GESTORE (es. Octopus Energy)", _providerController, Icons.business, isNumeric: false),
             
@@ -92,10 +92,34 @@ class _AddContractPageState extends State<AddContractPage> {
                   SizedBox(width: 12),
                   Expanded(
                     child: Text(
-                      "Inserisci la 'Materia Energia'. L'app aggiungerà automaticamente perdite di rete, accise e oneri.",
+                      "Inserisci solo i valori del tuo contratto. L'app aggiunge automaticamente i costi standard ARERA riportati sotto.",
                       style: TextStyle(color: Colors.white70, fontSize: 11, height: 1.4),
                     ),
                   ),
+                ],
+              ),
+            ),
+
+            const SizedBox(height: 15),
+
+            // --- NUOVA SEZIONE: COSTI ARERA (SOLA LETTURA) ---
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+              decoration: BoxDecoration(
+                color: Colors.white.withOpacity(0.02),
+                borderRadius: BorderRadius.circular(10),
+                border: Border.all(color: Colors.white.withOpacity(0.05)),
+              ),
+              child: Column(
+                children: [
+                  _buildReadOnlyRow("Perdite di Rete (Mercato Libero)", "${((CostCalculator.perditeRete - 1) * 100).toStringAsFixed(1)}%"),
+                  const Divider(color: Colors.white10, height: 12),
+                  _buildReadOnlyRow("Oneri di Sistema", "${CostCalculator.oneriSistema.toStringAsFixed(4)} €/kWh"),
+                  const Divider(color: Colors.white10, height: 12),
+                  _buildReadOnlyRow("Trasporto Variabile", "${CostCalculator.trasportoEnergia.toStringAsFixed(4)} €/kWh"),
+                  const Divider(color: Colors.white10, height: 12),
+                  _buildReadOnlyRow("Accise (Imposta Erariale)", "${CostCalculator.accise.toStringAsFixed(4)} €/kWh"),
+                  _buildReadOnlyRow("IVA (Clienti Domestici)", "10%"),
                 ],
               ),
             ),
@@ -142,11 +166,12 @@ class _AddContractPageState extends State<AddContractPage> {
 
             const SizedBox(height: 20),
             
-            _buildInput("SPREAD / COSTI EXTRA (€/kWh)", _spreadController, Icons.add_moderator, hint: "es. 0.02"),
+            // --- SPREAD MODIFICATO ---
+            _buildInput("SPREAD / COSTI EXTRA (€/kWh)", _spreadController, Icons.add_moderator, hint: "es. 0.012"),
             const Padding(
               padding: EdgeInsets.only(left: 40, top: 4),
               child: Text(
-                "💡 Inserisci voci come 'Omega' o 'Margine' se presenti.",
+                "💡 Includi qui margini, sbilanciamento o Componente Capacità (es. 0.0116).",
                 style: TextStyle(color: Colors.white24, fontSize: 9),
               ),
             ),
@@ -182,7 +207,17 @@ class _AddContractPageState extends State<AddContractPage> {
     );
   }
 
-  // 🔥 AGGIORNATO: Aggiunto parametro isNumeric con default true
+  // Widget per mostrare i dati ARERA non modificabili
+  Widget _buildReadOnlyRow(String label, String value) {
+    return Row(
+      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+      children: [
+        Text(label, style: const TextStyle(color: Colors.white38, fontSize: 11)),
+        Text(value, style: const TextStyle(color: Colors.white70, fontSize: 11, fontWeight: FontWeight.bold)),
+      ],
+    );
+  }
+
   Widget _buildInput(String label, TextEditingController ctrl, IconData icon, {String? hint, bool isNumeric = true}) {
     return TextFormField(
       controller: ctrl,
@@ -204,30 +239,34 @@ class _AddContractPageState extends State<AddContractPage> {
   }
 
   void _save() {
-    if (_formKey.currentState!.validate()) {
-      final homeProv = Provider.of<HomeProvider>(context, listen: false);
+  if (_formKey.currentState!.validate()) {
+    final homeProv = Provider.of<HomeProvider>(context, listen: false);
+    
+    final f1Str = _f1Controller.text.replaceAll(',', '.');
+    final f1 = double.tryParse(f1Str) ?? 0.0;
+    
+    // Recuperiamo il nome utente attuale per non perderlo
+    
+
+    final nuovo = EnergyContract(
+      id: widget.contractToEdit?.id ?? DateTime.now().millisecondsSinceEpoch.toString(),
+      contractName: _nameController.text,
+      provider: _providerController.text,
       
-      final f1Str = _f1Controller.text.replaceAll(',', '.');
-      final f1 = double.tryParse(f1Str) ?? 0.0;
-      
-      final nuovo = EnergyContract(
-        id: widget.contractToEdit?.id ?? DateTime.now().millisecondsSinceEpoch.toString(),
-        contractName: _nameController.text,
-        provider: _providerController.text,
-        isMonorario: _isMonorario,
-        f1Price: f1,
-        f2Price: _isMonorario ? f1 : (double.tryParse(_f2Controller.text.replaceAll(',', '.')) ?? 0.0),
-        f3Price: _isMonorario ? f1 : (double.tryParse(_f3Controller.text.replaceAll(',', '.')) ?? 0.0),
-        fixedMonthlyFee: double.tryParse(_fixedFeeController.text.replaceAll(',', '.')) ?? 0.0,
-        powerFee: double.tryParse(_powerLimitController.text.replaceAll(',', '.')) ?? 0.0,
-        spread: double.tryParse(_spreadController.text.replaceAll(',', '.')) ?? 0.0,
-      );
-      
-      homeProv.addOrUpdateContract(nuovo);
-      if (widget.contractToEdit == null) {
-        homeProv.selectActiveContract(nuovo.id);
-      }
-      Navigator.pop(context);
+      isMonorario: _isMonorario,
+      f1Price: f1,
+      f2Price: _isMonorario ? f1 : (double.tryParse(_f2Controller.text.replaceAll(',', '.')) ?? 0.0),
+      f3Price: _isMonorario ? f1 : (double.tryParse(_f3Controller.text.replaceAll(',', '.')) ?? 0.0),
+      fixedMonthlyFee: double.tryParse(_fixedFeeController.text.replaceAll(',', '.')) ?? 0.0,
+      powerFee: double.tryParse(_powerLimitController.text.replaceAll(',', '.')) ?? 0.0,
+      spread: double.tryParse(_spreadController.text.replaceAll(',', '.')) ?? 0.0,
+    );
+    
+    homeProv.addOrUpdateContract(nuovo);
+    if (widget.contractToEdit == null) {
+      homeProv.selectActiveContract(nuovo.id);
     }
+    Navigator.pop(context);
   }
+}
 }

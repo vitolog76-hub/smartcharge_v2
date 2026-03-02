@@ -1,16 +1,14 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
-import 'dart:convert';
 import 'package:smartcharge_v2/models/charge_session.dart';
 import 'package:smartcharge_v2/models/contract_model.dart';
 
 class SyncService {
   final FirebaseFirestore _db = FirebaseFirestore.instance;
 
-  // 1. Verifica se l'ID esiste (Cerca nel documento principale dell'utente)
+  // 1. Verifica esistenza ID
   Future<bool> checkIfUserExists(String userId) async {
     if (userId.isEmpty) return false;
     try {
-      print("DEBUG SYNC: Verifica esistenza utente $userId...");
       DocumentSnapshot doc = await _db.collection("users").doc(userId).get();
       return doc.exists;
     } catch (e) {
@@ -19,46 +17,40 @@ class SyncService {
     }
   }
 
-  // 2. Upload: Carica Cronologia e Contratto su Firestore
-  Future<void> uploadData(String userId, List<ChargeSession> history, EnergyContract contract) async {
+  // 2. Upload: Sincronizza tutto il pacchetto dati
+  Future<void> uploadData(
+    String userId, 
+    List<ChargeSession> history, 
+    List<EnergyContract> allContracts, 
+    String activeContractId,
+    String userName, 
+  ) async {
     if (userId.isEmpty) return;
 
     try {
-      // 🔥 PROTEZIONE 1: Se la history passata è vuota, verifichiamo prima se sul server c'è già roba
-      if (history.isEmpty) {
-        DocumentSnapshot doc = await _db.collection("users").doc(userId).collection("versions").doc("v2").get();
-        if (doc.exists) {
-          Map<String, dynamic>? data = doc.data() as Map<String, dynamic>?;
-          List? remoteHistory = data?['history'] as List?;
-          if (remoteHistory != null && remoteHistory.isNotEmpty) {
-            print("⚠️ ATTENZIONE: Tentativo di upload history vuota su dati esistenti. ANNULLO PER SICUREZZA.");
-            return; // Blocca l'upload distruttivo
-          }
-        }
-      }
-
+      // Trasformazione in mappe JSON (senza userName se hai già modificato il modello)
       List<Map<String, dynamic>> historyMap = history.map((s) => s.toJson()).toList();
-      Map<String, dynamic> contractMap = contract.toJson();
+      List<Map<String, dynamic>> contractsMap = allContracts.map((c) => c.toJson()).toList();
 
+      // 🔥 SALVATAGGIO STRUTTURATO: Il nome è al livello dell'ID, non del contratto
       await _db.collection("users").doc(userId).collection("versions").doc("v2").set({
             'lastUpdate': FieldValue.serverTimestamp(),
-            'history': historyMap,
-            'contract': contractMap,
+            'globalUserName': userName,           // <--- NOME PROFILO (Legato all'ID)
+            'history': historyMap,                // <--- CRONOLOGIA
+            'allContracts': contractsMap,         // <--- LISTA TARIFFE (Dati Tecnici)
+            'activeContractId': activeContractId, // <--- QUALE TARIFFA È ATTIVA
           }, SetOptions(merge: true));
 
-      // ... resto del codice ...
+      print("✅ SYNC OK: Utente [$userName] aggiornato su Cloud con ID: $userId");
     } catch (e) {
       print("!!! ERRORE UPLOAD: $e");
     }
   }
 
-  // 3. Download: Scarica tutto il pacchetto (Contratto + Cronologia)
+  // 3. Download (Inalterato ma pronto per il nuovo schema)
   Future<Map<String, dynamic>?> downloadAllData(String userId) async {
-    print("--- INIZIO DOWNLOAD SYNC ---");
     if (userId.isEmpty) return null;
-
     try {
-      print("DEBUG SYNC: Recupero documento v2 per $userId...");
       DocumentSnapshot doc = await _db
           .collection("users")
           .doc(userId)
@@ -67,14 +59,11 @@ class SyncService {
           .get();
       
       if (doc.exists && doc.data() != null) {
-        print("DEBUG SYNC: Dati ricevuti correttamente!");
         return doc.data() as Map<String, dynamic>;
-      } else {
-        print("DEBUG SYNC: Documento v2 non trovato o vuoto su Firebase.");
-        return null;
       }
+      return null;
     } catch (e) {
-      print("!!! ERRORE CRITICO DOWNLOAD: $e");
+      print("!!! ERRORE DOWNLOAD: $e");
       return null;
     }
   }

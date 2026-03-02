@@ -2,8 +2,8 @@ class EnergyContract {
   final String id;           
   String contractName;      
   String provider;
-  String userName;
-  double f1Price;      // Rappresenta la Materia Prima inserita dall'utente
+  // 🔥 userName RIMOSSO: Il nome appartiene al profilo, non alla tariffa
+  double f1Price;      
   double f2Price;      
   double f3Price;      
   bool isMonorario;
@@ -17,14 +17,13 @@ class EnergyContract {
   double? transportFee;
   double? systemCharges;
   double? vat;
-  double spread;            // 🔥 NUOVO: Spread, Omega o costi extra kWh (es. 0.06)
+  double spread;            
   DateTime? createdAt;      
 
   EnergyContract({
     required this.id,       
     this.contractName = "Contratto Standard",
     this.provider = "Nuovo Fornitore",
-    this.userName = "Utente",
     this.f1Price = 0.0, 
     this.f2Price = 0.0, 
     this.f3Price = 0.0, 
@@ -37,7 +36,7 @@ class EnergyContract {
     this.transportFee,
     this.systemCharges,
     this.vat,
-    this.spread = 0.0,      // Default a 0
+    this.spread = 0.0,      
     this.createdAt,
   });
 
@@ -45,12 +44,11 @@ class EnergyContract {
     'id': id,
     'contractName': contractName,
     'provider': provider,
-    'userName': userName,
     'f1Price': f1Price,
     'f2Price': f2Price,
     'f3Price': f3Price,
     'isMonorario': isMonorario,
-    'spread': spread,        // Salvataggio spread
+    'spread': spread,        
     if (f1Pure != null) 'f1Pure': f1Pure,
     if (f2Pure != null) 'f2Pure': f2Pure,
     if (f3Pure != null) 'f3Pure': f3Pure,
@@ -66,12 +64,11 @@ class EnergyContract {
     id: json['id'] ?? DateTime.now().millisecondsSinceEpoch.toString(),
     contractName: json['contractName'] ?? "Contratto",
     provider: json['provider'] ?? "",
-    userName: json['userName'] ?? "Utente",
     f1Price: (json['f1Price'] ?? 0.0).toDouble(), 
     f2Price: (json['f2Price'] ?? 0.0).toDouble(),
     f3Price: (json['f3Price'] ?? 0.0).toDouble(),
     isMonorario: json['isMonorario'] ?? false,
-    spread: (json['spread'] ?? 0.0).toDouble(), // Caricamento spread
+    spread: (json['spread'] ?? 0.0).toDouble(), 
     f1Pure: json['f1Pure']?.toDouble(),
     f2Pure: json['f2Pure']?.toDouble(),
     f3Pure: json['f3Pure']?.toDouble(),
@@ -90,14 +87,5 @@ class EnergyContract {
       case 'F3': return f3Price;
       default: return f1Price;
     }
-  }
-
-  // Nota: Questo metodo verrà superato dalla logica del CostCalculator
-  // ma lo manteniamo per compatibilità.
-  double getTotalFixedMonthlyCost() {
-    double total = 0;
-    if (fixedMonthlyFee != null) total += fixedMonthlyFee!;
-    if (powerFee != null) total += (powerFee! * 1.79); // 1.79€ è la media quota potenza/mese/kW
-    return total;
   }
 }

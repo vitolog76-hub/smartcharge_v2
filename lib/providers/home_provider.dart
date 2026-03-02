@@ -23,36 +23,61 @@ class HomeProvider extends ChangeNotifier {
   List<CarModel> allCars = [];
   bool carsLoaded = false;
   final capacityController = TextEditingController();
-  
-  //EnergyContract myContract = EnergyContract();
   List<ChargeSession> chargeHistory = [];
   
   final SimulationService simService = SimulationService();
   bool isSimulating = false;
   bool _showCompletionDialog = false;
   List<EnergyContract> allContracts = [];
+
   String activeContractId = "";
+
+  // 🔥 NOME UTENTE GLOBALE (PROFILO) - INDIPENDENTE DAI CONTRATTI
+  String _globalUserName = "Utente";
+  String get globalUserName => _globalUserName;
+
+  // --- GESTIONE PROFILO (ID + NOME) ---
+  // Da chiamare nella SettingsPage per salvare il nome
+  Future<void> syncUserProfile(String nuovoNome) async {
+    _globalUserName = nuovoNome;
+    final prefs = await SharedPreferences.getInstance();
+    
+    // 1. Salva il nome nel profilo locale sul MacBook associato all'ID/Profilo
+    await prefs.setString('global_user_name', nuovoNome);
+    
+    // 2. Se esiste un ID utente, associa il nome a quell'ID nel Cloud
+    final String? userId = prefs.getString('user_sync_id');
+    if (userId != null && userId.isNotEmpty) {
+      // Carica il nome come attributo del profilo utente (non del contratto)
+      await SyncService().uploadData(
+        userId, 
+        chargeHistory, 
+        allContracts, 
+        activeContractId, 
+        _globalUserName
+      );
+    }
+    
+    notifyListeners(); 
+  }
   
   // Getter per ottenere il contratto attivo corrente
   EnergyContract get myContract {
     if (allContracts.isEmpty) return EnergyContract(id: 'default', contractName: 'Contratto Base');
     return allContracts.firstWhere(
       (c) => c.id == activeContractId,
-      orElse: () => allContracts.first,
+      orElse: () => allContracts.isNotEmpty ? allContracts.first : EnergyContract(id: 'default', contractName: 'Contratto Base'),
     );
   }
 
-  // --- NUOVE COSTANTI ---
+  // --- COSTANTI ---
   static const String KEY_CONTRACTS_LIST = 'energy_contracts_list';
   static const String KEY_ACTIVE_CONTRACT_ID = 'active_contract_id';
-
-  // --- COSTANTI PER SHARED PREFERENCES ---
   static const String KEY_SOC_INIZIALE = 'saved_current_soc';
   static const String KEY_SOC_TARGET = 'saved_target_soc';
   static const String KEY_WALLBOX_PWR = 'saved_wallbox_pwr';
   static const String KEY_READY_TIME_HOUR = 'ready_time_hour';
   static const String KEY_READY_TIME_MINUTE = 'ready_time_minute';
-  
   static const String KEY_SIM_ACTIVE = 'simulation_active';
   static const String KEY_SIM_START = 'simulation_start';
   static const String KEY_SIM_END = 'simulation_end';
@@ -83,14 +108,48 @@ class HomeProvider extends ChangeNotifier {
   // --- INIZIALIZZAZIONE ---
   Future<void> init() async {
     await _loadCarsFromJson();
-    await _loadContract();
-    await _loadHistory();
+    await _loadContract(); // Questo ora carica anche il Nome Profilo
+    await _loadHistory(); 
     await _loadSimulationParameters(); 
     await _loadSimulationProgress();
+
+    final prefs = await SharedPreferences.getInstance();
+    final userId = prefs.getString('user_sync_id');
+    
+    if (userId != null && userId.isNotEmpty) {
+      final cloudData = await SyncService().downloadAllData(userId);
+      if (cloudData != null) {
+        _updateFromDownload(cloudData);
+      }
+    }
+
     notifyListeners();
   }
 
-  // --- GETTERS PER CALCOLI ---
+  
+  void updateActiveContractDetails({
+    required String provider,
+    required bool isMonorario,
+    required double f1,
+    double? f2,
+    double? f3,
+  }) {
+    // Cerchiamo il contratto attivo nella lista
+    final index = allContracts.indexWhere((c) => c.id == activeContractId);
+    
+    if (index != -1) {
+      allContracts[index].provider = provider;
+      allContracts[index].isMonorario = isMonorario;
+      allContracts[index].f1Price = f1;
+      allContracts[index].f2Price = isMonorario ? f1 : (f2 ?? f1);
+      allContracts[index].f3Price = isMonorario ? f1 : (f3 ?? f1);
+
+      // Salva la lista aggiornata (prezzi, spread, etc.)
+      saveAllContracts(); 
+    }
+  }
+
+  // --- CALCOLI ---
   double get currentBatteryCap => double.tryParse(capacityController.text) ?? (carsLoaded ? selectedCar.batteryCapacity : 50.0);
   double get energyNeeded => ChargeEngine.calculateEnergy(currentSoc, targetSoc, currentBatteryCap);
   Duration get duration => ChargeEngine.calculateDuration(energyNeeded, wallboxPwr);
@@ -106,7 +165,6 @@ class HomeProvider extends ChangeNotifier {
   String get startTimeDisplay => DateFormat('HH:mm').format(calculatedStartDateTime);
   bool get isChargingReal => isSimulating && DateTime.now().isAfter(simService.scheduledStart ?? DateTime.now());
 
-  // 🔥 FIX: Aggiornata chiamata a CostCalculator con parametri nominati e wallboxPower
   double get estimatedCost {
     final startTimeOfDay = TimeOfDay.fromDateTime(calculatedStartDateTime);
     return CostCalculator.calculate(
@@ -170,7 +228,6 @@ class HomeProvider extends ChangeNotifier {
     final now = DateTime.now();
     final kwhEfettivi = ChargeEngine.calculateEnergy(_socAtStartOfSim, currentSoc, currentBatteryCap);
     
-    // 🔥 CALCOLO DELLA FASCIA PER LA SIMULAZIONE
     final String fasciaEtichetta = CostCalculator.getFasciaLabel(
       totalKwh: kwhEfettivi,
       wallboxPower: wallboxPwr,
@@ -194,7 +251,6 @@ class HomeProvider extends ChangeNotifier {
       contractId: activeContractId,
       wallboxPower: wallboxPwr,
       fascia: fasciaEtichetta,
-      // 🔥 NUOVI CAMPI: Salviamo i prezzi correnti nel DNA della ricarica
       f1PriceAtTime: myContract.f1Price,
       f2PriceAtTime: myContract.f2Price,
       f3PriceAtTime: myContract.f3Price,
@@ -203,7 +259,7 @@ class HomeProvider extends ChangeNotifier {
     addChargeSession(session);
   }
 
-  // --- PERSISTENZA ---
+  // --- PERSISTENZA E SYNC ---
   Future<void> saveHistory() async {
     final prefs = await SharedPreferences.getInstance();
     await prefs.setString('charge_history', jsonEncode(chargeHistory.map((s) => s.toJson()).toList()));
@@ -212,75 +268,75 @@ class HomeProvider extends ChangeNotifier {
   Future<void> _syncHistoryIfPossible() async {
     final prefs = await SharedPreferences.getInstance();
     final userId = prefs.getString('user_sync_id');
-    if (userId != null) {
-      await SyncService().uploadData(userId, chargeHistory, myContract);
+    if (userId != null && userId.isNotEmpty) {
+      await SyncService().uploadData(
+        userId, 
+        chargeHistory, 
+        allContracts, 
+        activeContractId, 
+        _globalUserName
+      );
     }
   }
 
   Future<void> saveAllContracts() async {
-  final prefs = await SharedPreferences.getInstance();
-  
-  // 1. Salvataggio locale immediato
-  final String jsonData = jsonEncode(allContracts.map((c) => c.toJson()).toList());
-  await prefs.setString(KEY_CONTRACTS_LIST, jsonData);
-  await prefs.setString(KEY_ACTIVE_CONTRACT_ID, activeContractId);
-
-  // 2. PROTEZIONE SYNC: Non inviare MAI se la lista locale è vuota
-  // ma sappiamo che dovrebbero esserci dei dati (o se il caricamento non è finito)
-  final userId = prefs.getString('user_sync_id');
-  
-  if (userId != null && chargeHistory.isNotEmpty) { // 🔥 SOLO se c'è roba da inviare
-    await SyncService().uploadData(userId, chargeHistory, myContract);
-    print("✅ Sync sicuro: Inviate ${chargeHistory.length} sessioni.");
-  } else {
-    print("⚠️ Sync saltato: Nessuna sessione in memoria, evito di sovrascrivere il Cloud.");
-  }
-  
-  notifyListeners();
-}
-
-void selectActiveContract(String id) {
-  activeContractId = id;
-  saveAllContracts();
-}
-
-void addOrUpdateContract(EnergyContract contract) {
-  final index = allContracts.indexWhere((c) => c.id == contract.id);
-  if (index != -1) {
-    allContracts[index] = contract;
-  } else {
-    allContracts.add(contract);
-  }
-  saveAllContracts();
-}
-
-void deleteContract(String id) {
-  // Usiamo 'allContracts' perché così l'hai definita alla riga 31
-  if (allContracts.length > 1) { 
-    // Rimuoviamo il contratto dalla lista
-    allContracts.removeWhere((c) => c.id == id);
+    final prefs = await SharedPreferences.getInstance();
     
-    // Usiamo 'activeContractId' perché così l'hai definita alla riga 32
-    if (activeContractId == id) {
-      activeContractId = allContracts.first.id;
+    // Salva il nome utente globale (Profilo) indipendentemente dai contratti
+    await prefs.setString('global_user_name', _globalUserName);
+    
+    final String jsonData = jsonEncode(allContracts.map((c) => c.toJson()).toList());
+    await prefs.setString(KEY_CONTRACTS_LIST, jsonData);
+    await prefs.setString(KEY_ACTIVE_CONTRACT_ID, activeContractId);
+
+    final userId = prefs.getString('user_sync_id');
+    if (userId != null && userId.isNotEmpty) { 
+      await SyncService().uploadData(
+        userId, 
+        chargeHistory, 
+        allContracts, 
+        activeContractId, 
+        _globalUserName
+      );
     }
-    
-    saveAllContracts();
     notifyListeners();
   }
-}
-  Future<void> salvaTuttiParametri() async { 
-    await _saveSimulationParameters(); 
+
+  void selectActiveContract(String id) {
+    activeContractId = id;
+    saveAllContracts();
   }
+
+  void addOrUpdateContract(EnergyContract contract) {
+    final index = allContracts.indexWhere((c) => c.id == contract.id);
+    if (index != -1) {
+      allContracts[index] = contract;
+    } else {
+      allContracts.add(contract);
+    }
+    saveAllContracts();
+  }
+
+  void deleteContract(String id) {
+    if (allContracts.length > 1) { 
+      allContracts.removeWhere((c) => c.id == id);
+      if (activeContractId == id) {
+        activeContractId = allContracts.first.id;
+      }
+      saveAllContracts();
+      notifyListeners();
+    }
+  }
+
+  // --- PARAMETRI SIMULAZIONE ---
+  Future<void> salvaTuttiParametri() async { await _saveSimulationParameters(); }
 
   Future<void> _loadSimulationParameters() async {
     final prefs = await SharedPreferences.getInstance();
     double savedSoc = prefs.getDouble(KEY_SOC_INIZIALE) ?? 20.0;
     currentSoc = savedSoc.roundToDouble();
-    
     targetSoc = prefs.getDouble(KEY_SOC_TARGET) ?? 80.0;
     wallboxPwr = prefs.getDouble(KEY_WALLBOX_PWR) ?? 3.7;
-    
     final h = prefs.getInt(KEY_READY_TIME_HOUR);
     final m = prefs.getInt(KEY_READY_TIME_MINUTE);
     if (h != null && m != null) readyTime = TimeOfDay(hour: h, minute: m);
@@ -328,6 +384,7 @@ void deleteContract(String id) {
     await prefs.remove(KEY_SIM_START_SOC);
   }
 
+  // --- CARICAMENTO DATI ---
   Future<void> _loadCarsFromJson() async {
     final String response = await rootBundle.loadString('assets/cars.json');
     final List<dynamic> data = json.decode(response);
@@ -341,42 +398,26 @@ void deleteContract(String id) {
   }
 
   Future<void> _loadContract() async {
-  final prefs = await SharedPreferences.getInstance();
-  
-  // 1. Carica la lista dei contratti
-  final String? listData = prefs.getString(KEY_CONTRACTS_LIST);
-  if (listData != null) {
-    final List<dynamic> decoded = jsonDecode(listData);
-    allContracts = decoded.map((item) => EnergyContract.fromJson(item)).toList();
-  }
-  
-  // 2. Carica l'ID attivo
-  activeContractId = prefs.getString(KEY_ACTIVE_CONTRACT_ID) ?? "";
+    final prefs = await SharedPreferences.getInstance();
+    
+    // 🔥 CARICAMENTO NOME UTENTE GLOBALE (Indipendente dai contratti)
+    _globalUserName = prefs.getString('global_user_name') ?? "Utente";
 
-  // 3. MIGRAZIONE: Se la lista è vuota ma esiste un vecchio contratto singolo
-  final String? oldData = prefs.getString('energy_contract');
-  if (allContracts.isEmpty && oldData != null) {
-    final oldContract = EnergyContract.fromJson(jsonDecode(oldData));
-    // Gli assegniamo un ID se non lo ha
-    final migrated = EnergyContract.fromJson({
-      ...jsonDecode(oldData),
-      'id': 'migrated_default',
-      'contractName': 'Contratto Precedente'
-    });
-    allContracts.add(migrated);
-    activeContractId = migrated.id;
-    await saveAllContracts(); // Salva subito nel nuovo formato
-  }
+    final String? listData = prefs.getString(KEY_CONTRACTS_LIST);
+    if (listData != null) {
+      final List<dynamic> decoded = jsonDecode(listData);
+      allContracts = decoded.map((item) => EnergyContract.fromJson(item)).toList();
+    }
+    
+    activeContractId = prefs.getString(KEY_ACTIVE_CONTRACT_ID) ?? "";
 
-  // 4. Se è ancora tutto vuoto, crea un default
-  if (allContracts.isEmpty) {
-    final defaultContract = EnergyContract(id: 'def_1', contractName: 'Principale');
-    allContracts.add(defaultContract);
-    activeContractId = defaultContract.id;
+    if (allContracts.isEmpty) {
+      final defaultContract = EnergyContract(id: 'def_1', contractName: 'Principale');
+      allContracts.add(defaultContract);
+      activeContractId = defaultContract.id;
+    }
+    notifyListeners();
   }
-  
-  notifyListeners();
-}
 
   Future<void> _loadHistory() async {
     final prefs = await SharedPreferences.getInstance();
@@ -387,57 +428,45 @@ void deleteContract(String id) {
     }
   }
   
-  // --- NUOVO METODO PER IL SYNC SICURO ---
+  // --- SYNC DOWNLOAD ---
   void _updateFromDownload(Map<String, dynamic> data) {
-    // 1. Contratto (Qui va bene sovrascrivere perché il contratto è uno solo)
-    if (data['contract'] != null) {
-      final newContract = EnergyContract.fromJson(data['contract']);
-      // Se non è già in lista, lo aggiungiamo o aggiorniamo
-      addOrUpdateContract(newContract);
-      activeContractId = newContract.id;
+    bool hasChanged = false;
+
+    // 🔥 Recupero Nome Utente Globale dal Cloud
+    if (data['globalUserName'] != null) {
+      _globalUserName = data['globalUserName'];
+      hasChanged = true;
     }
 
-    // 2. Cronologia (MAI sovrascrivere alla cieca!)
+    if (data['allContracts'] != null) {
+      List<dynamic> cloudList = data['allContracts'];
+      allContracts = cloudList.map((item) => EnergyContract.fromJson(item)).toList();
+      activeContractId = data['activeContractId'] ?? allContracts.first.id;
+      hasChanged = true;
+    } 
+
     if (data['history'] != null) {
       List<dynamic> cloudList = data['history'];
       List<ChargeSession> cloudSessions = cloudList.map((e) => ChargeSession.fromJson(e)).toList();
-
-      // 🔥 UNISCI I DATI: Aggiungi al MacBook solo le ricariche che non hai già
       for (var session in cloudSessions) {
-        bool exists = chargeHistory.any((s) => s.id == session.id);
-        if (!exists) {
+        if (!chargeHistory.any((s) => s.id == session.id)) {
           chargeHistory.add(session);
+          hasChanged = true;
         }
       }
-      
-      // Ordina la lista per data (dalla più recente alla più vecchia)
       chargeHistory.sort((a, b) => b.date.compareTo(a.date));
-      
-      // Salva subito il risultato dell'unione sul disco del MacBook
-      saveHistory();
     }
-    notifyListeners();
+
+    if (hasChanged) {
+      saveHistory();
+      saveAllContracts();
+    }
   }
 
   void selectCar(CarModel c) { selectedCar = c; capacityController.text = c.batteryCapacity.toString(); _saveSimulationParameters(); notifyListeners(); }
   void updateReadyTime(TimeOfDay t) { readyTime = t; _saveSimulationParameters(); notifyListeners(); }
   void updateWallboxPwr(double v) { wallboxPwr = v; _saveSimulationParameters(); notifyListeners(); }
-  
-  void updateCurrentSoc(double v) { 
-    currentSoc = v.roundToDouble(); 
-    _saveSimulationParameters(); 
-    notifyListeners(); 
-  }
-
-  Future<void> _createLocalBackup() async {
-  final prefs = await SharedPreferences.getInstance();
-  final data = prefs.getString('charge_history');
-  if (data != null) {
-    // Salviamo una copia di sicurezza "congelata"
-    await prefs.setString('charge_history_backup_${DateTime.now().day}', data);
-  }
-}
-  
+  void updateCurrentSoc(double v) { currentSoc = v.roundToDouble(); _saveSimulationParameters(); notifyListeners(); }
   void updateTargetSoc(double v) { targetSoc = v; _saveSimulationParameters(); notifyListeners(); }
   bool get shouldShowCompletionDialog => _showCompletionDialog;
   void resetCompletionDialog() => _showCompletionDialog = false;
