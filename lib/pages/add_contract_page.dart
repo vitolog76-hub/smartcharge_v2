@@ -4,7 +4,7 @@ import 'package:smartcharge_v2/models/contract_model.dart';
 import 'package:smartcharge_v2/providers/home_provider.dart';
 
 class AddContractPage extends StatefulWidget {
-  final EnergyContract? contractToEdit; // 🔥 Parametro opzionale per la modifica
+  final EnergyContract? contractToEdit;
 
   const AddContractPage({super.key, this.contractToEdit});
 
@@ -15,7 +15,6 @@ class AddContractPage extends StatefulWidget {
 class _AddContractPageState extends State<AddContractPage> {
   final _formKey = GlobalKey<FormState>();
   
-  // Usiamo late per inizializzarli nel initState
   late TextEditingController _nameController;
   late TextEditingController _providerController;
   late TextEditingController _f1Controller;
@@ -30,7 +29,6 @@ class _AddContractPageState extends State<AddContractPage> {
   @override
   void initState() {
     super.initState();
-    // Se stiamo modificando, carichiamo i dati esistenti, altrimenti usiamo i default
     final c = widget.contractToEdit;
     
     _nameController = TextEditingController(text: c?.contractName ?? "");
@@ -75,12 +73,12 @@ class _AddContractPageState extends State<AddContractPage> {
         child: ListView(
           padding: const EdgeInsets.all(20),
           children: [
-            _buildInput("NOME CONTRATTO (es. Casa Octopus)", _nameController, Icons.edit),
-            _buildInput("GESTORE (es. Octopus Energy)", _providerController, Icons.business),
+            // 🔥 MODIFICATI: Aggiunto isNumeric: false
+            _buildInput("NOME CONTRATTO (es. Casa Octopus)", _nameController, Icons.edit, isNumeric: false),
+            _buildInput("GESTORE (es. Octopus Energy)", _providerController, Icons.business, isNumeric: false),
             
             const SizedBox(height: 25),
             
-            // --- BOX INFORMATIVO ---
             Container(
               padding: const EdgeInsets.all(12),
               decoration: BoxDecoration(
@@ -104,7 +102,6 @@ class _AddContractPageState extends State<AddContractPage> {
 
             const SizedBox(height: 25),
 
-            // --- SWITCH TIPOLOGIA ---
             Container(
               padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
               decoration: BoxDecoration(
@@ -185,11 +182,14 @@ class _AddContractPageState extends State<AddContractPage> {
     );
   }
 
-  Widget _buildInput(String label, TextEditingController ctrl, IconData icon, {String? hint}) {
+  // 🔥 AGGIORNATO: Aggiunto parametro isNumeric con default true
+  Widget _buildInput(String label, TextEditingController ctrl, IconData icon, {String? hint, bool isNumeric = true}) {
     return TextFormField(
       controller: ctrl,
       style: const TextStyle(color: Colors.white, fontSize: 14),
-      keyboardType: const TextInputType.numberWithOptions(decimal: true),
+      keyboardType: isNumeric 
+          ? const TextInputType.numberWithOptions(decimal: true) 
+          : TextInputType.text,
       decoration: InputDecoration(
         labelText: label,
         hintText: hint,
@@ -207,29 +207,26 @@ class _AddContractPageState extends State<AddContractPage> {
     if (_formKey.currentState!.validate()) {
       final homeProv = Provider.of<HomeProvider>(context, listen: false);
       
-      final f1 = double.parse(_f1Controller.text.replaceAll(',', '.'));
+      final f1Str = _f1Controller.text.replaceAll(',', '.');
+      final f1 = double.tryParse(f1Str) ?? 0.0;
       
       final nuovo = EnergyContract(
-        // Se stiamo modificando, manteniamo lo stesso ID
         id: widget.contractToEdit?.id ?? DateTime.now().millisecondsSinceEpoch.toString(),
         contractName: _nameController.text,
         provider: _providerController.text,
         isMonorario: _isMonorario,
         f1Price: f1,
-        f2Price: _isMonorario ? f1 : double.parse(_f2Controller.text.replaceAll(',', '.')),
-        f3Price: _isMonorario ? f1 : double.parse(_f3Controller.text.replaceAll(',', '.')),
-        fixedMonthlyFee: double.parse(_fixedFeeController.text.replaceAll(',', '.')),
-        powerFee: double.parse(_powerLimitController.text.replaceAll(',', '.')),
-        spread: double.parse(_spreadController.text.replaceAll(',', '.')),
+        f2Price: _isMonorario ? f1 : (double.tryParse(_f2Controller.text.replaceAll(',', '.')) ?? 0.0),
+        f3Price: _isMonorario ? f1 : (double.tryParse(_f3Controller.text.replaceAll(',', '.')) ?? 0.0),
+        fixedMonthlyFee: double.tryParse(_fixedFeeController.text.replaceAll(',', '.')) ?? 0.0,
+        powerFee: double.tryParse(_powerLimitController.text.replaceAll(',', '.')) ?? 0.0,
+        spread: double.tryParse(_spreadController.text.replaceAll(',', '.')) ?? 0.0,
       );
       
       homeProv.addOrUpdateContract(nuovo);
-      
-      // Se era un nuovo contratto, selezioniamolo come attivo
       if (widget.contractToEdit == null) {
         homeProv.selectActiveContract(nuovo.id);
       }
-      
       Navigator.pop(context);
     }
   }
