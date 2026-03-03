@@ -350,6 +350,8 @@ class HomePage extends StatelessWidget {
 
   void _showCompletionDialog(BuildContext context, HomeProvider provider) {
     _completionDialogShown = true;
+    
+    // Salvataggio dei dati (popola lastSavedEnergy e lastSavedCost)
     provider.saveCurrentCharge();
     
     showDialog(
@@ -360,7 +362,7 @@ class HomePage extends StatelessWidget {
           backgroundColor: const Color(0xFF1E1E1E),
           shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
           title: const Text(
-            '⚡ Ricarica Completata!',
+            '⚡ RICARICA COMPLETATA!',
             style: TextStyle(color: Colors.cyanAccent, fontWeight: FontWeight.bold),
             textAlign: TextAlign.center,
           ),
@@ -369,29 +371,38 @@ class HomePage extends StatelessWidget {
             children: [
               const Icon(Icons.check_circle, color: Colors.green, size: 50),
               const SizedBox(height: 16),
-              // 🔥 Fix decimali SOC
               Text(
                 'SOC finale: ${provider.currentSoc.toStringAsFixed(1)}%',
                 style: const TextStyle(color: Colors.white70, fontSize: 16),
               ),
+              const SizedBox(height: 12),
+              // Mostriamo solo i dati fondamentali "congelati"
               Text(
-                'Energia: ${provider.energyNeeded.toStringAsFixed(1)} kWh',
-                style: const TextStyle(color: Colors.white70, fontSize: 16),
+                'Energia: ${provider.lastSavedEnergy.toStringAsFixed(1)} kWh',
+                style: const TextStyle(color: Colors.white, fontSize: 18, fontWeight: FontWeight.bold),
               ),
+              const SizedBox(height: 4),
               Text(
-                'Durata: ${_formatDuration(provider.duration)}',
-                style: const TextStyle(color: Colors.white70, fontSize: 16),
+                'Costo: ${provider.lastSavedCost.toStringAsFixed(2)} €',
+                style: const TextStyle(color: Colors.cyanAccent, fontSize: 20, fontWeight: FontWeight.bold),
               ),
             ],
           ),
           actions: [
-            TextButton(
-              onPressed: () {
-                provider.resetCompletionDialog();
-                Navigator.of(ctx).pop();
-                _completionDialogShown = false;
-              },
-              child: const Text('OK', style: TextStyle(color: Colors.cyanAccent)),
+            Center(
+              child: ElevatedButton(
+                onPressed: () {
+                  provider.resetCompletionDialog();
+                  Navigator.of(ctx).pop();
+                  _completionDialogShown = false;
+                },
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: Colors.cyanAccent.withOpacity(0.2),
+                  foregroundColor: Colors.cyanAccent,
+                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                ),
+                child: const Text('CHIUDI'),
+              ),
             ),
           ],
         );

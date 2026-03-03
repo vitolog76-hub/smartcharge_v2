@@ -17,6 +17,8 @@ class HomeProvider extends ChangeNotifier {
   double targetSoc = 80.0;
   double _socAtStartOfSim = 20.0;
   double wallboxPwr = 3.7;
+  double lastSavedEnergy = 0.0;
+  double lastSavedCost = 0.0;
   TimeOfDay readyTime = const TimeOfDay(hour: 7, minute: 0);
   
   late CarModel selectedCar;
@@ -204,12 +206,13 @@ class HomeProvider extends ChangeNotifier {
   }
 
   void stopSimulation() {
-    simService.stopSimulation();
-    isSimulating = false;
-    _clearSimulationProgress();
-    _saveSimulationParameters();
-    notifyListeners();
-  }
+  simService.stopSimulation();
+  isSimulating = false;
+  // _saveCompletedCharge(); <--- SE C'È QUESTA RIGA, CANCELLALA!
+  _clearSimulationProgress();
+  _saveSimulationParameters();
+  notifyListeners();
+}
 
   void addChargeSession(ChargeSession session) {
     chargeHistory.add(session);
@@ -225,40 +228,79 @@ class HomeProvider extends ChangeNotifier {
   }
 
   void _saveCompletedCharge() {
-    final now = DateTime.now();
-    final kwhEfettivi = ChargeEngine.calculateEnergy(_socAtStartOfSim, currentSoc, currentBatteryCap);
-    
-    final String fasciaEtichetta = CostCalculator.getFasciaLabel(
+  // 1. CATTURA IMMEDIATA DEI DATI (Prima che vengano azzerati)
+  final now = DateTime.now();
+  final double socIniziale = _socAtStartOfSim;
+  final double socFinale = currentSoc;
+  final double capacita = currentBatteryCap;
+  
+  // Calcolo energia effettiva
+  final kwhEfettivi = ChargeEngine.calculateEnergy(socIniziale, socFinale, capacita);
+  
+  // PROTEZIONE DOPPIO SALVATAGGIO: 
+  // Se l'energia è quasi nulla o il SOC non è cambiato, ignoriamo.
+  if (kwhEfettivi <= 0.01) {
+    print("DEBUG: Ricarica nulla o già salvata. Ignoro.");
+    return;
+  }
+
+  // 2. RECUPERO CONTRATTO ATTIVO
+  final contrattoAttivo = myContract;
+
+  // 3. CALCOLO COSTO REALE
+  final costoCalcolato = CostCalculator.calculate(
+    totalKwh: kwhEfettivi,
+    wallboxPower: wallboxPwr,
+    startTime: TimeOfDay.fromDateTime(simService.scheduledStart ?? now),
+    date: now,
+    contract: contrattoAttivo,
+  );
+
+  // 4. CREAZIONE SESSIONE PER CRONOLOGIA
+  final session = ChargeSession(
+    id: "CHG_${DateTime.now().millisecondsSinceEpoch}", 
+    date: now,
+    startDateTime: simService.scheduledStart ?? now,
+    endDateTime: now,
+    startSoc: socIniziale,
+    endSoc: socFinale,
+    kwh: kwhEfettivi,
+    cost: costoCalcolato,
+    location: "Home",
+    carBrand: selectedCar.brand,
+    carModel: selectedCar.model,
+    contractId: activeContractId,
+    wallboxPower: wallboxPwr,
+    fascia: CostCalculator.getFasciaLabel(
       totalKwh: kwhEfettivi,
       wallboxPower: wallboxPwr,
       startTime: TimeOfDay.fromDateTime(simService.scheduledStart ?? now),
       date: now,
-      isMonorario: myContract.isMonorario,
-    );
+      isMonorario: contrattoAttivo.isMonorario,
+    ),
+    f1PriceAtTime: contrattoAttivo.f1Price,
+    f2PriceAtTime: contrattoAttivo.f2Price,
+    f3PriceAtTime: contrattoAttivo.f3Price,
+  );
+  
+  // 5. SALVATAGGIO IN CRONOLOGIA
+  chargeHistory.add(session);
+  saveHistory();
+  _syncHistoryIfPossible();
 
-    final session = ChargeSession(
-      id: DateTime.now().millisecondsSinceEpoch.toString(),
-      date: now,
-      startDateTime: simService.scheduledStart ?? now,
-      endDateTime: now,
-      startSoc: _socAtStartOfSim,
-      endSoc: currentSoc,
-      kwh: kwhEfettivi,
-      cost: estimatedCost,
-      location: "Home",
-      carBrand: selectedCar.brand,
-      carModel: selectedCar.model,
-      contractId: activeContractId,
-      wallboxPower: wallboxPwr,
-      fascia: fasciaEtichetta,
-      f1PriceAtTime: myContract.f1Price,
-      f2PriceAtTime: myContract.f2Price,
-      f3PriceAtTime: myContract.f3Price,
-    );
-    
-    addChargeSession(session);
-  }
+  // 🔥 6. AGGIORNAMENTO VARIABILI PER IL DIALOG (UI)
+  // Queste variabili "congelano" il risultato per mostrarlo nel popup finale
+  lastSavedEnergy = kwhEfettivi;
+  lastSavedCost = costoCalcolato;
 
+  // 7. RESET STATO INTERNO
+  // Impedisce salvataggi multipli se il metodo viene richiamato per errore
+  _socAtStartOfSim = currentSoc; 
+  
+  print("DEBUG SALVATAGGIO: $kwhEfettivi kWh salvati al costo di $costoCalcolato €");
+  
+  notifyListeners();
+}
   // --- PERSISTENZA E SYNC ---
   Future<void> saveHistory() async {
     final prefs = await SharedPreferences.getInstance();
