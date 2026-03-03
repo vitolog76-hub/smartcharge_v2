@@ -204,290 +204,296 @@ class _SettingsPageState extends State<SettingsPage> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: Colors.black,
-      appBar: AppBar(
-        title: const Text("IMPOSTAZIONI SISTEMA", style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
-        centerTitle: true,
-        backgroundColor: Colors.black.withOpacity(0.8),
-        elevation: 0,
-        leading: IconButton(
-          icon: const Icon(Icons.arrow_back_ios, color: Colors.blueAccent, size: 20),
-          onPressed: () => Navigator.pop(context),
+      body: Container(
+        width: double.infinity,
+        height: double.infinity,
+        decoration: const BoxDecoration(
+          gradient: LinearGradient(
+            begin: Alignment.topLeft,
+            end: Alignment.bottomRight,
+            colors: [
+              Color(0xFF0F172A), // Slate 900
+              Color(0xFF020617), // Slate 950
+              Colors.black,
+            ],
+          ),
         ),
-        actions: [
-          if (!_isSyncing) IconButton(
-            onPressed: _saveAll, 
-            icon: const Icon(Icons.check, color: Colors.blueAccent)
-          )
-        ],
-      ),
-      body: SingleChildScrollView(
-        padding: const EdgeInsets.all(20),
         child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            _buildSectionTitle("1 - SINCRONIZZAZIONE CLOUD"),
-            _buildCard(
-              child: Row(
-                children: [
-                  const Padding(
-                    padding: EdgeInsets.all(16.0),
-                    child: Icon(Icons.cloud_queue, color: Colors.blueAccent, size: 30),
-                  ),
-                  Expanded(
-                    child: TextField(
-                      controller: _idController,
-                      style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold),
-                      decoration: const InputDecoration(
-                        labelText: "ID SINCRONIZZAZIONE",
-                        labelStyle: TextStyle(color: Colors.white38, fontSize: 10),
-                        border: InputBorder.none,
-                      ),
-                    ),
-                  ),
-                  IconButton(
-                    onPressed: () => _importFromCloud(_idController.text.trim()),
-                    icon: const Icon(Icons.download, color: Colors.blueAccent),
-                  ),
-                ],
+            AppBar(
+              title: const Text("IMPOSTAZIONI SISTEMA", 
+                  style: TextStyle(fontSize: 14, fontWeight: FontWeight.w900, letterSpacing: 2)),
+              centerTitle: true,
+              backgroundColor: Colors.transparent,
+              elevation: 0,
+              leading: IconButton(
+                icon: const Icon(Icons.arrow_back_ios, color: Colors.cyanAccent, size: 20),
+                onPressed: () => Navigator.pop(context),
               ),
+              actions: [
+                if (!_isSyncing) IconButton(
+                  onPressed: _saveAll, 
+                  icon: const Icon(Icons.check, color: Colors.cyanAccent)
+                )
+              ],
             ),
-
-            const SizedBox(height: 25),
-
-            _buildSectionTitle("2 - DATI UTENTE E VEICOLO"),
-            _buildCard(
-              child: Column(
-                children: [
-                  _buildInput("NOME UTENTE / AZIENDA", _nameController, Icons.person_outline),
-                  const Divider(color: Colors.white10, indent: 50),
-                  _buildStaticRow(Icons.directions_car, "AUTO SELEZIONATA", widget.selectedCar.model.toUpperCase()),
-                  const Divider(color: Colors.white10, indent: 50),
-                  _buildStaticRow(Icons.battery_charging_full, "CAPACITÀ BATTERIA", "${widget.batteryValue} kWh"),
-                ],
-              ),
-            ),
-
-            const SizedBox(height: 25),
-
-            _buildSectionTitle("3 - GESTIONE CONTRATTI ENERGIA"),
-            _buildCard(
-              child: Padding(
-                padding: const EdgeInsets.all(16.0),
+            Expanded(
+              child: SingleChildScrollView(
+                padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 10),
                 child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    InkWell(
-                      onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const ContractSummaryPage())),
-                      child: Container(
-                        padding: const EdgeInsets.all(12),
-                        decoration: BoxDecoration(
-                          color: Colors.blueAccent.withOpacity(0.1),
-                          borderRadius: BorderRadius.circular(10),
-                          border: Border.all(color: Colors.blueAccent.withOpacity(0.3)),
-                        ),
-                        child: const Row(
-                          children: [
-                            Icon(Icons.pie_chart, color: Colors.blueAccent, size: 20),
-                            SizedBox(width: 12),
-                            Expanded(
-                              child: Text("DETTAGLI E TRASPARENZA COSTI",
-                                style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 12)),
+                    _buildSectionTitle("1 - SINCRONIZZAZIONE CLOUD"),
+                    _buildCard(
+                      child: Row(
+                        children: [
+                          const Padding(
+                            padding: EdgeInsets.all(16.0),
+                            child: Icon(Icons.cloud_queue, color: Colors.cyanAccent, size: 30),
+                          ),
+                          Expanded(
+                            child: TextField(
+                              controller: _idController,
+                              style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold),
+                              decoration: const InputDecoration(
+                                labelText: "ID SINCRONIZZAZIONE",
+                                labelStyle: TextStyle(color: Colors.white38, fontSize: 10),
+                                border: InputBorder.none,
+                              ),
                             ),
-                            Icon(Icons.arrow_forward, color: Colors.blueAccent, size: 16),
-                          ],
-                        ),
+                          ),
+                          IconButton(
+                            onPressed: () => _importFromCloud(_idController.text.trim()),
+                            icon: const Icon(Icons.download, color: Colors.cyanAccent),
+                          ),
+                        ],
                       ),
                     ),
-                    const Divider(color: Colors.white10, height: 30),
-                    const Align(
-                      alignment: Alignment.centerLeft,
-                      child: Text("I TUOI PIANI TARIFFARI",
-                          style: TextStyle(color: Colors.white38, fontSize: 10, fontWeight: FontWeight.bold)),
+
+                    const SizedBox(height: 25),
+
+                    _buildSectionTitle("2 - DATI UTENTE E VEICOLO"),
+                    _buildCard(
+                      child: Column(
+                        children: [
+                          _buildInput("NOME UTENTE / AZIENDA", _nameController, Icons.person_outline),
+                          const Divider(color: Colors.white10, indent: 50),
+                          _buildStaticRow(Icons.directions_car, "AUTO SELEZIONATA", widget.selectedCar.model.toUpperCase()),
+                          const Divider(color: Colors.white10, indent: 50),
+                          _buildStaticRow(Icons.battery_charging_full, "CAPACITÀ BATTERIA", "${widget.batteryValue} kWh"),
+                        ],
+                      ),
                     ),
-                    const SizedBox(height: 10),
 
-                    Consumer<HomeProvider>(
-                      builder: (context, homeProv, child) {
-                        return Column(
+                    const SizedBox(height: 25),
+
+                    _buildSectionTitle("3 - GESTIONE CONTRATTI ENERGIA"),
+                    _buildCard(
+                      child: Padding(
+                        padding: const EdgeInsets.all(16.0),
+                        child: Column(
                           children: [
-                            ...homeProv.allContracts.map((contratto) {
-  final isSelected = contratto.id == homeProv.activeContractId;
-  
-  double differenzaTotale = 0;
-
-  if (!isSelected && homeProv.chargeHistory.isNotEmpty) {
-    // 1. PARTE VARIABILE (Consumo kWh)
-    for (var sessione in homeProv.chargeHistory) {
-      double costoAttuale = CostCalculator.calculateComparison(
-        session: sessione, 
-        targetContract: homeProv.myContract
-      );
-      double costoAlternativo = CostCalculator.calculateComparison(
-        session: sessione, 
-        targetContract: contratto
-      );
-      differenzaTotale += (costoAttuale - costoAlternativo);
-    }
-
-    // 2. PARTE FISSA (Quota Mensile)
-    // Calcoliamo quanti mesi copre lo storico (es: da Gennaio a Marzo = 3 mesi)
-    DateTime dataInizio = homeProv.chargeHistory.first.date;
-    DateTime dataFine = homeProv.chargeHistory.last.date;
-    
-    // Calcolo semplificato dei mesi trascorsi (minimo 1 mese)
-    int mesi = ((dataFine.year - dataInizio.year) * 12) + (dataFine.month - dataInizio.month);
-    if (mesi <= 0) mesi = 1; 
-
-    double quotaFissaAttuale = homeProv.myContract.fixedMonthlyFee ?? 0.0;
-    double quotaFissaAlternativa = contratto.fixedMonthlyFee ?? 0.0;
-
-    // Aggiungiamo la differenza dei costi fissi al totale
-    differenzaTotale += (quotaFissaAttuale - quotaFissaAlternativa) * mesi;
-  }
-
-                              return Container(
-                                margin: const EdgeInsets.only(bottom: 8),
-                                decoration: BoxDecoration(
-                                  color: isSelected ? Colors.blueAccent.withOpacity(0.05) : Colors.white.withOpacity(0.02),
-                                  borderRadius: BorderRadius.circular(10),
-                                  border: Border.all(color: isSelected ? Colors.blueAccent.withOpacity(0.4) : Colors.white10),
-                                ),
-                                child: RadioListTile<String>(
-                                  contentPadding: const EdgeInsets.symmetric(horizontal: 8),
-                                  title: Text(contratto.contractName.toUpperCase(),
-                                      style: TextStyle(color: isSelected ? Colors.blueAccent : Colors.white, fontSize: 13, fontWeight: FontWeight.bold)),
-                                  subtitle: Column(
-                                    crossAxisAlignment: CrossAxisAlignment.start,
-                                    children: [
-                                      Text("${contratto.provider} • F1: ${contratto.f1Price} €/kWh",
-                                          style: const TextStyle(color: Colors.white38, fontSize: 11)),
-                                      if (!isSelected && homeProv.chargeHistory.isNotEmpty)
-                                        Padding(
-                                          padding: const EdgeInsets.only(top: 6),
-                                          child: Row(
-                                            children: [
-                                              Icon(differenzaTotale >= 0 ? Icons.trending_down : Icons.trending_up,
-                                                   color: differenzaTotale >= 0 ? Colors.greenAccent : Colors.redAccent, size: 14),
-                                              const SizedBox(width: 4),
-                                              Text(
-                                                differenzaTotale >= 0 
-                                                  ? "RISPARMIERESTI ${differenzaTotale.toStringAsFixed(2)}€"
-                                                  : "SPENDERESTI ${differenzaTotale.abs().toStringAsFixed(2)}€ IN PIÙ",
-                                                style: TextStyle(color: differenzaTotale >= 0 ? Colors.greenAccent : Colors.redAccent, fontSize: 9, fontWeight: FontWeight.bold),
-                                              ),
-                                            ],
-                                          ),
-                                        ),
-                                    ],
-                                  ),
-                                  value: contratto.id,
-                                  groupValue: homeProv.activeContractId,
-                                  activeColor: Colors.blueAccent,
-                                  onChanged: (String? value) {
-                                    if (value != null) {
-                                      // 1. Cambia il contratto attivo nel Provider
-                                      homeProv.selectActiveContract(value);
-                                      
-                                      // 2. 🔥 AGGIORNA I BOX IN ALTO
-                                      // Usiamo setState per forzare i controller a mostrare i dati del nuovo contratto
-                                      setState(() {
-                                        
-                                        _providerController.text = contratto.provider;
-                                        // Se hai anche i prezzi in questa pagina, aggiorna anche quelli:
-                                        _f1Controller.text = contratto.f1Price.toString();
-                                        _isMonorario = contratto.isMonorario;
-                                      });
-                                    }
-                                  },
-                                  secondary: Row(
-                                    mainAxisSize: MainAxisSize.min,
-                                    children: [
-                                      IconButton(
-  icon: const Icon(Icons.edit, color: Colors.white24, size: 18),
-  onPressed: () async {
-    // 1. Aspettiamo che l'utente finisca di modificare e prema "Salva"
-    await Navigator.push(
-      context, 
-      MaterialPageRoute(builder: (_) => AddContractPage(contractToEdit: contratto))
-    );
-    
-    // 2. Una volta tornati qui, forziamo la ricostruzione della pagina.
-    // Questo farà ripartire il ciclo 'for' con i nuovi prezzi appena salvati!
-    if (mounted) {
-      setState(() {});
-    }
-  },
-),
-                                      if (homeProv.allContracts.length > 1)
-                                        IconButton(
-                                          icon: const Icon(Icons.delete_outline, color: Colors.redAccent, size: 18),
-                                          onPressed: () => homeProv.deleteContract(contratto.id),
-                                        ),
-                                    ],
-                                  ),
-                                ),
-                              );
-                            }).toList(),
-                            const SizedBox(height: 15),
                             InkWell(
-                              onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const AddContractPage())),
+                              onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const ContractSummaryPage())),
                               child: Container(
-                                padding: const EdgeInsets.symmetric(vertical: 12),
+                                padding: const EdgeInsets.all(12),
                                 decoration: BoxDecoration(
-                                  color: Colors.white.withOpacity(0.05),
+                                  color: Colors.cyanAccent.withOpacity(0.1),
                                   borderRadius: BorderRadius.circular(10),
-                                  border: Border.all(color: Colors.white10),
+                                  border: Border.all(color: Colors.cyanAccent.withOpacity(0.3)),
                                 ),
                                 child: const Row(
-                                  mainAxisAlignment: MainAxisAlignment.center,
                                   children: [
-                                    Icon(Icons.add_circle_outline, color: Colors.blueAccent, size: 18),
-                                    SizedBox(width: 8),
-                                    Text("AGGIUNGI NUOVO CONTRATTO",
-                                        style: TextStyle(color: Colors.blueAccent, fontWeight: FontWeight.bold, fontSize: 11)),
+                                    Icon(Icons.pie_chart, color: Colors.cyanAccent, size: 20),
+                                    SizedBox(width: 12),
+                                    Expanded(
+                                      child: Text("DETTAGLI E TRASPARENZA COSTI",
+                                        style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 12)),
+                                    ),
+                                    Icon(Icons.arrow_forward, color: Colors.cyanAccent, size: 16),
                                   ],
                                 ),
                               ),
                             ),
+                            const Divider(color: Colors.white10, height: 30),
+                            const Align(
+                              alignment: Alignment.centerLeft,
+                              child: Text("I TUOI PIANI TARIFFARI",
+                                  style: TextStyle(color: Colors.white38, fontSize: 10, fontWeight: FontWeight.bold)),
+                            ),
+                            const SizedBox(height: 10),
+
+                            Consumer<HomeProvider>(
+                              builder: (context, homeProv, child) {
+                                return Column(
+                                  children: [
+                                    ...homeProv.allContracts.map((contratto) {
+                                      final isSelected = contratto.id == homeProv.activeContractId;
+                                      
+                                      // Logica calcolo differenza (mantenuta uguale)
+                                      double differenzaTotale = 0;
+                                      if (!isSelected && homeProv.chargeHistory.isNotEmpty) {
+                                        for (var sessione in homeProv.chargeHistory) {
+                                          double costoAttuale = CostCalculator.calculateComparison(session: sessione, targetContract: homeProv.myContract);
+                                          double costoAlternativo = CostCalculator.calculateComparison(session: sessione, targetContract: contratto);
+                                          differenzaTotale += (costoAttuale - costoAlternativo);
+                                        }
+                                        int mesi = 1; 
+                                        if(homeProv.chargeHistory.length > 1) {
+                                          mesi = ((homeProv.chargeHistory.last.date.year - homeProv.chargeHistory.first.date.year) * 12) + (homeProv.chargeHistory.last.date.month - homeProv.chargeHistory.first.date.month);
+                                          if (mesi <= 0) mesi = 1;
+                                        }
+                                        differenzaTotale += ((homeProv.myContract.fixedMonthlyFee ?? 0.0) - (contratto.fixedMonthlyFee ?? 0.0)) * mesi;
+                                      }
+
+                                      return AnimatedContainer(
+                                        duration: const Duration(milliseconds: 300),
+                                        margin: const EdgeInsets.only(bottom: 12),
+                                        decoration: BoxDecoration(
+                                          borderRadius: BorderRadius.circular(20),
+                                          border: Border.all(
+                                            color: isSelected ? Colors.cyanAccent : Colors.white.withOpacity(0.05),
+                                            width: isSelected ? 2 : 1,
+                                          ),
+                                          boxShadow: isSelected ? [BoxShadow(color: Colors.cyanAccent.withOpacity(0.15), blurRadius: 12)] : [],
+                                        ),
+                                        child: _buildCard(
+                                          child: Theme(
+                                            data: ThemeData(unselectedWidgetColor: Colors.white24),
+                                            child: RadioListTile<String>(
+                                              contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
+                                              value: contratto.id,
+                                              groupValue: homeProv.activeContractId,
+                                              activeColor: Colors.cyanAccent,
+                                              onChanged: (val) {
+                                                if (val != null) {
+                                                  homeProv.selectActiveContract(val);
+                                                  setState(() {
+                                                    _providerController.text = contratto.provider;
+                                                    _f1Controller.text = contratto.f1Price.toString();
+                                                    _isMonorario = contratto.isMonorario;
+                                                  });
+                                                }
+                                              },
+                                              title: Text(contratto.contractName.toUpperCase(),
+                                                style: TextStyle(color: isSelected ? Colors.white : Colors.white70, fontWeight: FontWeight.w900, fontSize: 13, letterSpacing: 0.5)),
+                                              subtitle: Column(
+                                                crossAxisAlignment: CrossAxisAlignment.start,
+                                                children: [
+                                                  const SizedBox(height: 4),
+                                                  Text("${contratto.provider} • F1: ${contratto.f1Price}€", style: const TextStyle(color: Colors.white38, fontSize: 11)),
+                                                  if (!isSelected && homeProv.chargeHistory.isNotEmpty)
+                                                    Container(
+                                                      margin: const EdgeInsets.only(top: 8),
+                                                      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                                                      decoration: BoxDecoration(
+                                                        color: differenzaTotale >= 0 ? Colors.greenAccent.withOpacity(0.1) : Colors.redAccent.withOpacity(0.1),
+                                                        borderRadius: BorderRadius.circular(10),
+                                                      ),
+                                                      child: Row(
+                                                        mainAxisSize: MainAxisSize.min,
+                                                        children: [
+                                                          Icon(differenzaTotale >= 0 ? Icons.trending_down : Icons.trending_up, color: differenzaTotale >= 0 ? Colors.greenAccent : Colors.redAccent, size: 14),
+                                                          const SizedBox(width: 6),
+                                                          Text(differenzaTotale >= 0 ? "RISPARMIO: +${differenzaTotale.toStringAsFixed(2)}€" : "COSTO EXTRA: ${differenzaTotale.abs().toStringAsFixed(2)}€",
+                                                            style: TextStyle(color: differenzaTotale >= 0 ? Colors.greenAccent : Colors.redAccent, fontSize: 10, fontWeight: FontWeight.w900)),
+                                                        ],
+                                                      ),
+                                                    ),
+                                                ],
+                                              ),
+                                              secondary: Row(
+                                                mainAxisSize: MainAxisSize.min,
+                                                children: [
+                                                  IconButton(
+                                                    icon: const Icon(Icons.edit_rounded, color: Colors.white38, size: 20),
+                                                    onPressed: () async {
+                                                      await Navigator.push(context, MaterialPageRoute(builder: (_) => AddContractPage(contractToEdit: contratto)));
+                                                      if (mounted) setState(() {});
+                                                    },
+                                                  ),
+                                                  if (homeProv.allContracts.length > 1)
+                                                    IconButton(
+                                                      icon: const Icon(Icons.delete_sweep_rounded, color: Colors.redAccent, size: 20),
+                                                      onPressed: () => homeProv.deleteContract(contratto.id),
+                                                    ),
+                                                ],
+                                              ),
+                                            ),
+                                          ),
+                                        ),
+                                      );
+                                    }).toList(),
+                                    const SizedBox(height: 15),
+                                    InkWell(
+                                      onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const AddContractPage())),
+                                      child: Container(
+                                        padding: const EdgeInsets.symmetric(vertical: 12),
+                                        decoration: BoxDecoration(
+                                          color: Colors.white.withOpacity(0.05),
+                                          borderRadius: BorderRadius.circular(10),
+                                          border: Border.all(color: Colors.white10),
+                                        ),
+                                        child: const Row(
+                                          mainAxisAlignment: MainAxisAlignment.center,
+                                          children: [
+                                            Icon(Icons.add_circle_outline, color: Colors.cyanAccent, size: 18),
+                                            SizedBox(width: 8),
+                                            Text("AGGIUNGI NUOVO CONTRATTO",
+                                                style: TextStyle(color: Colors.cyanAccent, fontWeight: FontWeight.bold, fontSize: 11)),
+                                          ],
+                                        ),
+                                      ),
+                                    ),
+                                  ],
+                                );
+                              },
+                            ),
                           ],
-                        );
-                      },
+                        ),
+                      ),
+                    ),
+
+                    const SizedBox(height: 25),
+                    _buildSectionTitle("4 - ACCOUNT"),
+                    _buildCard(
+                      child: ListTile(
+                        leading: const Icon(Icons.logout, color: Colors.redAccent),
+                        title: const Text("Esci dall'account", style: TextStyle(color: Colors.redAccent)),
+                        onTap: () async {
+                          final confirm = await _showLogoutConfirmDialog();
+                          if (confirm == true) {
+                            await widget.authProvider.signOut();
+                            if (context.mounted) Navigator.pop(context);
+                          }
+                        },
+                      ),
+                    ),
+                    const SizedBox(height: 30),
+                    if (_isSyncing) const Center(child: Padding(
+                      padding: EdgeInsets.only(bottom: 20),
+                      child: CircularProgressIndicator(color: Colors.cyanAccent),
+                    )),
+                    SizedBox(
+                      width: double.infinity,
+                      height: 60,
+                      child: ElevatedButton(
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: Colors.cyanAccent,
+                          foregroundColor: Colors.black,
+                          elevation: 10,
+                          shadowColor: Colors.cyanAccent.withOpacity(0.5),
+                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(18)),
+                        ),
+                        onPressed: _isSyncing ? null : _saveAll,
+                        child: _isSyncing 
+                          ? const CircularProgressIndicator(color: Colors.black)
+                          : const Text("CONFERMA TUTTE LE MODIFICHE", 
+                              style: TextStyle(fontWeight: FontWeight.w900, letterSpacing: 1.5)),
+                      ),
                     ),
                   ],
                 ),
-              ),
-            ),
-
-            const SizedBox(height: 25),
-            _buildSectionTitle("4 - ACCOUNT"),
-            _buildCard(
-              child: ListTile(
-                leading: const Icon(Icons.logout, color: Colors.redAccent),
-                title: const Text("Esci dall'account", style: TextStyle(color: Colors.redAccent)),
-                onTap: () async {
-                  final confirm = await _showLogoutConfirmDialog();
-                  if (confirm == true) {
-                    await widget.authProvider.signOut();
-                    if (context.mounted) Navigator.pop(context);
-                  }
-                },
-              ),
-            ),
-            const SizedBox(height: 30),
-            if (_isSyncing) const Center(child: Padding(
-              padding: EdgeInsets.only(bottom: 20),
-              child: CircularProgressIndicator(color: Colors.blueAccent),
-            )),
-            SizedBox(
-              width: double.infinity,
-              height: 54,
-              child: ElevatedButton(
-                style: ElevatedButton.styleFrom(
-                  backgroundColor: Colors.blueAccent,
-                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12))
-                ),
-                onPressed: _isSyncing ? null : _saveAll,
-                child: const Text("SALVA IMPOSTAZIONI", style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
               ),
             ),
           ],
@@ -497,53 +503,122 @@ class _SettingsPageState extends State<SettingsPage> {
   }
 
   Widget _buildSectionTitle(String title) {
-    return Padding(
-      padding: const EdgeInsets.only(bottom: 8, left: 4),
-      child: Text(title, style: const TextStyle(color: Colors.white38, fontWeight: FontWeight.bold, fontSize: 10, letterSpacing: 1.1)),
-    );
-  }
-
-  Widget _buildCard({required Widget child}) {
-    return Container(
-      decoration: BoxDecoration(
-        color: const Color(0xFF1C1C1E),
-        borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: Colors.white.withOpacity(0.05)),
-      ),
-      child: child,
-    );
-  }
-
-  Widget _buildStaticRow(IconData icon, String label, String value) {
-    return Padding(
-      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-      child: Row(
-        children: [
-          Icon(icon, color: Colors.white24, size: 20),
-          const SizedBox(width: 15),
-          Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Text(label, style: const TextStyle(color: Colors.white38, fontSize: 8, fontWeight: FontWeight.bold)),
-              Text(value, style: const TextStyle(color: Colors.white, fontSize: 13, fontWeight: FontWeight.bold)),
+  return Padding(
+    padding: const EdgeInsets.only(bottom: 12, left: 8, top: 15),
+    child: Row(
+      children: [
+        Container(
+          width: 3,
+          height: 16,
+          decoration: BoxDecoration(
+            color: Colors.blueAccent,
+            borderRadius: BorderRadius.circular(2),
+            boxShadow: [
+              BoxShadow(
+                color: Colors.blueAccent.withOpacity(0.5),
+                blurRadius: 8,
+                spreadRadius: 1,
+              )
             ],
           ),
+        ),
+        const SizedBox(width: 10),
+        Text(
+          title.toUpperCase(),
+          style: const TextStyle(
+            color: Colors.white70,
+            fontWeight: FontWeight.w900,
+            fontSize: 11,
+            letterSpacing: 1.5,
+          ),
+        ),
+      ],
+    ),
+  );
+}
+
+  Widget _buildCard({required Widget child}) {
+  return Container(
+    clipBehavior: Clip.antiAlias,
+    decoration: BoxDecoration(
+      borderRadius: BorderRadius.circular(22),
+      gradient: LinearGradient(
+        begin: Alignment.topLeft,
+        end: Alignment.bottomRight,
+        colors: [
+          Colors.white.withOpacity(0.08),
+          Colors.white.withOpacity(0.03),
         ],
       ),
-    );
-  }
+      border: Border.all(
+        color: Colors.white.withOpacity(0.12),
+        width: 1,
+      ),
+    ),
+    child: child,
+  );
+}
+
+  Widget _buildStaticRow(IconData icon, String label, String value) {
+  return Padding(
+    padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 14),
+    child: Row(
+      children: [
+        Container(
+          padding: const EdgeInsets.all(8),
+          decoration: BoxDecoration(
+            color: Colors.blueAccent.withOpacity(0.1),
+            shape: BoxShape.circle,
+          ),
+          child: Icon(icon, color: Colors.blueAccent.withOpacity(0.7), size: 18),
+        ),
+        const SizedBox(width: 16),
+        Expanded(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                label,
+                style: const TextStyle(
+                  color: Colors.white38,
+                  fontSize: 9,
+                  fontWeight: FontWeight.w800,
+                  letterSpacing: 0.5,
+                ),
+              ),
+              const SizedBox(height: 2),
+              Text(
+                value,
+                style: const TextStyle(
+                  color: Colors.white,
+                  fontSize: 14,
+                  fontWeight: FontWeight.bold,
+                ),
+              ),
+            ],
+          ),
+        ),
+      ],
+    ),
+  );
+}
 
   Widget _buildInput(String label, TextEditingController ctrl, IconData icon) {
-    return TextField(
+  return Container(
+    padding: const EdgeInsets.symmetric(vertical: 2),
+    child: TextField(
       controller: ctrl,
-      style: const TextStyle(color: Colors.white, fontSize: 14),
+      style: const TextStyle(color: Colors.white, fontSize: 15, fontWeight: FontWeight.w600),
       decoration: InputDecoration(
         labelText: label,
-        labelStyle: const TextStyle(color: Colors.white38, fontSize: 10, fontWeight: FontWeight.bold),
-        prefixIcon: Icon(icon, color: Colors.blueAccent, size: 20),
-        enabledBorder: const UnderlineInputBorder(borderSide: BorderSide(color: Colors.white10)),
-        focusedBorder: const UnderlineInputBorder(borderSide: BorderSide(color: Colors.blueAccent)),
+        labelStyle: const TextStyle(color: Colors.blueAccent, fontSize: 10, fontWeight: FontWeight.bold),
+        prefixIcon: Icon(icon, color: Colors.blueAccent.withOpacity(0.6), size: 22),
+        border: InputBorder.none,
+        contentPadding: const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
+        floatingLabelBehavior: FloatingLabelBehavior.always,
+        hintStyle: const TextStyle(color: Colors.white24),
       ),
-    );
-  }
+    ),
+  );
+}
 }
