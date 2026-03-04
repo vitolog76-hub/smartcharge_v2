@@ -194,6 +194,10 @@ class HomePage extends StatelessWidget {
                           ),
                           
                           const SizedBox(height: 12),
+
+                          _buildBatteryCoach(provider),
+
+                          const SizedBox(height: 12),
                           
                           // RIGA SIMULAZIONE E INFO AUTO
                           Row(
@@ -227,8 +231,7 @@ class HomePage extends StatelessWidget {
                           
                           const SizedBox(height: 12),
                           
-                          // TILE CAPACITÀ BATTERIA
-                          _buildEditCapacityTile(context, provider),
+                         
                           
                           const SizedBox(height: 30), // Padding finale per lo scroll
                         ],
@@ -246,107 +249,9 @@ class HomePage extends StatelessWidget {
 
   // --- WIDGETS DI SUPPORTO ---
 
-  Widget _buildEditCapacityTile(BuildContext context, HomeProvider provider) {
-    return GestureDetector(
-      onTap: () => _showEditCapacityDialog(context, provider),
-      child: _glassContainer(
-        opacity: 0.1,
-        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
-        child: Row(
-          children: [
-            const _PulseIcon(
-              child: Icon(Icons.bolt_rounded, color: Colors.cyanAccent, size: 26),
-            ),
-            const SizedBox(width: 12),
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    "${provider.capacityController.text} kWh",
-                    style: const TextStyle(
-                      color: Colors.white,
-                      fontSize: 16,
-                      fontWeight: FontWeight.w900,
-                      letterSpacing: 0.5,
-                      shadows: [Shadow(color: Colors.blueAccent, blurRadius: 8)],
-                    ),
-                  ),
-                  const Text(
-                    "CAPACITÀ BATTERIA ATTUALE",
-                    style: TextStyle(
-                      color: Colors.white38,
-                      fontSize: 8,
-                      fontWeight: FontWeight.bold,
-                      letterSpacing: 1.1,
-                    ),
-                  ),
-                ],
-              ),
-            ),
-            Icon(Icons.edit_note_rounded, color: Colors.white.withOpacity(0.3), size: 22),
-          ],
-        ),
-      ),
-    );
-  }
+  
 
-  void _showEditCapacityDialog(BuildContext context, HomeProvider provider) {
-    final TextEditingController tempController = TextEditingController(text: provider.capacityController.text);
-    showDialog(
-      context: context,
-      builder: (ctx) => BackdropFilter(
-        filter: ImageFilter.blur(sigmaX: 10, sigmaY: 10),
-        child: AlertDialog(
-          backgroundColor: Colors.white.withOpacity(0.05),
-          shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(24),
-            side: BorderSide(color: Colors.white.withOpacity(0.1)),
-          ),
-          title: const Text(
-            "SET CAPACITÀ",
-            textAlign: TextAlign.center,
-            style: TextStyle(color: Colors.white, fontWeight: FontWeight.w900, fontSize: 16, letterSpacing: 1.5),
-          ),
-          content: TextField(
-            controller: tempController,
-            keyboardType: TextInputType.number,
-            textAlign: TextAlign.center,
-            style: const TextStyle(color: Colors.cyanAccent, fontSize: 24, fontWeight: FontWeight.bold),
-            decoration: InputDecoration(
-              suffixText: "kWh",
-              suffixStyle: const TextStyle(color: Colors.white38, fontSize: 14),
-              enabledBorder: UnderlineInputBorder(borderSide: BorderSide(color: Colors.white.withOpacity(0.1))),
-              focusedBorder: const UnderlineInputBorder(borderSide: BorderSide(color: Colors.cyanAccent)),
-            ),
-          ),
-          actions: [
-            TextButton(
-              onPressed: () => Navigator.pop(ctx),
-              child: const Text("CHIUDI", style: TextStyle(color: Colors.white38, fontWeight: FontWeight.bold)),
-            ),
-            ElevatedButton(
-              onPressed: () {
-                if (tempController.text.isNotEmpty) {
-                  provider.capacityController.text = tempController.text;
-                  provider.notifyListeners();
-                }
-                Navigator.pop(ctx);
-              },
-              style: ElevatedButton.styleFrom(
-                backgroundColor: Colors.cyanAccent.withOpacity(0.2),
-                foregroundColor: Colors.cyanAccent,
-                shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(12),
-                ),
-              ),
-              child: const Text("AGGIORNA"),
-            ),
-          ],
-        ),
-      ),
-    );
-  }
+  
 
   void _showCompletionDialog(BuildContext context, HomeProvider provider) {
     _completionDialogShown = true;
@@ -481,6 +386,55 @@ class HomePage extends StatelessWidget {
             ],
           ),
         ),
+      ),
+    );
+  }
+
+  Widget _buildBatteryCoach(HomeProvider provider) {
+    String title;
+    Color accentColor;
+    IconData icon;
+
+    // Colori e Titoli cambiano per chimica, ma il TESTO (advice) sarà dinamico
+    switch (provider.batteryChemistry) {
+      case "LFP":
+        title = "ANALISI BATTERIA LFP";
+        accentColor = Colors.greenAccent;
+        icon = Icons.analytics_outlined;
+        break;
+      case "NMC / NCA":
+        title = "ANALISI BATTERIA NMC";
+        accentColor = Colors.orangeAccent;
+        icon = Icons.health_and_safety_outlined;
+        break;
+      default:
+        title = "CONSIGLIO GENERICO";
+        accentColor = Colors.blueAccent;
+        icon = Icons.info_outline;
+    }
+
+    return _glassContainer(
+      opacity: 0.1,
+      padding: const EdgeInsets.all(16),
+      child: Row(
+        children: [
+          Icon(icon, color: accentColor, size: 24),
+          const SizedBox(width: 14),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(title, style: TextStyle(color: accentColor, fontSize: 9, fontWeight: FontWeight.w900, letterSpacing: 1.2)),
+                const SizedBox(height: 4),
+                // 🔥 QUI CHIAMIAMO LA FUNZIONE INTELLIGENTE
+                Text(
+                  provider.getSmartBatteryAdvice(), 
+                  style: const TextStyle(color: Colors.white70, fontSize: 11, height: 1.3),
+                ),
+              ],
+            ),
+          ),
+        ],
       ),
     );
   }

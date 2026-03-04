@@ -37,6 +37,40 @@ class HomeProvider extends ChangeNotifier {
   // 🔥 NOME UTENTE GLOBALE (PROFILO) - INDIPENDENTE DAI CONTRATTI
   String _globalUserName = "Utente";
   String get globalUserName => _globalUserName;
+  String _batteryChemistry = "NMC / NCA";
+  String get batteryChemistry => _batteryChemistry;
+
+  String getSmartBatteryAdvice() {
+  if (chargeHistory.isEmpty) return "Inizia a caricare per ricevere consigli basati sul tuo stile di guida.";
+
+  final ora = DateTime.now();
+  
+  // --- LOGICA PER LFP (Calibrazione) ---
+  if (_batteryChemistry == "LFP") {
+    bool haCaricatoAl100Recentemente = chargeHistory.any((s) => 
+      s.endSoc >= 99 && ora.difference(s.date).inDays <= 7
+    );
+
+    if (!haCaricatoAl100Recentemente) {
+      return "⚠️ Non carichi al 100% da più di una settimana. Fallo stasera per allineare le celle (BMS).";
+    }
+    return "✅ Batteria ben calibrata. Mantieni il target tra 20-80% per il resto della settimana.";
+  }
+
+  // --- LOGICA PER NMC (Stress chimico) ---
+  if (_batteryChemistry == "NMC / NCA") {
+    int caricheEccessive = chargeHistory.where((s) => 
+      s.endSoc > 85 && ora.difference(s.date).inDays <= 30
+    ).length;
+
+    if (caricheEccessive > 4) {
+      return "⚠️ Hai caricato oltre l'80% ben $caricheEccessive volte nell'ultimo mese. Cerca di limitarlo per ridurre il degrado.";
+    }
+    return "✅ Ottima gestione: stai preservando la chimica al nichel limitando i picchi di carica.";
+  }
+
+  return "Mantieni la carica tra 20-80% per una longevità ottimale.";
+}
 
   // --- GESTIONE PROFILO (ID + NOME) ---
   // Da chiamare nella SettingsPage per salvare il nome
@@ -114,6 +148,7 @@ class HomeProvider extends ChangeNotifier {
     await _loadHistory(); 
     await _loadSimulationParameters(); 
     await _loadSimulationProgress();
+    await loadBatteryConfig();
 
     final prefs = await SharedPreferences.getInstance();
     final userId = prefs.getString('user_sync_id');
@@ -203,6 +238,12 @@ class HomeProvider extends ChangeNotifier {
       _saveSimulationProgress();
       notifyListeners();
     });
+  }
+
+  Future<void> loadBatteryConfig() async {
+    final prefs = await SharedPreferences.getInstance();
+    _batteryChemistry = prefs.getString('battery_chemistry') ?? "NMC / NCA";
+    notifyListeners();
   }
 
   void stopSimulation() {
@@ -370,6 +411,11 @@ class HomeProvider extends ChangeNotifier {
     }
   }
 
+  void refreshBatteryChemistry(String newChemistry) {
+  _batteryChemistry = newChemistry; // Aggiorna la variabile privata
+  notifyListeners(); // 🔥 Fondamentale: scatena il rebuild del "Battery Coach" nella Home
+}
+
   // --- PARAMETRI SIMULAZIONE ---
   Future<void> salvaTuttiParametri() async { await _saveSimulationParameters(); }
 
@@ -512,5 +558,9 @@ class HomeProvider extends ChangeNotifier {
   void updateTargetSoc(double v) { targetSoc = v; _saveSimulationParameters(); notifyListeners(); }
   bool get shouldShowCompletionDialog => _showCompletionDialog;
   void resetCompletionDialog() => _showCompletionDialog = false;
-  Future<void> refreshAfterSettings() async { await _loadHistory(); await _loadContract(); notifyListeners(); }
+  Future<void> refreshAfterSettings() async { 
+    await _loadHistory(); 
+    await _loadContract(); notifyListeners(); 
+    await loadBatteryConfig();
+    }
 }

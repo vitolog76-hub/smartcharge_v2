@@ -11,6 +11,7 @@ import 'package:smartcharge_v2/screens/contract_summary_page.dart';
 import 'package:provider/provider.dart';
 import 'package:smartcharge_v2/pages/add_contract_page.dart';
 import 'package:smartcharge_v2/services/cost_calculator.dart';
+import 'package:flutter/services.dart';
 
 class SettingsPage extends StatefulWidget {
   final EnergyContract contract;
@@ -39,9 +40,13 @@ class _SettingsPageState extends State<SettingsPage> {
   late TextEditingController _f1Controller;
   late TextEditingController _f2Controller;
   late TextEditingController _f3Controller;
+  late TextEditingController _batteryController;
   
   bool _isSyncing = false;
   late bool _isMonorario;
+
+  // --- MODIFICA 1: AGGIUNGI QUESTA RIGA ---
+  String _selectedBatteryType = "NMC / NCA"; 
 
   @override
   void initState() {
@@ -49,19 +54,38 @@ class _SettingsPageState extends State<SettingsPage> {
     
     _providerController = TextEditingController(text: widget.contract.provider);
     _nameController = TextEditingController(text: widget.homeProvider.globalUserName);
+    _batteryController = TextEditingController(text: widget.homeProvider.capacityController.text);
     _f1Controller = TextEditingController(text: widget.contract.f1Price.toString());
     _f2Controller = TextEditingController(text: widget.contract.f2Price.toString());
     _f3Controller = TextEditingController(text: widget.contract.f3Price.toString());
     _idController = TextEditingController();
     
     _isMonorario = widget.contract.isMonorario;
-    _loadSyncId();
+    
+    // --- MODIFICA 2: CHIAMA IL CARICAMENTO DATI ---
+    _loadSettingsData(); 
+  }
+
+  // Creiamo questa funzione per caricare tutto all'avvio
+  Future<void> _loadSettingsData() async {
+    final prefs = await SharedPreferences.getInstance();
+    setState(() {
+      _idController.text = prefs.getString('user_sync_id') ?? "";
+      // Legge la batteria salvata, se non c'è usa il default
+      _selectedBatteryType = prefs.getString('battery_chemistry') ?? "NMC / NCA";
+      
+      String? savedName = prefs.getString('global_user_name');
+      if (savedName != null && savedName.isNotEmpty) {
+        _nameController.text = savedName;
+      }
+    });
   }
 
   @override
   void dispose() {
     _idController.dispose();
     _nameController.dispose();
+    _batteryController.dispose();
     _providerController.dispose();
     _f1Controller.dispose();
     _f2Controller.dispose();
@@ -81,120 +105,119 @@ class _SettingsPageState extends State<SettingsPage> {
   }
 
   void _saveAll() async {
-    String userId = _idController.text.trim();
-    String nuovoNomeProfilo = _nameController.text.trim(); 
-    final homeProv = context.read<HomeProvider>();
+  // --- 1. VALIDAZIONE DI SICUREZZA ---
+  // Puliamo il testo da spazi e uniformiamo la virgola col punto
+  String batteryRaw = _batteryController.text.trim().replaceAll(',', '.');
+  double? batteryValue = double.tryParse(batteryRaw);
 
-    setState(() => _isSyncing = true);
-    
-    // 1. SALVATAGGIO PROFILO (Nome e ID)
-    // Questo metodo salva su MacBook e sincronizza col Cloud se l'ID esiste
-    await homeProv.syncUserProfile(nuovoNomeProfilo);
-
-    // 2. SALVATAGGIO ID SINCRONIZZAZIONE (Se cambiato manualmente)
-    if (userId.isNotEmpty) {
-      final prefs = await SharedPreferences.getInstance();
-      await prefs.setString('user_sync_id', userId);
-    }
-
-    // 3. AGGIORNAMENTO DATI TECNICI CONTRATTO
-    // Nota: Abbiamo rimosso 'userName' dai parametri perché ora è globale
-    homeProv.updateActiveContractDetails(
-      provider: _providerController.text,
-      isMonorario: _isMonorario,
-      f1: double.tryParse(_f1Controller.text) ?? homeProv.myContract.f1Price,
-      f2: double.tryParse(_f2Controller.text),
-      f3: double.tryParse(_f3Controller.text),
+  // Controllo se il valore è nullo, zero o negativo
+  if (batteryValue == null || batteryValue <= 0) {
+    _showErrorDialog(
+      "VALORE NON VALIDO", 
+      "Inserisci una capacità batteria maggiore di zero per permettere il calcolo dei costi."
     );
-
-    // 4. SALVATAGGIO FINALE E SYNC
-    // Forza il rinfresco di tutto il pacchetto dati sul Cloud
-    await homeProv.saveAllContracts(); 
-
-    setState(() => _isSyncing = false);
-    
-    if (mounted) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text("✅ Profilo e Impostazioni salvati con successo!"),
-          backgroundColor: Colors.green,
-        )
-      );
-      Navigator.pop(context, true);
-    }
+    return; // Interrompe l'esecuzione e non salva nulla
   }
+
+  // --- 2. PREPARAZIONE DATI ---
+  String userId = _idController.text.trim();
+  String nuovoNomeProfilo = _nameController.text.trim(); 
+  final homeProv = context.read<HomeProvider>();
+
+  setState(() => _isSyncing = true);
+  
+  // --- 3. AGGIORNAMENTO PROVIDER (Dati Tecnici) ---
+  // Salviamo il valore pulito (formato numerico corretto)
+  homeProv.capacityController.text = batteryValue.toString();
+  
+  // 3.1 Aggiornamento Chimica
+  homeProv.refreshBatteryChemistry(_selectedBatteryType); 
+
+  // --- 4. PERSISTENZA E CLOUD ---
+  // 4.1 Profilo (Nome e ID)
+  await homeProv.syncUserProfile(nuovoNomeProfilo);
+
+  // 4.2 Preferenze Locali
+  final prefs = await SharedPreferences.getInstance();
+  await prefs.setString('battery_chemistry', _selectedBatteryType);
+  
+  if (userId.isNotEmpty) {
+    await prefs.setString('user_sync_id', userId);
+  }
+
+  // 4.3 Dettagli Contratto
+  homeProv.updateActiveContractDetails(
+    provider: _providerController.text,
+    isMonorario: _isMonorario,
+    f1: double.tryParse(_f1Controller.text) ?? homeProv.myContract.f1Price,
+    f2: double.tryParse(_f2Controller.text),
+    f3: double.tryParse(_f3Controller.text),
+  );
+
+  // --- 5. SALVATAGGIO FINALE E CHIUSURA ---
+  await homeProv.salvaTuttiParametri(); 
+
+  setState(() => _isSyncing = false);
+  
+  if (mounted) {
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(
+        content: Text("✅ Impostazioni e Batteria salvate!"),
+        backgroundColor: Colors.green,
+      )
+    );
+    Navigator.pop(context, true);
+  }
+}
 
   Future<void> _importFromCloud(String userId) async {
     if (userId.isEmpty) {
-      _showErrorDialog("Errore", "Inserisci un ID valido per importare i dati.");
+      _showErrorDialog("Errore", "Inserisci un ID valido.");
       return;
     }
-
     setState(() => _isSyncing = true);
-    
     try {
-      // 1. Scarica i dati da Firebase
       var data = await SyncService().downloadAllData(userId);
-      
       if (data != null) {
-        // 2. Applica i dati scaricati al Provider (storia, contratti, nome)
         await context.read<HomeProvider>().refreshAfterSettings();
-        
-        if (mounted) {
-          final homeProv = context.read<HomeProvider>();
-          final nuovoContrattoAttivo = homeProv.myContract;
-
-          // 3. Aggiorna l'interfaccia con i dati appena scaricati
-          setState(() {
-            // Ora il nome viene dal profilo globale scaricato, non dal contratto!
-            _nameController.text = homeProv.globalUserName; 
-            
-            _providerController.text = nuovoContrattoAttivo.provider;
-            _f1Controller.text = nuovoContrattoAttivo.f1Price.toString();
-            _f2Controller.text = nuovoContrattoAttivo.f2Price.toString();
-            _f3Controller.text = nuovoContrattoAttivo.f3Price.toString();
-            _isMonorario = nuovoContrattoAttivo.isMonorario;
-          });
-
-          ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(content: Text("✅ Dati importati correttamente dal Cloud!"))
-          );
-        }
-      } else {
-        if (mounted) _showErrorDialog("Sync Fallito", "Nessun dato trovato per questo ID.");
+        final homeProv = context.read<HomeProvider>();
+        final prefs = await SharedPreferences.getInstance();
+        setState(() {
+          _nameController.text = homeProv.globalUserName;
+          _selectedBatteryType = prefs.getString('battery_chemistry') ?? "NMC / NCA";
+          _providerController.text = homeProv.myContract.provider;
+          _f1Controller.text = homeProv.myContract.f1Price.toString();
+        });
       }
     } catch (e) {
-      debugPrint("Errore Import: $e");
-      if (mounted) _showErrorDialog("Errore Critico", "Impossibile scaricare i dati. Controlla la connessione.");
+      _showErrorDialog("Errore", "Sincronizzazione fallita.");
     } finally {
-      if (mounted) setState(() => _isSyncing = false);
+      setState(() => _isSyncing = false);
     }
-  }
-
-  // --- DIALOGS ---
-  Future<bool?> _showLogoutConfirmDialog() {
-    return showDialog<bool>(
-      context: context,
-      builder: (ctx) => AlertDialog(
-        backgroundColor: const Color(0xFF1C1C1E),
-        title: const Text("Conferma logout", style: TextStyle(color: Colors.white)),
-        content: const Text("Vuoi davvero uscire? I dati locali rimarranno sul MacBook.", style: TextStyle(color: Colors.white70)),
-        actions: [
-          TextButton(onPressed: () => Navigator.pop(ctx, false), child: const Text("ANNULLA")),
-          TextButton(onPressed: () => Navigator.pop(ctx, true), child: const Text("ESCI", style: TextStyle(color: Colors.redAccent))),
-        ],
-      ),
-    );
   }
 
   void _showErrorDialog(String title, String message) {
     showDialog(
       context: context,
       builder: (ctx) => AlertDialog(
-        backgroundColor: const Color(0xFF1C1C1E),
+        backgroundColor: const Color(0xFF0F172A),
         title: Text(title, style: const TextStyle(color: Colors.white)),
         content: Text(message, style: const TextStyle(color: Colors.white70)),
         actions: [TextButton(onPressed: () => Navigator.pop(ctx), child: const Text("OK"))],
+      ),
+    );
+  }
+
+  Future<bool?> _showLogoutConfirmDialog() {
+    return showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        backgroundColor: const Color(0xFF0F172A),
+        title: const Text("Logout", style: TextStyle(color: Colors.white)),
+        actions: [
+          TextButton(onPressed: () => Navigator.pop(ctx, false), child: const Text("ANNULLA")),
+          TextButton(onPressed: () => Navigator.pop(ctx, true), child: const Text("ESCI", style: TextStyle(color: Colors.redAccent))),
+        ],
       ),
     );
   }
@@ -273,21 +296,150 @@ class _SettingsPageState extends State<SettingsPage> {
                     const SizedBox(height: 25),
 
                     _buildSectionTitle("2 - DATI UTENTE E VEICOLO"),
+_buildCard(
+  child: Column(
+    children: [
+      _buildInput("NOME UTENTE / AZIENDA", _nameController, Icons.person_outline),
+      const Divider(color: Colors.white10, indent: 50),
+      _buildStaticRow(Icons.directions_car, "AUTO SELEZIONATA", widget.selectedCar.model.toUpperCase()),
+      const Divider(color: Colors.white10, indent: 50),
+      
+      // --- CAPACITÀ BATTERIA EDITABILE ---
+      // --- MODULO CAPACITÀ BATTERIA MODERNIZZATO ---
+Container(
+  margin: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+  padding: const EdgeInsets.all(14),
+  decoration: BoxDecoration(
+    // Effetto vetro scuro per far risaltare il modulo
+    color: Colors.white.withOpacity(0.04), 
+    borderRadius: BorderRadius.circular(20),
+    border: Border.all(color: Colors.white.withOpacity(0.08)),
+  ),
+  child: Row(
+    children: [
+      // Icona con bagliore neon
+      Container(
+        padding: const EdgeInsets.all(10),
+        decoration: BoxDecoration(
+          color: Colors.cyanAccent.withOpacity(0.1),
+          shape: BoxShape.circle,
+          boxShadow: [
+            BoxShadow(
+              color: Colors.cyanAccent.withOpacity(0.05),
+              blurRadius: 10,
+              spreadRadius: 2,
+            )
+          ],
+        ),
+        child: const Icon(Icons.bolt_rounded, color: Colors.cyanAccent, size: 22),
+      ),
+      const SizedBox(width: 16),
+      
+      // Testo informativo a doppia riga
+      const Expanded(
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(
+              "VALORE NOMINALE",
+              style: TextStyle(
+                color: Colors.cyanAccent, 
+                fontSize: 8, 
+                fontWeight: FontWeight.w900,
+                letterSpacing: 1.5
+              ),
+            ),
+            SizedBox(height: 2),
+            Text(
+              "CAPACITÀ (kWh)",
+              style: TextStyle(
+                color: Colors.white, 
+                fontSize: 13, 
+                fontWeight: FontWeight.bold
+              ),
+            ),
+          ],
+        ),
+      ),
+
+      // Box di inserimento stile "Display Digitale"
+      Container(
+        width: 95,
+        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+        decoration: BoxDecoration(
+          color: Colors.black.withOpacity(0.5), // Sfondo nero profondo
+          borderRadius: BorderRadius.circular(12),
+          border: Border.all(color: Colors.white.withOpacity(0.1)),
+        ),
+        child: TextField(
+          controller: _batteryController,
+          inputFormatters: [
+  FilteringTextInputFormatter.allow(RegExp(r'(^\d*[\.,]?\d*)')),
+],
+          keyboardType: const TextInputType.numberWithOptions(decimal: true),
+          textAlign: TextAlign.center,
+          style: const TextStyle(
+            color: Colors.cyanAccent, 
+            fontWeight: FontWeight.w900, 
+            fontSize: 18,
+            fontFamily: 'Courier', // Se vuoi un look ancora più tecnico/digitale
+          ),
+          decoration: const InputDecoration(
+            isDense: true,
+            border: InputBorder.none,
+            contentPadding: EdgeInsets.zero,
+            hintText: "0.0",
+            hintStyle: TextStyle(color: Colors.white10),
+          ),
+        ),
+      ),
+    ],
+  ),
+),
+    ],
+  ),
+),
+// --- NUOVA SEZIONE BATTERIA ---
+                    _buildSectionTitle("3 - INTELLIGENZA BATTERIA"),
                     _buildCard(
-                      child: Column(
-                        children: [
-                          _buildInput("NOME UTENTE / AZIENDA", _nameController, Icons.person_outline),
-                          const Divider(color: Colors.white10, indent: 50),
-                          _buildStaticRow(Icons.directions_car, "AUTO SELEZIONATA", widget.selectedCar.model.toUpperCase()),
-                          const Divider(color: Colors.white10, indent: 50),
-                          _buildStaticRow(Icons.battery_charging_full, "CAPACITÀ BATTERIA", "${widget.batteryValue} kWh"),
-                        ],
+                      child: Padding(
+                        padding: const EdgeInsets.all(16.0),
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            const Text("CHIMICA DELLE CELLE", 
+                              style: TextStyle(color: Colors.cyanAccent, fontSize: 10, fontWeight: FontWeight.bold)),
+                            const SizedBox(height: 10),
+                            DropdownButtonHideUnderline(
+                              child: DropdownButton<String>(
+                                value: _selectedBatteryType,
+                                isExpanded: true, // <--- QUI C'ERA L'ERRORE "协议"
+                                dropdownColor: const Color(0xFF0F172A),
+                                style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold),
+                                items: ["NMC / NCA", "LFP", "SCONOSCIUTA"].map((String type) {
+                                  return DropdownMenuItem(value: type, child: Text(type));
+                                }).toList(),
+                                onChanged: (val) {
+                                  setState(() {
+                                    _selectedBatteryType = val!;
+                                  });
+                                },
+                              ),
+                            ),
+                            const Divider(color: Colors.white10, height: 20),
+                            Text(
+  _selectedBatteryType == "LFP" 
+    ? "CONSIGLIO LFP: Mantieni tra 20-80% quotidianamente. Carica al 100% una volta a settimana per calibrare il BMS."
+    : _selectedBatteryType == "NMC / NCA"
+        ? "CONSIGLIO NMC: Evita di superare l'80% per l'uso quotidiano. Carica al 100% solo per lunghi viaggi."
+        : "CONSIGLIO: Se non conosci la chimica, resta tra il 20% e l'80%. È la fascia di sicurezza universale per ogni batteria al litio.",
+  style: const TextStyle(color: Colors.white38, fontSize: 11, fontStyle: FontStyle.italic),
+),
+                          ],
+                        ),
                       ),
                     ),
-
-                    const SizedBox(height: 25),
-
-                    _buildSectionTitle("3 - GESTIONE CONTRATTI ENERGIA"),
+                    _buildSectionTitle("4 - GESTIONE CONTRATTI ENERGIA"),
                     _buildCard(
                       child: Padding(
                         padding: const EdgeInsets.all(16.0),
@@ -455,7 +607,7 @@ class _SettingsPageState extends State<SettingsPage> {
                     ),
 
                     const SizedBox(height: 25),
-                    _buildSectionTitle("4 - ACCOUNT"),
+                    _buildSectionTitle("5 - ACCOUNT"),
                     _buildCard(
                       child: ListTile(
                         leading: const Icon(Icons.logout, color: Colors.redAccent),
