@@ -7,18 +7,42 @@ import 'package:smartcharge_v2/providers/home_provider.dart';
 import 'package:smartcharge_v2/screens/login_page.dart';
 import 'package:smartcharge_v2/screens/home_page.dart';
 import 'package:smartcharge_v2/services/notification_service.dart';
+import 'package:flutter_dotenv/flutter_dotenv.dart';
 import 'package:flutter/foundation.dart' show kIsWeb;
 
 void main() async {
+  // 1. OBBLIGATORIO: Inizializza i legami con il sistema operativo
   WidgetsFlutterBinding.ensureInitialized();
   
-  await initializeDateFormatting('it_IT', null);
+  // 2. Carica .env da assets/
+  try {
+    await dotenv.load(fileName: "assets/.env");
+    debugPrint('✅ .env caricato da assets/');
+  } catch (e) {
+    debugPrint('📢 .env non trovato in assets/ (Normale in produzione)');
+  }
 
+  // 3. Inizializzazione Firebase (Web e Mobile)
   try {
     if (kIsWeb) {
+      debugPrint('🌐 Inizializzazione Firebase per WEB...');
+      
+      String firebaseApiKey = '';
+      firebaseApiKey = const String.fromEnvironment('FIRESTORE_KEY');
+
+      if (firebaseApiKey.isEmpty && dotenv.isInitialized) {
+        firebaseApiKey = dotenv.env['FIRESTORE_KEY'] ?? '';
+      }
+      
+      if (firebaseApiKey.isEmpty) {
+        debugPrint('❌ ERRORE: FIRESTORE_KEY non trovata!');
+      } else {
+        debugPrint('🔑 Chiave caricata correttamente (inizia con: ${firebaseApiKey.substring(0, 6)})');
+      }
+      
       await Firebase.initializeApp(
-        options: const FirebaseOptions(
-          apiKey: "AIzaSyDEY3p6_T-X_tW4p9QW9-R35N994658",
+        options: FirebaseOptions(
+          apiKey: firebaseApiKey,
           authDomain: "smartcharge-c5b34.firebaseapp.com",
           projectId: "smartcharge-c5b34",
           storageBucket: "smartcharge-c5b34.firebasestorage.app",
@@ -27,17 +51,27 @@ void main() async {
           measurementId: "G-R35N994658",
         ),
       );
+      debugPrint('✅ Firebase WEB inizializzato');
     } else {
+      debugPrint('📱 Inizializzazione Firebase per MOBILE...');
       await Firebase.initializeApp();
+      debugPrint('✅ Firebase MOBILE inizializzato');
     }
-  } catch (e) {
-    debugPrint('Firebase Error: $e');
+  } catch (e, stack) {
+    debugPrint('❌ ERRORE Firebase: $e');
+    debugPrint('📍 Stack: $stack');
   }
 
+  // 4. Inizializzazione Localizzazione (Date)
+  await initializeDateFormatting('it_IT', null);
+
+  // 5. FIX NOTIFICHE: Chiamata corretta tramite istanza Singleton
   try {
-    await NotificationService().init();
+    final notificationService = NotificationService(); 
+    await notificationService.init(); 
+    debugPrint('🔔 NotificationService inizializzato correttamente');
   } catch (e) {
-    debugPrint('Notification Error: $e');
+    debugPrint('⚠️ Errore inizializzazione notifiche: $e');
   }
 
   runApp(const MyApp());
@@ -55,9 +89,16 @@ class MyApp extends StatelessWidget {
       ],
       child: MaterialApp(
         debugShowCheckedModeBanner: false,
-        theme: ThemeData.dark().copyWith(scaffoldBackgroundColor: Colors.black),
+        title: 'Smart Charge',
+        theme: ThemeData.dark().copyWith(
+          scaffoldBackgroundColor: Colors.black,
+          appBarTheme: const AppBarTheme(
+            backgroundColor: Colors.transparent,
+            elevation: 0,
+          ),
+        ),
         home: Consumer<AuthProvider>(
-          builder: (context, auth, child) {
+          builder: (_, auth, __) {
             return auth.isAuthenticated ? const HomePage() : const LoginPage();
           },
         ),
