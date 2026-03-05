@@ -90,8 +90,7 @@ class SimulationService {
     required double pwr,
     required double cap,
   }) {
-    debugPrint('🔄 restoreSimulation - currentSoc: $currentSoc, targetSoc: $targetSoc');
-    debugPrint('🔄 restoreSimulation - start: $startDateTime, end: $endDateTime');
+    debugPrint('🔄 restoreSimulation - ripristino stato');
     
     _hasNotifiedCompletion = false;
     scheduledStart = startDateTime;
@@ -101,14 +100,26 @@ class SimulationService {
     _power = pwr;
     _capacity = cap;
     
-    // Se l'orario di inizio è già passato, avvia subito la simulazione
-    if (DateTime.now().isAfter(startDateTime)) {
-      debugPrint('🔄 restoreSimulation - orario passato, avvio immediato');
+    final now = DateTime.now();
+
+    // 🔥 LOGICA DI RECUPERO IMMEDIATO
+    if (now.isAfter(startDateTime)) {
       _isSimulating = true;
       onStatusChange?.call(true);
+
+      // Calcoliamo subito dove dovrebbe essere il SOC ora
+      final totalSeconds = endDateTime.difference(startDateTime).inSeconds;
+      final elapsedSeconds = now.difference(startDateTime).inSeconds;
+
+      if (totalSeconds > 0) {
+        double progress = (elapsedSeconds / totalSeconds).clamp(0.0, 1.0);
+        double jumpedSoc = _currentSoc + ((_targetSoc - _currentSoc) * progress);
+        
+        // Comunichiamo subito il SOC ricalcolato al Provider
+        onSocUpdate?.call(jumpedSoc); 
+        debugPrint('🚀 Saltato al SOC ricalcolato: ${jumpedSoc.toStringAsFixed(2)}%');
+      }
     }
-    
-    debugPrint('🔄 Simulazione ripristinata');
   }
   
   void _startSimulation() {

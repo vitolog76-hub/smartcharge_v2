@@ -470,59 +470,44 @@ class HomeProvider extends ChangeNotifier {
   }
 
   Future<void> _loadSimulationProgress() async {
-  final prefs = await SharedPreferences.getInstance();
-  if (!(prefs.getBool(KEY_SIM_ACTIVE) ?? false)) return;
+    final prefs = await SharedPreferences.getInstance();
+    if (!(prefs.getBool(KEY_SIM_ACTIVE) ?? false)) return;
 
-  final startStr = prefs.getString(KEY_SIM_START);
-  final endStr = prefs.getString(KEY_SIM_END);
-  final savedSoc = prefs.getDouble(KEY_SIM_START_SOC);
+    final startStr = prefs.getString(KEY_SIM_START);
+    final endStr = prefs.getString(KEY_SIM_END);
+    final savedSoc = prefs.getDouble(KEY_SIM_START_SOC);
 
-  if (startStr != null && endStr != null && savedSoc != null) {
-    final start = DateTime.parse(startStr);
-    final end = DateTime.parse(endStr);
-    _socAtStartOfSim = savedSoc;
+    if (startStr != null && endStr != null && savedSoc != null) {
+      final start = DateTime.parse(startStr);
+      final end = DateTime.parse(endStr);
+      final now = DateTime.now();
+      _socAtStartOfSim = savedSoc;
 
-    // --- FIX: SE LA RICARICA È FINITA MENTRE L'APP ERA CHIUSA ---
-    if (DateTime.now().isAfter(end)) {
-      // 1. Portiamo il SOC al target (perché il tempo è scaduto)
-      currentSoc = targetSoc; 
-      
-      // 2. Calcoliamo i dati finali per "congelarli" nel Dialog
-      final kwh = ChargeEngine.calculateEnergy(_socAtStartOfSim, targetSoc, currentBatteryCap);
-      lastSavedEnergy = kwh;
-      lastSavedCost = CostCalculator.calculate(
-        totalKwh: kwh,
-        wallboxPower: wallboxPwr,
-        startTime: TimeOfDay.fromDateTime(start),
-        date: end, // Usiamo l'ora di fine prevista
-        contract: myContract,
-      );
-
-      // 3. Prepariamo lo stato per la HomePage
-      isSimulating = false;
-      _showCompletionDialog = true; // 🔥 Questo farà scattare il pop-up all'avvio!
-      
-      // 4. Puliamo i dati temporanei dal disco
-      await _clearSimulationProgress();
-      
+      // CASO A: Ricarica già finita mentre l'app era chiusa
+      if (now.isAfter(end)) {
+        currentSoc = targetSoc; 
+        _saveCompletedCharge(); 
+        _showCompletionDialog = true;
+        isSimulating = false;
+        await _clearSimulationProgress();
+      } 
+      // CASO B: Ricarica che doveva iniziare (o è già in corso)
+      else {
+        // Avviamo il ripristino. Il service ricalcolerà il SOC corretto
+        // sia che siamo nel mezzo della ricarica, sia che sia appena iniziata.
+        simService.restoreSimulation(
+          startDateTime: start, 
+          endDateTime: end, 
+          currentSoc: _socAtStartOfSim, 
+          targetSoc: targetSoc, 
+          pwr: wallboxPwr, 
+          cap: currentBatteryCap
+        );
+        isSimulating = true;
+      }
       notifyListeners();
-      return; 
     }
-    // --- FINE FIX ---
-
-    // Se invece è ancora in corso, ripristiniamo normalmente
-    simService.restoreSimulation(
-      startDateTime: start, 
-      endDateTime: end, 
-      currentSoc: _socAtStartOfSim, 
-      targetSoc: targetSoc, 
-      pwr: wallboxPwr, 
-      cap: currentBatteryCap
-    );
-    isSimulating = true;
-    notifyListeners();
   }
-}
 
   Future<void> _clearSimulationProgress() async {
     final prefs = await SharedPreferences.getInstance();
