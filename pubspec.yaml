@@ -8,6 +8,9 @@ environment:
 dependencies:
   flutter:
     sdk: flutter
+  flutter_local_notifications: ^17.0.0 # O l'ultima versione disponibile
+  timezone: ^0.9.4 # Necessario per programmare l'orario esatto
+
   
   # UI & Fonts
   google_fonts: ^6.1.0
@@ -44,8 +47,8 @@ dependencies:
   fluid_background: ^1.0.5
   
   # Notifiche & Permessi
-  flutter_local_notifications: ^17.1.0
-  timezone: ^0.9.2
+  
+  
   permission_handler: ^11.3.0
 
 dev_dependencies:

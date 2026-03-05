@@ -11,9 +11,10 @@ import 'package:flutter_dotenv/flutter_dotenv.dart';
 import 'package:flutter/foundation.dart' show kIsWeb;
 
 void main() async {
+  // 1. OBBLIGATORIO: Inizializza i legami con il sistema operativo
   WidgetsFlutterBinding.ensureInitialized();
   
-  // Carica .env da assets/
+  // 2. Carica .env da assets/
   try {
     await dotenv.load(fileName: "assets/.env");
     debugPrint('✅ .env caricato da assets/');
@@ -21,26 +22,21 @@ void main() async {
     debugPrint('📢 .env non trovato in assets/ (Normale in produzione)');
   }
 
+  // 3. Inizializzazione Firebase (Web e Mobile)
   try {
     if (kIsWeb) {
       debugPrint('🌐 Inizializzazione Firebase per WEB...');
       
-      // RECUPERO CHIAVE DINAMICO
       String firebaseApiKey = '';
-      
-      // 1. Prova da String.fromEnvironment (Passata durante il build)
       firebaseApiKey = const String.fromEnvironment('FIRESTORE_KEY');
 
-      // 2. Se vuota, prova dal file .env (Sviluppo locale o se caricato)
       if (firebaseApiKey.isEmpty && dotenv.isInitialized) {
         firebaseApiKey = dotenv.env['FIRESTORE_KEY'] ?? '';
       }
       
       if (firebaseApiKey.isEmpty) {
         debugPrint('❌ ERRORE: FIRESTORE_KEY non trovata!');
-        debugPrint('💡 Assicurati di aver impostato FIRESTORE_KEY su Vercel o nel file .env');
       } else {
-        // Stampa di controllo sicura
         debugPrint('🔑 Chiave caricata correttamente (inizia con: ${firebaseApiKey.substring(0, 6)})');
       }
       
@@ -66,8 +62,17 @@ void main() async {
     debugPrint('📍 Stack: $stack');
   }
 
+  // 4. Inizializzazione Localizzazione (Date)
   await initializeDateFormatting('it_IT', null);
-  await NotificationService().init();
+
+  // 5. FIX NOTIFICHE: Chiamata corretta tramite istanza Singleton
+  try {
+    final notificationService = NotificationService(); 
+    await notificationService.init(); 
+    debugPrint('🔔 NotificationService inizializzato correttamente');
+  } catch (e) {
+    debugPrint('⚠️ Errore inizializzazione notifiche: $e');
+  }
 
   runApp(const MyApp());
 }
