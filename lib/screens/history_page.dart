@@ -117,13 +117,25 @@ class _HistoryPageState extends State<HistoryPage> {
         _localHistory[index] = updatedSession;
       }
     });
+    
+    // 🔥 Salva la modifica nel Provider
+    final provider = Provider.of<HomeProvider>(context, listen: false);
+    provider.saveHistory(); 
+    provider.syncUserProfile(provider.globalUserName); // Questo scatena l'upload al cloud
+    
     widget.onHistoryChanged?.call(_localHistory);
   }
 
   void _onDeleteSessionById(String sessionId) {
+    // 1. Aggiorna l'interfaccia locale subito per fluidità
     setState(() {
       _localHistory.removeWhere((session) => session.id == sessionId);
     });
+
+    // 2. 🔥 COMANDO CRUCIALE: Dice al Provider di cancellare ovunque (Disco e Cloud)
+    Provider.of<HomeProvider>(context, listen: false).deleteChargeSession(sessionId);
+
+    // 3. Notifica il cambiamento se necessario
     widget.onHistoryChanged?.call(_localHistory);
   }
 

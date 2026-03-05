@@ -10,6 +10,7 @@ import 'package:smartcharge_v2/services/cost_calculator.dart';
 import 'package:smartcharge_v2/services/simulation_service.dart';
 import 'package:smartcharge_v2/services/sync_service.dart';
 import 'package:intl/intl.dart';
+import 'package:smartcharge_v2/services/notification_service.dart';
 
 class HomeProvider extends ChangeNotifier {
   // --- STATO ---
@@ -215,30 +216,44 @@ class HomeProvider extends ChangeNotifier {
 
   // --- AZIONI SIMULAZIONE ---
   void startSimulation() {
-    _clearSimulationProgress().then((_) {
-      _socAtStartOfSim = currentSoc.roundToDouble();
-      currentSoc = _socAtStartOfSim;
-      
-      DateTime startTime = calculatedStartDateTime;
-      final now = DateTime.now();
+  _clearSimulationProgress().then((_) {
+    // ... tua logica SOC esistente ...
+    
+    DateTime startTime = calculatedStartDateTime;
+    final now = DateTime.now();
+    if (startTime.isBefore(now)) startTime = now;
 
-      if (startTime.isBefore(now)) {
-        startTime = now;
-      }
+    // 1. Avvia la simulazione logica
+    simService.initSimulation(
+      startDateTime: startTime,
+      currentSoc: _socAtStartOfSim,
+      targetSoc: targetSoc,
+      pwr: wallboxPwr,
+      cap: currentBatteryCap,
+    );
 
-      simService.initSimulation(
-        startDateTime: startTime,
-        currentSoc: _socAtStartOfSim,
-        targetSoc: targetSoc,
-        pwr: wallboxPwr,
-        cap: currentBatteryCap,
-      );
+    // 🔥 2. NOTIFICHE REALI
+    // Notifica immediata: "Ricarica Iniziata"
+    NotificationService().showChargingStartedNotification(
+      socIniziale: currentSoc,
+      socTarget: targetSoc,
+      startTime: startTime,
+    );
 
-      isSimulating = true;
-      _saveSimulationProgress();
-      notifyListeners();
-    });
-  }
+    // Notifica programmata: "Ricarica Completata"
+    NotificationService().scheduleChargingComplete(
+      id: 999, // Un ID univoco per la sessione
+      completionTime: simService.endTime ?? now.add(duration),
+      socFinale: targetSoc,
+      energia: energyNeeded,
+      durata: duration,
+    );
+
+    isSimulating = true;
+    _saveSimulationProgress();
+    notifyListeners();
+  });
+}
 
   Future<void> loadBatteryConfig() async {
     final prefs = await SharedPreferences.getInstance();
@@ -248,8 +263,11 @@ class HomeProvider extends ChangeNotifier {
 
   void stopSimulation() {
   simService.stopSimulation();
+  
+  // 🔥 Cancella la notifica programmata se l'utente interrompe la carica
+  NotificationService().cancelAllNotifications(); 
+  
   isSimulating = false;
-  // _saveCompletedCharge(); <--- SE C'È QUESTA RIGA, CANCELLALA!
   _clearSimulationProgress();
   _saveSimulationParameters();
   notifyListeners();
@@ -269,83 +287,86 @@ class HomeProvider extends ChangeNotifier {
   }
 
   void _saveCompletedCharge() {
-  // 1. CATTURA IMMEDIATA DEI DATI (Prima che vengano azzerati)
-  final now = DateTime.now();
-  final double socIniziale = _socAtStartOfSim;
-  final double socFinale = currentSoc;
-  final double capacita = currentBatteryCap;
-  
-  // Calcolo energia effettiva
-  final kwhEfettivi = ChargeEngine.calculateEnergy(socIniziale, socFinale, capacita);
-  
-  // PROTEZIONE DOPPIO SALVATAGGIO: 
-  // Se l'energia è quasi nulla o il SOC non è cambiato, ignoriamo.
-  if (kwhEfettivi <= 0.01) {
-    print("DEBUG: Ricarica nulla o già salvata. Ignoro.");
-    return;
-  }
+    final now = DateTime.now();
+    final double socIniziale = _socAtStartOfSim;
+    final double socFinale = currentSoc;
+    final double capacita = currentBatteryCap;
+    final kwhEfettivi = ChargeEngine.calculateEnergy(socIniziale, socFinale, capacita);
+    
+    // BLOCCO 1: Se l'energia è zero, esci immediatamente
+    if (kwhEfettivi <= 0.05) return;
 
-  // 2. RECUPERO CONTRATTO ATTIVO
-  final contrattoAttivo = myContract;
+    // BLOCCO 2: Il Lucchetto Anti-Doppio (Se salvato negli ultimi 30 secondi, esci)
+    if (chargeHistory.isNotEmpty) {
+      final last = chargeHistory.last;
+      bool stessaOra = now.difference(last.date).inSeconds.abs() < 30;
+      bool stessoSoc = (last.endSoc - socFinale).abs() < 0.1;
+      if (stessaOra && stessoSoc) {
+        debugPrint("🚫 DOPPIONE BLOCCATO");
+        return; 
+      }
+    }
 
-  // 3. CALCOLO COSTO REALE
-  final costoCalcolato = CostCalculator.calculate(
-    totalKwh: kwhEfettivi,
-    wallboxPower: wallboxPwr,
-    startTime: TimeOfDay.fromDateTime(simService.scheduledStart ?? now),
-    date: now,
-    contract: contrattoAttivo,
-  );
-
-  // 4. CREAZIONE SESSIONE PER CRONOLOGIA
-  final session = ChargeSession(
-    id: "CHG_${DateTime.now().millisecondsSinceEpoch}", 
-    date: now,
-    startDateTime: simService.scheduledStart ?? now,
-    endDateTime: now,
-    startSoc: socIniziale,
-    endSoc: socFinale,
-    kwh: kwhEfettivi,
-    cost: costoCalcolato,
-    location: "Home",
-    carBrand: selectedCar.brand,
-    carModel: selectedCar.model,
-    contractId: activeContractId,
-    wallboxPower: wallboxPwr,
-    fascia: CostCalculator.getFasciaLabel(
+    final contrattoAttivo = myContract;
+    final costoCalcolato = CostCalculator.calculate(
       totalKwh: kwhEfettivi,
       wallboxPower: wallboxPwr,
       startTime: TimeOfDay.fromDateTime(simService.scheduledStart ?? now),
       date: now,
-      isMonorario: contrattoAttivo.isMonorario,
-    ),
-    f1PriceAtTime: contrattoAttivo.f1Price,
-    f2PriceAtTime: contrattoAttivo.f2Price,
-    f3PriceAtTime: contrattoAttivo.f3Price,
-  );
-  
-  // 5. SALVATAGGIO IN CRONOLOGIA
-  chargeHistory.add(session);
-  saveHistory();
-  _syncHistoryIfPossible();
+      contract: contrattoAttivo,
+    );
 
-  // 🔥 6. AGGIORNAMENTO VARIABILI PER IL DIALOG (UI)
-  // Queste variabili "congelano" il risultato per mostrarlo nel popup finale
-  lastSavedEnergy = kwhEfettivi;
-  lastSavedCost = costoCalcolato;
+    final session = ChargeSession(
+      id: "CHG_${now.millisecondsSinceEpoch}", 
+      date: now,
+      startDateTime: simService.scheduledStart ?? now,
+      endDateTime: now,
+      startSoc: socIniziale,
+      endSoc: socFinale,
+      kwh: kwhEfettivi,
+      cost: costoCalcolato,
+      location: "Home",
+      carBrand: selectedCar.brand,
+      carModel: selectedCar.model,
+      contractId: activeContractId,
+      wallboxPower: wallboxPwr,
+      fascia: CostCalculator.getFasciaLabel(
+        totalKwh: kwhEfettivi,
+        wallboxPower: wallboxPwr,
+        startTime: TimeOfDay.fromDateTime(simService.scheduledStart ?? now),
+        date: now,
+        isMonorario: contrattoAttivo.isMonorario,
+      ),
+      f1PriceAtTime: contrattoAttivo.f1Price,
+      f2PriceAtTime: contrattoAttivo.f2Price,
+      f3PriceAtTime: contrattoAttivo.f3Price,
+    );
+    
+    chargeHistory.add(session);
+    saveHistory(); 
+    _syncHistoryIfPossible();
 
-  // 7. RESET STATO INTERNO
-  // Impedisce salvataggi multipli se il metodo viene richiamato per errore
-  _socAtStartOfSim = currentSoc; 
-  
-  print("DEBUG SALVATAGGIO: $kwhEfettivi kWh salvati al costo di $costoCalcolato €");
-  
-  notifyListeners();
-}
+    lastSavedEnergy = kwhEfettivi;
+    lastSavedCost = costoCalcolato;
+    _socAtStartOfSim = currentSoc; 
+    
+    notifyListeners();
+  }
   // --- PERSISTENZA E SYNC ---
   Future<void> saveHistory() async {
     final prefs = await SharedPreferences.getInstance();
     await prefs.setString('charge_history', jsonEncode(chargeHistory.map((s) => s.toJson()).toList()));
+  }
+
+  void deleteChargeSession(String id) async {
+    // 1. Toglie dalla lista
+    chargeHistory.removeWhere((s) => s.id == id);
+    // 2. Aggiorna il file locale subito
+    await saveHistory();
+    // 3. Aggiorna il Cloud subito (sovrascrive con la lista pulita)
+    await _syncHistoryIfPossible();
+    
+    notifyListeners();
   }
 
   Future<void> _syncHistoryIfPossible() async {
@@ -575,13 +596,12 @@ class HomeProvider extends ChangeNotifier {
     if (data['history'] != null) {
       List<dynamic> cloudList = data['history'];
       List<ChargeSession> cloudSessions = cloudList.map((e) => ChargeSession.fromJson(e)).toList();
-      for (var session in cloudSessions) {
-        if (!chargeHistory.any((s) => s.id == session.id)) {
-          chargeHistory.add(session);
-          hasChanged = true;
-        }
-      }
+      
+      // SOSTITUZIONE TOTALE: La lista locale diventa IDENTICA a quella del Cloud.
+      // Se nel cloud non c'è (perché cancellata), non apparirà più qui.
+      chargeHistory = cloudSessions;
       chargeHistory.sort((a, b) => b.date.compareTo(a.date));
+      hasChanged = true;
     }
 
     if (hasChanged) {
