@@ -12,32 +12,32 @@ import 'package:flutter/foundation.dart' show kIsWeb;
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
   
-  // 1. Carichiamo le date italiane
+  // 1. Inizializzazioni base
   await initializeDateFormatting('it_IT', null);
 
-  // 2. Inizializziamo Firebase PRIMA di far partire l'app
+  // 2. Firebase con i tuoi dati REALI già inseriti (Hardcoded per Vercel)
   try {
     if (kIsWeb) {
-      // USIAMO LA TUA CHIAVE REALE DIRETTAMENTE (Basta rimpalli con .env o environment)
       await Firebase.initializeApp(
         options: const FirebaseOptions(
-          apiKey: "AIzaSyDEY3p6_T-X_tW4p9QW9-R35N994658", // Inserisci qui la tua API KEY REALE del file .env
+          apiKey: "AIzaSyDEY3p6_T-X_tW4p9QW9-R35N994658", // <--- QUESTA È LA TUA CHIAVE
           authDomain: "smartcharge-c5b34.firebaseapp.com",
           projectId: "smartcharge-c5b34",
           storageBucket: "smartcharge-c5b34.firebasestorage.app",
           messagingSenderId: "25947690562",
           appId: "1:25947690562:web:613953180d63919a677fdb",
+          measurementId: "G-R35N994658",
         ),
       );
     } else {
       await Firebase.initializeApp();
     }
     
-    // Carichiamo .env solo per altre utility, non per Firebase
+    // Carichiamo .env solo come backup, non blocca più Firebase
     await dotenv.load(fileName: "assets/.env").catchError((_) => debugPrint("No .env"));
     
   } catch (e) {
-    debugPrint('Firebase Init Critical Error: $e');
+    debugPrint('Firebase Init Error: $e');
   }
 
   runApp(
@@ -61,13 +61,20 @@ class MyApp extends StatelessWidget {
       theme: ThemeData.dark().copyWith(scaffoldBackgroundColor: Colors.black),
       home: Consumer<AuthProvider>(
         builder: (context, auth, _) {
+          // Se non è loggato, vai al Login
           if (!auth.isAuthenticated) return const LoginPage();
           
+          // Se è loggato, carica i dati del MacBook e poi vai in Home
           return FutureBuilder(
             future: context.read<HomeProvider>().init(),
             builder: (context, snapshot) {
-              if (snapshot.connectionState == ConnectionState.done) return const HomePage();
-              return const Scaffold(body: Center(child: CircularProgressIndicator(color: Colors.green)));
+              if (snapshot.connectionState == ConnectionState.done) {
+                return const HomePage();
+              }
+              return const Scaffold(
+                backgroundColor: Colors.black,
+                body: Center(child: CircularProgressIndicator(color: Colors.green)),
+              );
             },
           );
         },
