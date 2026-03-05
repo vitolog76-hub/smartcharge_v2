@@ -34,12 +34,13 @@ class SyncService {
 
       // 🔥 SALVATAGGIO STRUTTURATO: Il nome è al livello dell'ID, non del contratto
       await _db.collection("users").doc(userId).collection("versions").doc("v2").set({
-            'lastUpdate': FieldValue.serverTimestamp(),
-            'globalUserName': userName,           // <--- NOME PROFILO (Legato all'ID)
-            'history': historyMap,                // <--- CRONOLOGIA
-            'allContracts': contractsMap,         // <--- LISTA TARIFFE (Dati Tecnici)
-            'activeContractId': activeContractId, // <--- QUALE TARIFFA È ATTIVA
-          }, SetOptions(merge: true));
+      // Usa i millisecondi del dispositivo per un confronto diretto con SharedPreferences
+      'lastUpdate': DateTime.now().millisecondsSinceEpoch, 
+      'globalUserName': userName,
+      'history': historyMap,
+      'allContracts': contractsMap,
+      'activeContractId': activeContractId,
+    }); // Niente merge = Pulizia totale
 
       print("✅ SYNC OK: Utente [$userName] aggiornato su Cloud con ID: $userId");
     } catch (e) {

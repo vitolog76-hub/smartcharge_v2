@@ -144,24 +144,38 @@ class HomeProvider extends ChangeNotifier {
 
   // --- INIZIALIZZAZIONE ---
   Future<void> init() async {
+    // 1. CARICA TUTTO DAL MACBOOK (Locale - Istantaneo)
     await _loadCarsFromJson();
-    await _loadContract(); // Questo ora carica anche il Nome Profilo
+    await _loadContract(); 
     await _loadHistory(); 
     await _loadSimulationParameters(); 
     await _loadSimulationProgress();
     await loadBatteryConfig();
 
+    // 2. MOSTRA SUBITO LA HOME (Rimuove lo schermo bianco)
+    notifyListeners();
+
+    // 3. AGGIORNA DAL CLOUD IN BACKGROUND (Senza bloccare l'app)
+    _syncFromCloudBackground();
+  }
+
+  // Aggiungi questa funzione subito sotto l'init
+  Future<void> _syncFromCloudBackground() async {
     final prefs = await SharedPreferences.getInstance();
     final userId = prefs.getString('user_sync_id');
     
     if (userId != null && userId.isNotEmpty) {
-      final cloudData = await SyncService().downloadAllData(userId);
-      if (cloudData != null) {
-        _updateFromDownload(cloudData);
+      try {
+        // Scarichiamo i dati, ma l'utente sta già usando l'app
+        final cloudData = await SyncService().downloadAllData(userId);
+        if (cloudData != null) {
+          _updateFromDownload(cloudData);
+          notifyListeners(); // Aggiorna i dati solo quando arrivano
+        }
+      } catch (e) {
+        debugPrint("☁️ Errore download in background: $e");
       }
     }
-
-    notifyListeners();
   }
 
   
@@ -356,6 +370,7 @@ class HomeProvider extends ChangeNotifier {
   Future<void> saveHistory() async {
     final prefs = await SharedPreferences.getInstance();
     await prefs.setString('charge_history', jsonEncode(chargeHistory.map((s) => s.toJson()).toList()));
+    await prefs.setInt('last_local_update', DateTime.now().millisecondsSinceEpoch);
   }
 
   void deleteChargeSession(String id) async {
@@ -562,38 +577,53 @@ class HomeProvider extends ChangeNotifier {
   }
   
   // --- SYNC DOWNLOAD ---
-  void _updateFromDownload(Map<String, dynamic> data) {
-    bool hasChanged = false;
-
-    // 🔥 Recupero Nome Utente Globale dal Cloud
-    if (data['globalUserName'] != null) {
-      _globalUserName = data['globalUserName'];
-      hasChanged = true;
-    }
-
-    if (data['allContracts'] != null) {
-      List<dynamic> cloudList = data['allContracts'];
-      allContracts = cloudList.map((item) => EnergyContract.fromJson(item)).toList();
-      activeContractId = data['activeContractId'] ?? allContracts.first.id;
-      hasChanged = true;
-    } 
-
-    if (data['history'] != null) {
-      List<dynamic> cloudList = data['history'];
-      List<ChargeSession> cloudSessions = cloudList.map((e) => ChargeSession.fromJson(e)).toList();
-      
-      // SOSTITUZIONE TOTALE: La lista locale diventa IDENTICA a quella del Cloud.
-      // Se nel cloud non c'è (perché cancellata), non apparirà più qui.
-      chargeHistory = cloudSessions;
-      chargeHistory.sort((a, b) => b.date.compareTo(a.date));
-      hasChanged = true;
-    }
-
-    if (hasChanged) {
-      saveHistory();
-      saveAllContracts();
-    }
+  void _updateFromDownload(Map<String, dynamic> data) async {
+  final prefs = await SharedPreferences.getInstance();
+  
+  // 1. Prendi il timestamp dell'ultima modifica fatta su questo MacBook
+  int localTS = prefs.getInt('last_local_update') ?? 0;
+  
+  // 2. Prendi il timestamp dal Cloud (Firestore lo manda in 'lastUpdate')
+  int cloudTS = 0;
+  var cloudRaw = data['lastUpdate'];
+  if (cloudRaw is int) cloudTS = cloudRaw;
+  // Se è un Timestamp di Firebase (comune in v2)
+  else if (cloudRaw != null && cloudRaw.runtimeType.toString().contains('Timestamp')) {
+    cloudTS = cloudRaw.millisecondsSinceEpoch;
   }
+
+  // 🔥 LOGICA DI FERRO:
+  // Se il MacBook è più "giovane" (TS più alto) del Cloud, il Cloud è vecchio.
+  // NON scarichiamo la history, altrimenti perdiamo le ricariche nuove o riprendiamo quelle cancellate.
+  if (localTS > cloudTS) {
+    debugPrint("⏳ MacBook più recente ($localTS) del Cloud ($cloudTS). Salto download history.");
+    // Aggiorniamo solo il nome se presente, ma non tocchiamo i dati sensibili
+    if (data['globalUserName'] != null) _globalUserName = data['globalUserName'];
+    notifyListeners();
+    return; 
+  }
+
+  // SE ARRIVIAMO QUI: Il Cloud è più recente o uguale. Possiamo aggiornare.
+  bool hasChanged = false;
+
+  if (data['globalUserName'] != null) {
+    _globalUserName = data['globalUserName'];
+    hasChanged = true;
+  }
+
+  if (data['history'] != null) {
+    List<dynamic> cloudList = data['history'];
+    chargeHistory = cloudList.map((e) => ChargeSession.fromJson(e)).toList();
+    chargeHistory.sort((a, b) => b.date.compareTo(a.date));
+    hasChanged = true;
+  }
+
+  if (hasChanged) {
+    // Salviamo in locale, ma SENZA aggiornare il timestamp (perché è un dato che arriva da fuori)
+    await prefs.setString('charge_history', jsonEncode(chargeHistory.map((s) => s.toJson()).toList()));
+    notifyListeners();
+  }
+}
 
   void selectCar(CarModel c) { selectedCar = c; capacityController.text = c.batteryCapacity.toString(); _saveSimulationParameters(); notifyListeners(); }
   void updateReadyTime(TimeOfDay t) { readyTime = t; _saveSimulationParameters(); notifyListeners(); }
