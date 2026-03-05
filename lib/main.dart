@@ -6,21 +6,19 @@ import 'package:smartcharge_v2/providers/auth_provider.dart';
 import 'package:smartcharge_v2/providers/home_provider.dart';
 import 'package:smartcharge_v2/screens/login_page.dart';
 import 'package:smartcharge_v2/screens/home_page.dart';
-import 'package:flutter_dotenv/flutter_dotenv.dart';
+import 'package:smartcharge_v2/services/notification_service.dart';
 import 'package:flutter/foundation.dart' show kIsWeb;
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
   
-  // 1. Inizializzazioni base
   await initializeDateFormatting('it_IT', null);
 
-  // 2. Firebase con i tuoi dati REALI già inseriti (Hardcoded per Vercel)
   try {
     if (kIsWeb) {
       await Firebase.initializeApp(
         options: const FirebaseOptions(
-          apiKey: "AIzaSyDEY3p6_T-X_tW4p9QW9-R35N994658", // <--- QUESTA È LA TUA CHIAVE
+          apiKey: "AIzaSyDEY3p6_T-X_tW4p9QW9-R35N994658",
           authDomain: "smartcharge-c5b34.firebaseapp.com",
           projectId: "smartcharge-c5b34",
           storageBucket: "smartcharge-c5b34.firebasestorage.app",
@@ -32,23 +30,17 @@ void main() async {
     } else {
       await Firebase.initializeApp();
     }
-    
-    // Carichiamo .env solo come backup, non blocca più Firebase
-    await dotenv.load(fileName: "assets/.env").catchError((_) => debugPrint("No .env"));
-    
   } catch (e) {
-    debugPrint('Firebase Init Error: $e');
+    debugPrint('Firebase Error: $e');
   }
 
-  runApp(
-    MultiProvider(
-      providers: [
-        ChangeNotifierProvider(create: (_) => AuthProvider()),
-        ChangeNotifierProvider(create: (_) => HomeProvider()),
-      ],
-      child: const MyApp(),
-    ),
-  );
+  try {
+    await NotificationService().init();
+  } catch (e) {
+    debugPrint('Notification Error: $e');
+  }
+
+  runApp(const MyApp());
 }
 
 class MyApp extends StatelessWidget {
@@ -56,28 +48,19 @@ class MyApp extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return MaterialApp(
-      debugShowCheckedModeBanner: false,
-      theme: ThemeData.dark().copyWith(scaffoldBackgroundColor: Colors.black),
-      home: Consumer<AuthProvider>(
-        builder: (context, auth, _) {
-          // Se non è loggato, vai al Login
-          if (!auth.isAuthenticated) return const LoginPage();
-          
-          // Se è loggato, carica i dati del MacBook e poi vai in Home
-          return FutureBuilder(
-            future: context.read<HomeProvider>().init(),
-            builder: (context, snapshot) {
-              if (snapshot.connectionState == ConnectionState.done) {
-                return const HomePage();
-              }
-              return const Scaffold(
-                backgroundColor: Colors.black,
-                body: Center(child: CircularProgressIndicator(color: Colors.green)),
-              );
-            },
-          );
-        },
+    return MultiProvider(
+      providers: [
+        ChangeNotifierProvider(create: (_) => AuthProvider()),
+        ChangeNotifierProvider(create: (_) => HomeProvider()..init()),
+      ],
+      child: MaterialApp(
+        debugShowCheckedModeBanner: false,
+        theme: ThemeData.dark().copyWith(scaffoldBackgroundColor: Colors.black),
+        home: Consumer<AuthProvider>(
+          builder: (context, auth, child) {
+            return auth.isAuthenticated ? const HomePage() : const LoginPage();
+          },
+        ),
       ),
     );
   }
