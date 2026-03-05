@@ -11,33 +11,17 @@ import 'package:flutter_dotenv/flutter_dotenv.dart';
 import 'package:flutter/foundation.dart' show kIsWeb;
 
 void main() async {
-  // 1. OBBLIGATORIO: Inizializza i legami con il sistema operativo
   WidgetsFlutterBinding.ensureInitialized();
   
-  // 2. Carica .env da assets/
+  // Avviamo le inizializzazioni pesanti
   try {
     await dotenv.load(fileName: "assets/.env");
-    debugPrint('✅ .env caricato da assets/');
-  } catch (e) {
-    debugPrint('📢 .env non trovato in assets/ (Normale in produzione)');
-  }
-
-  // 3. Inizializzazione Firebase (Web e Mobile)
-  try {
+    await initializeDateFormatting('it_IT', null);
+    
     if (kIsWeb) {
-      debugPrint('🌐 Inizializzazione Firebase per WEB...');
-      
-      String firebaseApiKey = '';
-      firebaseApiKey = const String.fromEnvironment('FIRESTORE_KEY');
-
+      String firebaseApiKey = const String.fromEnvironment('FIRESTORE_KEY');
       if (firebaseApiKey.isEmpty && dotenv.isInitialized) {
         firebaseApiKey = dotenv.env['FIRESTORE_KEY'] ?? '';
-      }
-      
-      if (firebaseApiKey.isEmpty) {
-        debugPrint('❌ ERRORE: FIRESTORE_KEY non trovata!');
-      } else {
-        debugPrint('🔑 Chiave caricata correttamente (inizia con: ${firebaseApiKey.substring(0, 6)})');
       }
       
       await Firebase.initializeApp(
@@ -51,27 +35,14 @@ void main() async {
           measurementId: "G-R35N994658",
         ),
       );
-      debugPrint('✅ Firebase WEB inizializzato');
     } else {
-      debugPrint('📱 Inizializzazione Firebase per MOBILE...');
       await Firebase.initializeApp();
-      debugPrint('✅ Firebase MOBILE inizializzato');
     }
-  } catch (e, stack) {
-    debugPrint('❌ ERRORE Firebase: $e');
-    debugPrint('📍 Stack: $stack');
-  }
 
-  // 4. Inizializzazione Localizzazione (Date)
-  await initializeDateFormatting('it_IT', null);
-
-  // 5. FIX NOTIFICHE: Chiamata corretta tramite istanza Singleton
-  try {
     final notificationService = NotificationService(); 
     await notificationService.init(); 
-    debugPrint('🔔 NotificationService inizializzato correttamente');
   } catch (e) {
-    debugPrint('⚠️ Errore inizializzazione notifiche: $e');
+    debugPrint('⚠️ Errore inizializzazione: $e');
   }
 
   runApp(const MyApp());
@@ -85,7 +56,8 @@ class MyApp extends StatelessWidget {
     return MultiProvider(
       providers: [
         ChangeNotifierProvider(create: (_) => AuthProvider()),
-        ChangeNotifierProvider(create: (_) => HomeProvider()..init()),
+        // Rimosso ..init() da qui per evitare blocchi all'avvio
+        ChangeNotifierProvider(create: (_) => HomeProvider()),
       ],
       child: MaterialApp(
         debugShowCheckedModeBanner: false,
@@ -97,12 +69,37 @@ class MyApp extends StatelessWidget {
             elevation: 0,
           ),
         ),
-        home: Consumer<AuthProvider>(
-          builder: (_, auth, __) {
-            return auth.isAuthenticated ? const HomePage() : const LoginPage();
-          },
-        ),
+        // Usiamo AppWrapper per gestire l'inizializzazione del Provider senza bloccare la UI
+        home: const AppWrapper(),
       ),
+    );
+  }
+}
+
+// Questo Widget gestisce il passaggio tra Login e Home e lancia l'init()
+class AppWrapper extends StatefulWidget {
+  const AppWrapper({super.key});
+
+  @override
+  State<AppWrapper> createState() => _AppWrapperState();
+}
+
+class _AppWrapperState extends State<AppWrapper> {
+  @override
+  void initState() {
+    super.initState();
+    // Esegue l'init del HomeProvider subito dopo il primo frame disegnato
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      context.read<HomeProvider>().init();
+    });
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Consumer<AuthProvider>(
+      builder: (_, auth, __) {
+        return auth.isAuthenticated ? const HomePage() : const LoginPage();
+      },
     );
   }
 }
