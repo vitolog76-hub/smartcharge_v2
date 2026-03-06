@@ -181,6 +181,80 @@ class HomeProvider extends ChangeNotifier {
   _startBackgroundSync(); 
 }
 
+void _recuperaRicaricaTerminataOffline(DateTime inizioReale, DateTime end) {
+  debugPrint("🔄 Eseguo recupero offline in post-init...");
+  
+  try {
+    // Verifica che i dati necessari siano disponibili
+    if (selectedCar.batteryCapacity <= 0) {
+      debugPrint("⚠️ Dati auto non ancora caricati, impossibile recuperare");
+      return;
+    }
+    
+    final double kwhEffettivi = ChargeEngine.calculateEnergy(
+      _socAtStartOfSim, 
+      targetSoc, 
+      currentBatteryCap
+    );
+    
+    final double costoCalcolato = CostCalculator.calculate(
+      totalKwh: kwhEffettivi,
+      wallboxPower: wallboxPwr,
+      startTime: TimeOfDay.fromDateTime(inizioReale),
+      date: DateTime.now(),
+      contract: myContract,
+    );
+
+    final session = ChargeSession(
+      id: "CHG_${DateTime.now().millisecondsSinceEpoch}", 
+      date: DateTime.now(),
+      startDateTime: inizioReale,
+      endDateTime: DateTime.now(),
+      startSoc: _socAtStartOfSim,
+      endSoc: targetSoc,
+      kwh: kwhEffettivi,
+      cost: costoCalcolato,
+      location: "Home",
+      carBrand: selectedCar.brand,
+      carModel: selectedCar.model,
+      contractId: activeContractId,
+      wallboxPower: wallboxPwr,
+      fascia: CostCalculator.getFasciaLabel(
+        totalKwh: kwhEffettivi,
+        wallboxPower: wallboxPwr,
+        startTime: TimeOfDay.fromDateTime(inizioReale),
+        date: DateTime.now(),
+        isMonorario: myContract.isMonorario,
+      ),
+      f1PriceAtTime: myContract.f1Price,
+      f2PriceAtTime: myContract.f2Price,
+      f3PriceAtTime: myContract.f3Price,
+    );
+    
+    // Aggiorna UI
+    chargeHistory.add(session);
+    saveHistory(); // Fire and forget - non bloccare
+    
+    currentSoc = targetSoc;
+    lastSavedEnergy = kwhEffettivi;
+    lastSavedCost = costoCalcolato;
+    _showCompletionDialog = true;
+    
+    // Mostra notifica
+    NotificationService().showChargingCompleteNotification(
+      socFinale: targetSoc,
+      energia: kwhEffettivi,
+      durata: end.difference(inizioReale),
+    );
+    
+    notifyListeners();
+    
+    debugPrint("✅ Recupero offline completato con successo");
+  } catch (e) {
+    debugPrint("❌ Errore nel recupero offline: $e");
+  }
+}
+
 // Modifica questa funzione così per essere più sicuri
 void _startBackgroundSync() {
   debugPrint("☁️ Sync Cloud in corso... controllo se sovrascrive il SoC");
@@ -548,105 +622,74 @@ void _startBackgroundSync() {
   final String? endStr = prefs.getString(KEY_SIM_END);
   final double? savedStartSoc = prefs.getDouble(KEY_SIM_START_SOC);
   
+  if (startStr == null || endStr == null || savedStartSoc == null) {
+    debugPrint("⚠️ Dati simulazione incompleti, pulisco...");
+    await _clearSimulationProgress();
+    return;
+  }
+
+  final start = DateTime.parse(startStr);
+  final end = DateTime.parse(endStr);
+  final now = DateTime.now();
+  
   // 🔥 RECUPERA I DATI CONGELATI
   final double? socInizialeCongelato = prefs.getDouble(KEY_SOC_INIZIALE_CONGELATO);
   final int? timestampInizioCongelato = prefs.getInt(KEY_TIMESTAMP_INIZIO_CONGELATO);
+  
+  // 🔥 USA I DATI CONGELATI SE DISPONIBILI, ALTRIMENTI QUELLI NORMALI
+  _socAtStartOfSim = socInizialeCongelato ?? savedStartSoc;
+  final DateTime inizioReale = timestampInizioCongelato != null 
+      ? DateTime.fromMillisecondsSinceEpoch(timestampInizioCongelato)
+      : start;
 
-  if (startStr != null && endStr != null && savedStartSoc != null) {
-    final start = DateTime.parse(startStr);
-    final end = DateTime.parse(endStr);
-    final now = DateTime.now();
+  // CASO A: La ricarica è finita mentre l'app era chiusa
+  if (now.isAfter(end)) {
+    debugPrint("🏁 Carica terminata offline. Pianifico salvataggio post-init...");
     
-    // 🔥 USA I DATI CONGELATI SE DISPONIBILI, ALTRIMENTI QUELLI NORMALI
-    _socAtStartOfSim = socInizialeCongelato ?? savedStartSoc;
-    final DateTime inizioReale = timestampInizioCongelato != null 
-        ? DateTime.fromMillisecondsSinceEpoch(timestampInizioCongelato)
-        : start;
-
-    // CASO A: La ricarica è finita mentre l'app era chiusa
-    if (now.isAfter(end)) {
-      debugPrint("🏁 Carica terminata offline. Forzo salvataggio...");
-      
-      // 🔥 FORZA IL SALVATAGGIO USANDO I DATI CONGELATI
-      currentSoc = targetSoc;
-      
-      // Crea la sessione usando i dati congelati
-      final double kwhEfettivi = ChargeEngine.calculateEnergy(
-        _socAtStartOfSim, 
-        targetSoc, 
-        currentBatteryCap
-      );
-      
-      final double costoCalcolato = CostCalculator.calculate(
-        totalKwh: kwhEfettivi,
-        wallboxPower: wallboxPwr,
-        startTime: TimeOfDay.fromDateTime(inizioReale),
-        date: now,
-        contract: myContract,
-      );
-
-      final session = ChargeSession(
-        id: "CHG_${now.millisecondsSinceEpoch}", 
-        date: now,
-        startDateTime: inizioReale,
-        endDateTime: now,
-        startSoc: _socAtStartOfSim,
-        endSoc: targetSoc,
-        kwh: kwhEfettivi,
-        cost: costoCalcolato,
-        location: "Home",
-        carBrand: selectedCar.brand,
-        carModel: selectedCar.model,
-        contractId: activeContractId,
-        wallboxPower: wallboxPwr,
-        fascia: CostCalculator.getFasciaLabel(
-          totalKwh: kwhEfettivi,
-          wallboxPower: wallboxPwr,
-          startTime: TimeOfDay.fromDateTime(inizioReale),
-          date: now,
-          isMonorario: myContract.isMonorario,
-        ),
-        f1PriceAtTime: myContract.f1Price,
-        f2PriceAtTime: myContract.f2Price,
-        f3PriceAtTime: myContract.f3Price,
-      );
-      
-      // Salva la sessione
-      chargeHistory.add(session);
-      await saveHistory();
-      
-      // 🔥 MOSTRA NOTIFICA
-      NotificationService().showChargingCompleteNotification(
-        socFinale: targetSoc,
-        energia: kwhEfettivi,
-        durata: end.difference(inizioReale),
-      );
-      
-      // Aggiorna UI
-      _showCompletionDialog = true;
-      isSimulating = false;
-      await _clearSimulationProgress();
-      
-      // Pulisci i dati congelati
-      await prefs.remove(KEY_SOC_INIZIALE_CONGELATO);
-      await prefs.remove(KEY_TIMESTAMP_INIZIO_CONGELATO);
-      
-      notifyListeners();
-    } 
-    // CASO B: La ricarica è ancora in corso
-    else {
-      debugPrint("⚡ Ripristino simulazione attiva...");
+    // NON fare nulla ora - aspetta che l'UI sia pronta
+    // Pianifichiamo il salvataggio per DOPO che l'init è completo
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      _recuperaRicaricaTerminataOffline(inizioReale, end);
+    });
+    
+    // Nel frattempo, resetta lo stato per evitare blocchi
+    isSimulating = false;
+    await _clearSimulationProgress();
+    notifyListeners();
+  } 
+  // CASO B: La ricarica è ancora in corso
+  else {
+    debugPrint("⚡ Ripristino simulazione attiva...");
+    
+    // Assicuriamoci che i dati necessari siano pronti
+    if (selectedCar.batteryCapacity > 0) {
       simService.restoreSimulation(
-        startDateTime: inizioReale, // 🔥 USA L'INIZIO REALE CONGELATO
+        startDateTime: inizioReale,
         endDateTime: end, 
-        currentSoc: _socAtStartOfSim, // 🔥 USA IL SOC CONGELATO
+        currentSoc: _socAtStartOfSim,
         targetSoc: targetSoc, 
         pwr: wallboxPwr, 
         cap: currentBatteryCap
       );
       isSimulating = true;
-      notifyListeners();
+    } else {
+      debugPrint("⚠️ Dati auto non ancora caricati, rimando ripristino...");
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (selectedCar.batteryCapacity > 0) {
+          simService.restoreSimulation(
+            startDateTime: inizioReale,
+            endDateTime: end, 
+            currentSoc: _socAtStartOfSim,
+            targetSoc: targetSoc, 
+            pwr: wallboxPwr, 
+            cap: currentBatteryCap
+          );
+          isSimulating = true;
+          notifyListeners();
+        }
+      });
     }
+    notifyListeners();
   }
 }
 
