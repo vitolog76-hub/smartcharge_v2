@@ -142,21 +142,30 @@ class HomeProvider extends ChangeNotifier {
     );
   }
 
-  // --- INIZIALIZZAZIONE ---
-  Future<void> init() async {
-    // 1. CARICA TUTTO DAL MACBOOK (Locale - Istantaneo)
-    await _loadCarsFromJson();
-    await _loadContract(); 
-    await _loadHistory(); 
+ Future<void> init() async {
+    // 1. Carica prima i parametri vitali (SoC, Target, Orari)
     await _loadSimulationParameters(); 
     await _loadSimulationProgress();
     await loadBatteryConfig();
 
-    // 2. MOSTRA SUBITO LA HOME (Rimuove lo schermo bianco)
+    // 2. Carica il resto dei dati locali
+    await _loadCarsFromJson();
+    await _loadContract(); 
+    await _loadHistory(); 
+
+    // 3. Notifica subito l'UI per mostrare la Home (Evita lo schermo bianco)
     notifyListeners();
 
-    // 3. AGGIORNA DAL CLOUD IN BACKGROUND (Senza bloccare l'app)
-    _syncFromCloudBackground();
+    // 4. FIX: Avvia il sync in background dopo un breve delay
+    // Usiamo un unawaited per far capire al compilatore che è voluto
+    _startBackgroundSync(); 
+  }
+
+  // Metodo di supporto per gestire la chiamata asincrona senza warning
+  void _startBackgroundSync() {
+    Future.delayed(const Duration(seconds: 1), () {
+      _syncFromCloudBackground();
+    });
   }
 
   // Aggiungi questa funzione subito sotto l'init
@@ -456,15 +465,22 @@ class HomeProvider extends ChangeNotifier {
   Future<void> salvaTuttiParametri() async { await _saveSimulationParameters(); }
 
   Future<void> _loadSimulationParameters() async {
-    final prefs = await SharedPreferences.getInstance();
-    double savedSoc = prefs.getDouble(KEY_SOC_INIZIALE) ?? 20.0;
-    currentSoc = savedSoc.roundToDouble();
-    targetSoc = prefs.getDouble(KEY_SOC_TARGET) ?? 80.0;
-    wallboxPwr = prefs.getDouble(KEY_WALLBOX_PWR) ?? 3.7;
-    final h = prefs.getInt(KEY_READY_TIME_HOUR);
-    final m = prefs.getInt(KEY_READY_TIME_MINUTE);
-    if (h != null && m != null) readyTime = TimeOfDay(hour: h, minute: m);
+  final prefs = await SharedPreferences.getInstance();
+  
+  // Recuperiamo il valore esatto. Se è 25.4, resta 25.4.
+  currentSoc = prefs.getDouble(KEY_SOC_INIZIALE) ?? 20.0;
+  
+  targetSoc = prefs.getDouble(KEY_SOC_TARGET) ?? 80.0;
+  wallboxPwr = prefs.getDouble(KEY_WALLBOX_PWR) ?? 3.7;
+  
+  final h = prefs.getInt(KEY_READY_TIME_HOUR);
+  final m = prefs.getInt(KEY_READY_TIME_MINUTE);
+  if (h != null && m != null) {
+    readyTime = TimeOfDay(hour: h, minute: m);
   }
+  
+  debugPrint("📥 Parametri caricati: SoC attuale $currentSoc%");
+}
 
   Future<void> _saveSimulationParameters() async {
     final prefs = await SharedPreferences.getInstance();
@@ -628,7 +644,12 @@ class HomeProvider extends ChangeNotifier {
   void selectCar(CarModel c) { selectedCar = c; capacityController.text = c.batteryCapacity.toString(); _saveSimulationParameters(); notifyListeners(); }
   void updateReadyTime(TimeOfDay t) { readyTime = t; _saveSimulationParameters(); notifyListeners(); }
   void updateWallboxPwr(double v) { wallboxPwr = v; _saveSimulationParameters(); notifyListeners(); }
-  void updateCurrentSoc(double v) { currentSoc = v.roundToDouble(); _saveSimulationParameters(); notifyListeners(); }
+  void updateCurrentSoc(double v) { 
+  // Usa toStringAsFixed per pulire eventuali decimali infiniti di Dart
+  currentSoc = double.parse(v.toStringAsFixed(1)); 
+  _saveSimulationParameters(); 
+  notifyListeners(); 
+}
   void updateTargetSoc(double v) { targetSoc = v; _saveSimulationParameters(); notifyListeners(); }
   bool get shouldShowCompletionDialog => _showCompletionDialog;
   void resetCompletionDialog() => _showCompletionDialog = false;
