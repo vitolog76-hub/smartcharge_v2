@@ -14,9 +14,9 @@ import 'package:smartcharge_v2/services/notification_service.dart';
 
 class HomeProvider extends ChangeNotifier {
   // --- STATO ---
-  double currentSoc = 20.0;
+  double currentSoc = -1;
   double targetSoc = 80.0;
-  double _socAtStartOfSim = 20.0;
+  double _socAtStartOfSim = -1;
   double wallboxPwr = 3.7;
   double lastSavedEnergy = 0.0;
   double lastSavedCost = 0.0;
@@ -121,52 +121,72 @@ class HomeProvider extends ChangeNotifier {
   static const String KEY_SIM_START_SOC = 'simulation_start_soc';
 
   // --- COSTRUTTORE ---
-  HomeProvider() {
-    simService.startChecking(
-      onSocUpdate: (newSoc) {
-        currentSoc = double.parse(newSoc.toStringAsFixed(1));
-        _saveSimulationProgress();
-        notifyListeners();
-      },
-      onStatusChange: (status) {
-        isSimulating = status;
-        if (!status) _clearSimulationProgress();
-        notifyListeners();
-      },
-      onSimulationComplete: () {
-        _saveCompletedCharge();
-        _showCompletionDialog = true;
-        _clearSimulationProgress();
-        notifyListeners();
-      },
-    );
-  }
+ HomeProvider() {
+  // Inizializziamo a -1 per la protezione anti-race-condition
+  currentSoc = -1.0; 
+  _socAtStartOfSim = -1.0;
+
+  simService.startChecking(
+    onSocUpdate: (newSoc) {
+      // PROTEZIONE: Se l'init non è finito, ignoriamo i messaggi del service
+      if (currentSoc == -1.0) return; 
+
+      currentSoc = double.parse(newSoc.toStringAsFixed(1));
+      
+      // NOTA: Qui NON aggiorniamo _socAtStartOfSim perché quel valore deve 
+      // rappresentare il SoC di INIZIO ricarica per i calcoli statistici.
+      
+      _saveSimulationProgress();
+      notifyListeners();
+    },
+    onStatusChange: (status) {
+      if (currentSoc == -1.0) return; 
+      isSimulating = status;
+      if (!status) _clearSimulationProgress();
+      notifyListeners();
+    },
+    onSimulationComplete: () {
+      if (currentSoc == -1.0) return;
+      _saveCompletedCharge();
+      _showCompletionDialog = true;
+      _clearSimulationProgress();
+      notifyListeners();
+    },
+  );
+}
 
  Future<void> init() async {
-    // 1. Carica prima i parametri vitali (SoC, Target, Orari)
-    await _loadSimulationParameters(); 
-    await _loadSimulationProgress();
-    await loadBatteryConfig();
-
-    // 2. Carica il resto dei dati locali
-    await _loadCarsFromJson();
-    await _loadContract(); 
-    await _loadHistory(); 
-
-    // 3. Notifica subito l'UI per mostrare la Home (Evita lo schermo bianco)
-    notifyListeners();
-
-    // 4. FIX: Avvia il sync in background dopo un breve delay
-    // Usiamo un unawaited per far capire al compilatore che è voluto
-    _startBackgroundSync(); 
+  // 1. Carica prima i dati dal MacBook
+  await _loadSimulationParameters(); 
+  
+  // Se dopo il caricamento è ancora -1 (prima installazione), metti 20
+  if (currentSoc == -1.0) {
+    currentSoc = 20.0;
+    _socAtStartOfSim = 20.0;
   }
 
-  // Metodo di supporto per gestire la chiamata asincrona senza warning
-  void _startBackgroundSync() {
-    Future.delayed(const Duration(seconds: 1), () {
-      _syncFromCloudBackground();
-    });
-  }
+  await _loadSimulationProgress();
+  await loadBatteryConfig();
+  await _loadCarsFromJson();
+  await _loadContract(); 
+  await _loadHistory(); 
+
+  // 2. Notifica l'UI: lo schermo bianco sparisce qui
+  notifyListeners();
+
+  // 3. FIX WARNING: Avviamo il sync senza bloccare il metodo init
+  // Usiamo questa sintassi per dire al compilatore che il distacco è voluto
+  _startBackgroundSync(); 
+}
+
+// Modifica questa funzione così per essere più sicuri
+void _startBackgroundSync() {
+  // Il delay assicura che il database locale (SharedPreferences) 
+  // sia libero e non in conflitto con il cloud
+  Future.delayed(const Duration(seconds: 2), () async {
+    await _syncFromCloudBackground();
+  });
+}
 
   // Aggiungi questa funzione subito sotto l'init
   Future<void> _syncFromCloudBackground() async {
@@ -239,33 +259,32 @@ class HomeProvider extends ChangeNotifier {
 
   // --- AZIONI SIMULAZIONE ---
   void startSimulation() {
+  // 🔥 CRUCIALE: Sincronizziamo il punto di partenza con il valore attuale dello slider
+  _socAtStartOfSim = currentSoc; 
+
   _clearSimulationProgress().then((_) {
-    // ... tua logica SOC esistente ...
-    
     DateTime startTime = calculatedStartDateTime;
     final now = DateTime.now();
     if (startTime.isBefore(now)) startTime = now;
 
-    // 1. Avvia la simulazione logica
+    // 1. Avvia la simulazione logica usando il SoC aggiornato
     simService.initSimulation(
       startDateTime: startTime,
-      currentSoc: _socAtStartOfSim,
+      currentSoc: _socAtStartOfSim, // Sarà 70.0 se lo slider è al 70
       targetSoc: targetSoc,
       pwr: wallboxPwr,
       cap: currentBatteryCap,
     );
 
-    // 🔥 2. NOTIFICHE REALI
-    // Notifica immediata: "Ricarica Iniziata"
+    // 2. NOTIFICHE REALI
     NotificationService().showChargingStartedNotification(
-      socIniziale: currentSoc,
+      socIniziale: _socAtStartOfSim,
       socTarget: targetSoc,
       startTime: startTime,
     );
 
-    // Notifica programmata: "Ricarica Completata"
     NotificationService().scheduleChargingComplete(
-      id: 999, // Un ID univoco per la sessione
+      id: 999,
       completionTime: simService.endTime ?? now.add(duration),
       socFinale: targetSoc,
       energia: energyNeeded,
@@ -273,6 +292,8 @@ class HomeProvider extends ChangeNotifier {
     );
 
     isSimulating = true;
+    
+    // 3. Salviamo subito il progresso (incluso il nuovo _socAtStartOfSim) sul disco
     _saveSimulationProgress();
     notifyListeners();
   });
@@ -646,12 +667,14 @@ class HomeProvider extends ChangeNotifier {
   void selectCar(CarModel c) { selectedCar = c; capacityController.text = c.batteryCapacity.toString(); _saveSimulationParameters(); notifyListeners(); }
   void updateReadyTime(TimeOfDay t) { readyTime = t; _saveSimulationParameters(); notifyListeners(); }
   void updateWallboxPwr(double v) { wallboxPwr = v; _saveSimulationParameters(); notifyListeners(); }
+  
   void updateCurrentSoc(double v) { 
-  // Usa toStringAsFixed per pulire eventuali decimali infiniti di Dart
   currentSoc = double.parse(v.toStringAsFixed(1)); 
+  _socAtStartOfSim = currentSoc; // Prepara il punto di partenza
   _saveSimulationParameters(); 
   notifyListeners(); 
 }
+
   void updateTargetSoc(double v) { targetSoc = v; _saveSimulationParameters(); notifyListeners(); }
   bool get shouldShowCompletionDialog => _showCompletionDialog;
   void resetCompletionDialog() => _showCompletionDialog = false;
