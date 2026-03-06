@@ -181,6 +181,7 @@ class HomeProvider extends ChangeNotifier {
 
 // Modifica questa funzione così per essere più sicuri
 void _startBackgroundSync() {
+  debugPrint("☁️ Sync Cloud in corso... controllo se sovrascrive il SoC");
   // Il delay assicura che il database locale (SharedPreferences) 
   // sia libero e non in conflitto con il cloud
   Future.delayed(const Duration(seconds: 2), () async {
@@ -337,16 +338,16 @@ void _startBackgroundSync() {
     final double capacita = currentBatteryCap;
     final kwhEfettivi = ChargeEngine.calculateEnergy(socIniziale, socFinale, capacita);
     
-    // BLOCCO 1: Se l'energia è zero, esci immediatamente
+    // Protezione per ricariche nulle o micro-incrementi
     if (kwhEfettivi <= 0.05) return;
 
-    // BLOCCO 2: Il Lucchetto Anti-Doppio (Se salvato negli ultimi 30 secondi, esci)
+    // Lucchetto Anti-Doppio (per evitare salvataggi multipli all'avvio)
     if (chargeHistory.isNotEmpty) {
       final last = chargeHistory.last;
       bool stessaOra = now.difference(last.date).inSeconds.abs() < 30;
       bool stessoSoc = (last.endSoc - socFinale).abs() < 0.1;
       if (stessaOra && stessoSoc) {
-        debugPrint("🚫 DOPPIONE BLOCCATO");
+        debugPrint("🚫 Salvataggio ignorato: sessione già registrata.");
         return; 
       }
     }
@@ -386,9 +387,12 @@ void _startBackgroundSync() {
       f3PriceAtTime: contrattoAttivo.f3Price,
     );
     
+    // Aggiunta e persistenza locale
     chargeHistory.add(session);
-    saveHistory(); 
-    _syncHistoryIfPossible();
+    saveHistory(); // Metodo asincrono chiamato senza await per non bloccare
+
+    // Sincronizzazione Cloud in background (Fire and Forget)
+    _syncHistoryIfPossible().catchError((e) => debugPrint("☁️ Errore sync: $e"));
 
     lastSavedEnergy = kwhEfettivi;
     lastSavedCost = costoCalcolato;
@@ -525,43 +529,55 @@ void _startBackgroundSync() {
   }
 
   Future<void> _loadSimulationProgress() async {
-  final prefs = await SharedPreferences.getInstance();
-  if (!(prefs.getBool(KEY_SIM_ACTIVE) ?? false)) return;
-
-  final startStr = prefs.getString(KEY_SIM_START);
-  final endStr = prefs.getString(KEY_SIM_END);
-  final savedStartSoc = prefs.getDouble(KEY_SIM_START_SOC); // Il SoC con cui era iniziata la carica
-
-  if (startStr != null && endStr != null && savedStartSoc != null) {
-    final start = DateTime.parse(startStr);
-    final end = DateTime.parse(endStr);
-    final now = DateTime.now();
+    final prefs = await SharedPreferences.getInstance();
     
-    // Aggiorniamo la variabile interna col valore salvato
-    _socAtStartOfSim = savedStartSoc; 
-
-    if (now.isAfter(end)) {
-      currentSoc = targetSoc; 
-      _saveCompletedCharge(); 
-      _showCompletionDialog = true;
-      isSimulating = false;
-      await _clearSimulationProgress();
-    } else {
-      // 🔥 IL FIX: Passiamo savedStartSoc (o currentSoc se preferisci il valore aggiornato)
-      // Assicurati che il service sappia da dove partiva davvero la ricarica
-      simService.restoreSimulation(
-        startDateTime: start, 
-        endDateTime: end, 
-        currentSoc: _socAtStartOfSim, // Ora siamo sicuri che non è 20.0 di default
-        targetSoc: targetSoc, 
-        pwr: wallboxPwr, 
-        cap: currentBatteryCap
-      );
-      isSimulating = true;
+    // 1. Controllo se c'è una simulazione attiva
+    if (!(prefs.getBool(KEY_SIM_ACTIVE) ?? false)) {
+      debugPrint("ℹ️ Nessun progresso da ripristinare.");
+      return;
     }
-    notifyListeners();
+
+    final String? startStr = prefs.getString(KEY_SIM_START);
+    final String? endStr = prefs.getString(KEY_SIM_END);
+    final double? savedStartSoc = prefs.getDouble(KEY_SIM_START_SOC);
+
+    if (startStr != null && endStr != null && savedStartSoc != null) {
+      final start = DateTime.parse(startStr);
+      final end = DateTime.parse(endStr);
+      final now = DateTime.now();
+      
+      _socAtStartOfSim = savedStartSoc; 
+
+      // CASO A: La ricarica è finita mentre l'app era chiusa
+      if (now.isAfter(end)) {
+        debugPrint("🏁 Carica terminata offline. Posticipo salvataggio per sbloccare l'UI.");
+        
+        // 🔥 TRUCCO ANTI-STALLO: Eseguiamo il salvataggio un istante DOPO l'avvio
+        Future.delayed(Duration.zero, () {
+          currentSoc = targetSoc; 
+          _saveCompletedCharge(); // Salvataggio effettivo
+          _showCompletionDialog = true;
+          isSimulating = false;
+          _clearSimulationProgress(); // Pulizia SharedPreferences
+          notifyListeners();
+        });
+      } 
+      // CASO B: La ricarica è ancora in corso
+      else {
+        debugPrint("⚡ Ripristino simulazione attiva...");
+        simService.restoreSimulation(
+          startDateTime: start, 
+          endDateTime: end, 
+          currentSoc: _socAtStartOfSim, 
+          targetSoc: targetSoc, 
+          pwr: wallboxPwr, 
+          cap: currentBatteryCap
+        );
+        isSimulating = true;
+        notifyListeners();
+      }
+    }
   }
-}
 
   Future<void> _clearSimulationProgress() async {
     final prefs = await SharedPreferences.getInstance();

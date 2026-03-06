@@ -16,7 +16,7 @@ class NotificationService {
 
   // Inizializzazione
   Future<void> init() async {
-    // Inizializza timezone
+    // 1. Inizializza timezone in modo sicuro
     tz.initializeTimeZones();
     
     // Configurazione per Android
@@ -25,26 +25,29 @@ class NotificationService {
     
     // Configurazione per iOS
     const DarwinInitializationSettings iosSettings = 
-        DarwinInitializationSettings();
+        DarwinInitializationSettings(
+          requestAlertPermission: false,
+          requestBadgePermission: false,
+          requestSoundPermission: false,
+        );
     
     const InitializationSettings settings = InitializationSettings(
       android: androidSettings,
       iOS: iosSettings,
     );
     
-    // Inizializza il plugin
+    // 2. Inizializza il plugin
     await _notificationsPlugin.initialize(
       settings,
       onDidReceiveNotificationResponse: _onNotificationTap,
     );
     
-    // Richiedi permessi
+    // 3. Richiedi permessi (Android 13+ e iOS)
     await _requestPermissions();
   }
 
-  // Richiedi permessi
+  // Richiesta permessi granulare
   Future<void> _requestPermissions() async {
-    // Per iOS
     if (defaultTargetPlatform == TargetPlatform.iOS) {
       await _notificationsPlugin
           .resolvePlatformSpecificImplementation<
@@ -55,38 +58,29 @@ class NotificationService {
             sound: true,
           );
     } 
-    // Per Android
     else if (defaultTargetPlatform == TargetPlatform.android) {
-      final status = await Permission.notification.request();
-      if (!status.isGranted) {
-        debugPrint('❌ Permesso notifiche negato');
-      }
+      // Necessario per Android 13 (API 33) e superiori
+      await Permission.notification.request();
     }
   }
 
-  // Gestione tap sulla notifica
   void _onNotificationTap(NotificationResponse response) {
-    debugPrint('🔔 Notifica aperta: ${response.payload}');
-    // Qui puoi navigare a una schermata specifica
+    debugPrint('🔔 Notifica aperta con payload: ${response.payload}');
   }
 
-  // Mostra notifica immediata
+  // Mostra notifica immediata con ID robusto
   Future<void> showInstantNotification({
     required String title,
     required String body,
     String? payload,
   }) async {
-    const AndroidNotificationDetails androidDetails = 
-        AndroidNotificationDetails(
+    const AndroidNotificationDetails androidDetails = AndroidNotificationDetails(
       'charging_channel',
       'Canale Ricarica',
       channelDescription: 'Notifiche relative alla ricarica',
       importance: Importance.high,
       priority: Priority.high,
       color: Colors.blue,
-      ledColor: Colors.blue,
-      ledOnMs: 1000,
-      ledOffMs: 500,
       enableVibration: true,
       playSound: true,
     );
@@ -101,9 +95,12 @@ class NotificationService {
       android: androidDetails,
       iOS: iosDetails,
     );
+
+    // ID basato sui microsecondi per evitare sovrascritture se arrivano notifiche ravvicinate
+    final int id = DateTime.now().microsecondsSinceEpoch % 2147483647;
     
     await _notificationsPlugin.show(
-      DateTime.now().millisecond, // ID univoco
+      id,
       title,
       body,
       details,
@@ -111,7 +108,7 @@ class NotificationService {
     );
   }
 
-  // Mostra notifica programmata
+  // Mostra notifica programmata con protezione per orari passati
   Future<void> scheduleNotification({
     required int id,
     required String title,
@@ -119,6 +116,12 @@ class NotificationService {
     required DateTime scheduledTime,
     String? payload,
   }) async {
+    // Se l'orario è già passato (es. rinvio dopo riavvio app), mostra subito
+    if (scheduledTime.isBefore(DateTime.now())) {
+      await showInstantNotification(title: title, body: body, payload: payload);
+      return;
+    }
+
     final androidDetails = AndroidNotificationDetails(
       'charging_channel',
       'Canale Ricarica',
@@ -126,8 +129,6 @@ class NotificationService {
       importance: Importance.high,
       priority: Priority.high,
       color: Colors.blue,
-      enableVibration: true,
-      playSound: true,
     );
     
     const iosDetails = DarwinNotificationDetails(
@@ -141,53 +142,47 @@ class NotificationService {
       iOS: iosDetails,
     );
     
-    await _notificationsPlugin.zonedSchedule(
-      id,
-      title,
-      body,
-      tz.TZDateTime.from(scheduledTime, tz.local),
-      details,
-      androidScheduleMode: AndroidScheduleMode.exactAllowWhileIdle,
-      uiLocalNotificationDateInterpretation:
-          UILocalNotificationDateInterpretation.absoluteTime,
-      payload: payload,
-    );
-    
-    debugPrint('✅ Notifica programmata per: $scheduledTime');
+    try {
+      await _notificationsPlugin.zonedSchedule(
+        id,
+        title,
+        body,
+        tz.TZDateTime.from(scheduledTime, tz.local),
+        details,
+        androidScheduleMode: AndroidScheduleMode.exactAllowWhileIdle,
+        uiLocalNotificationDateInterpretation:
+            UILocalNotificationDateInterpretation.absoluteTime,
+        payload: payload,
+      );
+      debugPrint('✅ Notifica programmata per: $scheduledTime');
+    } catch (e) {
+      debugPrint('❌ Errore programmazione notifica: $e');
+    }
   }
 
-  // Cancella notifiche
-  Future<void> cancelNotification(int id) async {
-    await _notificationsPlugin.cancel(id);
-  }
+  Future<void> cancelNotification(int id) async => await _notificationsPlugin.cancel(id);
 
-  Future<void> cancelAllNotifications() async {
-    await _notificationsPlugin.cancelAll();
-  }
+  Future<void> cancelAllNotifications() async => await _notificationsPlugin.cancelAll();
 
-  // Mostra notifica di ricarica completata
+  // Helper per messaggi ricarica
   Future<void> showChargingCompleteNotification({
     required double socFinale,
     required double energia,
     required Duration durata,
   }) async {
-    String durataStr = _formatDuration(durata);
-    
     await showInstantNotification(
       title: '⚡ Ricarica Completata!',
-      body: 'SOC: ${socFinale.toStringAsFixed(0)}% | Energia: ${energia.toStringAsFixed(1)} kWh | Durata: $durataStr',
+      body: 'SOC: ${socFinale.toStringAsFixed(0)}% | Energia: ${energia.toStringAsFixed(1)} kWh | Durata: ${_formatDuration(durata)}',
       payload: 'charging_complete',
     );
   }
 
-  // Mostra notifica di ricarica iniziata
   Future<void> showChargingStartedNotification({
     required double socIniziale,
     required double socTarget,
     required DateTime startTime,
   }) async {
     final format = DateFormat.Hm();
-    
     await showInstantNotification(
       title: '🚗 Ricarica Iniziata',
       body: 'Dal ${socIniziale.toStringAsFixed(0)}% al ${socTarget.toStringAsFixed(0)}% - Inizio: ${format.format(startTime)}',
@@ -195,7 +190,6 @@ class NotificationService {
     );
   }
 
-  // Programma notifica di completamento
   Future<void> scheduleChargingComplete({
     required int id,
     required DateTime completionTime,
@@ -203,22 +197,17 @@ class NotificationService {
     required double energia,
     required Duration durata,
   }) async {
-    String durataStr = _formatDuration(durata);
-    
     await scheduleNotification(
       id: id,
       title: '⚡ Ricarica Completata!',
-      body: 'SOC: ${socFinale.toStringAsFixed(0)}% | Energia: ${energia.toStringAsFixed(1)} kWh | Durata: $durataStr',
+      body: 'SOC: ${socFinale.toStringAsFixed(0)}% | Energia: ${energia.toStringAsFixed(1)} kWh | Durata: ${_formatDuration(durata)}',
       scheduledTime: completionTime,
       payload: 'charging_complete_$id',
     );
   }
 
-  // Formatta durata
   String _formatDuration(Duration duration) {
     String twoDigits(int n) => n.toString().padLeft(2, '0');
-    String hours = twoDigits(duration.inHours);
-    String minutes = twoDigits(duration.inMinutes.remainder(60));
-    return '$hours:$minutes h';
+    return '${twoDigits(duration.inHours)}:${twoDigits(duration.inMinutes.remainder(60))} h';
   }
 }
