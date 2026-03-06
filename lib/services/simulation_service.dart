@@ -83,44 +83,45 @@ class SimulationService {
 }
   
   void restoreSimulation({
-    required DateTime startDateTime,
-    required DateTime endDateTime,
-    required double currentSoc,
-    required double targetSoc,
-    required double pwr,
-    required double cap,
-  }) {
-    debugPrint('🔄 restoreSimulation - ripristino stato');
-    
-    _hasNotifiedCompletion = false;
-    scheduledStart = startDateTime;
-    _endTime = endDateTime;
-    _currentSoc = currentSoc;
-    _targetSoc = targetSoc;
-    _power = pwr;
-    _capacity = cap;
-    
-    final now = DateTime.now();
+  required DateTime startDateTime,
+  required DateTime endDateTime,
+  required double currentSoc, // Questo DEVE essere il SoC di inizio ricarica (es. 68.0)
+  required double targetSoc,
+  required double pwr,
+  required double cap,
+}) {
+  debugPrint('🔄 restoreSimulation - Punto di partenza: $currentSoc%');
+  
+  _hasNotifiedCompletion = false;
+  scheduledStart = startDateTime;
+  _endTime = endDateTime;
+  _currentSoc = currentSoc; // Impostiamo la base fissa
+  _targetSoc = targetSoc;
+  _power = pwr;
+  _capacity = cap;
+  
+  final now = DateTime.now();
 
-    // 🔥 LOGICA DI RECUPERO IMMEDIATO
-    if (now.isAfter(startDateTime)) {
-      _isSimulating = true;
-      onStatusChange?.call(true);
+  if (now.isAfter(startDateTime)) {
+    _isSimulating = true;
+    onStatusChange?.call(true);
 
-      // Calcoliamo subito dove dovrebbe essere il SOC ora
-      final totalSeconds = endDateTime.difference(startDateTime).inSeconds;
-      final elapsedSeconds = now.difference(startDateTime).inSeconds;
+    final totalSeconds = endDateTime.difference(startDateTime).inSeconds;
+    final elapsedSeconds = now.difference(startDateTime).inSeconds;
 
-      if (totalSeconds > 0) {
-        double progress = (elapsedSeconds / totalSeconds).clamp(0.0, 1.0);
-        double jumpedSoc = _currentSoc + ((_targetSoc - _currentSoc) * progress);
-        
-        // Comunichiamo subito il SOC ricalcolato al Provider
-        onSocUpdate?.call(jumpedSoc); 
-        debugPrint('🚀 Saltato al SOC ricalcolato: ${jumpedSoc.toStringAsFixed(2)}%');
-      }
+    if (totalSeconds > 0) {
+      // Calcolo lineare del progresso temporale
+      double progress = (elapsedSeconds / totalSeconds).clamp(0.0, 1.0);
+      
+      // Calcoliamo il nuovo SoC partendo dalla base fissa (es. 68.0)
+      double jumpedSoc = _currentSoc + ((_targetSoc - _currentSoc) * progress);
+      
+      // Comunichiamo il valore calcolato
+      onSocUpdate?.call(double.parse(jumpedSoc.toStringAsFixed(2))); 
+      debugPrint('🚀 Restore OK: Ora al ${jumpedSoc.toStringAsFixed(2)}% (partendo da $_currentSoc%)');
     }
   }
+}
   
   void _startSimulation() {
     debugPrint('▶️ _startSimulation - chiamato');
