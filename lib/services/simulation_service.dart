@@ -110,15 +110,16 @@ class SimulationService {
     final elapsedSeconds = now.difference(startDateTime).inSeconds;
 
     if (totalSeconds > 0) {
-      // Calcolo lineare del progresso temporale
       double progress = (elapsedSeconds / totalSeconds).clamp(0.0, 1.0);
-      
-      // Calcoliamo il nuovo SoC partendo dalla base fissa (es. 68.0)
       double jumpedSoc = _currentSoc + ((_targetSoc - _currentSoc) * progress);
       
-      // Comunichiamo il valore calcolato
-      onSocUpdate?.call(double.parse(jumpedSoc.toStringAsFixed(2))); 
-      debugPrint('🚀 Restore OK: Ora al ${jumpedSoc.toStringAsFixed(2)}% (partendo da $_currentSoc%)');
+      // 🔥 USARE MICROTASK: assicura che il Provider sia pronto a ricevere il dato
+      // senza entrare in conflitto con il ciclo di build di Flutter
+      Future.microtask(() {
+        onSocUpdate?.call(double.parse(jumpedSoc.toStringAsFixed(1)));
+      });
+      
+      debugPrint('🚀 Restore OK: Calcolato ${jumpedSoc.toStringAsFixed(1)}%');
     }
   }
 }
@@ -138,39 +139,31 @@ class SimulationService {
   void _checkSimulation(Timer timer) {
   final now = DateTime.now();
   
-  // 1. Controllo Partenza Programmata
-  if (scheduledStart != null && !_isSimulating) {
-    if (now.isAfter(scheduledStart!)) {
-      debugPrint('⏰ Ora di iniziare la ricarica!');
-      _startSimulation();
-    }
-  }
-  
-  // 2. Gestione Avanzamento Carica
   if (_isSimulating && _endTime != null && scheduledStart != null) {
-    // Calcoliamo la durata totale prevista
+    // 1. Calcoliamo la durata TOTALE che era prevista all'inizio
     final totalSeconds = _endTime!.difference(scheduledStart!).inSeconds;
     if (totalSeconds <= 0) {
        _completeSimulation();
        return;
     }
 
-    // Secondi passati dall'inizio REALE (scheduledStart)
+    // 2. Calcoliamo i secondi passati dall'inizio FISSO (scheduledStart)
     final elapsedSeconds = now.difference(scheduledStart!).inSeconds;
 
     if (now.isBefore(_endTime!)) {
-      // Calcolo progresso (0.0 a 1.0)
-      // Usiamo clamp per evitare valori negativi se 'now' è leggermente prima di 'scheduledStart'
+      // 3. Progresso basato sulla distanza dal punto di partenza originale
       double progress = (elapsedSeconds / totalSeconds).clamp(0.0, 1.0);
       
+      // 4. CALCOLO DETERMINISTICO
+      // _currentSoc è la costante (es. 20%) impostata nell'initSimulation. 
+      // Non la cambiamo MAI. Sommiamo solo l'incremento.
       double newSoc = _currentSoc + ((_targetSoc - _currentSoc) * progress);
       
-      // Callback per aggiornare l'interfaccia
+      // Inviamo l'aggiornamento (newSoc) al Provider
       onSocUpdate?.call(newSoc);
       
-      // Log ridotto per non intasare la console
-      if (elapsedSeconds % 10 == 0) { // Logga ogni 10 secondi
-         debugPrint('⚡ Carica in corso: ${newSoc.toStringAsFixed(2)}%');
+      if (elapsedSeconds % 10 == 0) {
+         debugPrint('⏳ Simulazione: Partenza fissa: ${DateFormat('HH:mm').format(scheduledStart!)} | SOC Iniziale: $_currentSoc% | SOC Attuale: ${newSoc.toStringAsFixed(1)}%');
       }
     } else if (!_hasNotifiedCompletion) {
       _hasNotifiedCompletion = true;

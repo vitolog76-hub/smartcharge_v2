@@ -27,6 +27,8 @@ class HomeProvider extends ChangeNotifier {
   bool carsLoaded = false;
   final capacityController = TextEditingController();
   List<ChargeSession> chargeHistory = [];
+  static const String KEY_SOC_INIZIALE_CONGELATO = 'soc_iniziale_congelato';
+  static const String KEY_TIMESTAMP_INIZIO_CONGELATO = 'timestamp_inizio_congelato'; 
   
   final SimulationService simService = SimulationService();
   bool isSimulating = false;
@@ -263,7 +265,7 @@ void _startBackgroundSync() {
   // 🔥 CRUCIALE: Sincronizziamo il punto di partenza con il valore attuale dello slider
   _socAtStartOfSim = currentSoc; 
 
-  _clearSimulationProgress().then((_) {
+  _clearSimulationProgress().then((_) async {
     DateTime startTime = calculatedStartDateTime;
     final now = DateTime.now();
     if (startTime.isBefore(now)) startTime = now;
@@ -271,7 +273,7 @@ void _startBackgroundSync() {
     // 1. Avvia la simulazione logica usando il SoC aggiornato
     simService.initSimulation(
       startDateTime: startTime,
-      currentSoc: _socAtStartOfSim, // Sarà 70.0 se lo slider è al 70
+      currentSoc: _socAtStartOfSim,
       targetSoc: targetSoc,
       pwr: wallboxPwr,
       cap: currentBatteryCap,
@@ -294,7 +296,12 @@ void _startBackgroundSync() {
 
     isSimulating = true;
     
-    // 3. Salviamo subito il progresso (incluso il nuovo _socAtStartOfSim) sul disco
+    // 🔥 3. SALVA I DATI CONGELATI SU DISCO
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setDouble(KEY_SOC_INIZIALE_CONGELATO, _socAtStartOfSim);
+    await prefs.setInt(KEY_TIMESTAMP_INIZIO_CONGELATO, startTime.millisecondsSinceEpoch);
+    
+    // 4. Salviamo subito il progresso
     _saveSimulationProgress();
     notifyListeners();
   });
@@ -529,63 +536,130 @@ void _startBackgroundSync() {
   }
 
   Future<void> _loadSimulationProgress() async {
-    final prefs = await SharedPreferences.getInstance();
+  final prefs = await SharedPreferences.getInstance();
+  
+  // 1. Controllo se c'è una simulazione attiva
+  if (!(prefs.getBool(KEY_SIM_ACTIVE) ?? false)) {
+    debugPrint("ℹ️ Nessun progresso da ripristinare.");
+    return;
+  }
+
+  final String? startStr = prefs.getString(KEY_SIM_START);
+  final String? endStr = prefs.getString(KEY_SIM_END);
+  final double? savedStartSoc = prefs.getDouble(KEY_SIM_START_SOC);
+  
+  // 🔥 RECUPERA I DATI CONGELATI
+  final double? socInizialeCongelato = prefs.getDouble(KEY_SOC_INIZIALE_CONGELATO);
+  final int? timestampInizioCongelato = prefs.getInt(KEY_TIMESTAMP_INIZIO_CONGELATO);
+
+  if (startStr != null && endStr != null && savedStartSoc != null) {
+    final start = DateTime.parse(startStr);
+    final end = DateTime.parse(endStr);
+    final now = DateTime.now();
     
-    // 1. Controllo se c'è una simulazione attiva
-    if (!(prefs.getBool(KEY_SIM_ACTIVE) ?? false)) {
-      debugPrint("ℹ️ Nessun progresso da ripristinare.");
-      return;
-    }
+    // 🔥 USA I DATI CONGELATI SE DISPONIBILI, ALTRIMENTI QUELLI NORMALI
+    _socAtStartOfSim = socInizialeCongelato ?? savedStartSoc;
+    final DateTime inizioReale = timestampInizioCongelato != null 
+        ? DateTime.fromMillisecondsSinceEpoch(timestampInizioCongelato)
+        : start;
 
-    final String? startStr = prefs.getString(KEY_SIM_START);
-    final String? endStr = prefs.getString(KEY_SIM_END);
-    final double? savedStartSoc = prefs.getDouble(KEY_SIM_START_SOC);
-
-    if (startStr != null && endStr != null && savedStartSoc != null) {
-      final start = DateTime.parse(startStr);
-      final end = DateTime.parse(endStr);
-      final now = DateTime.now();
+    // CASO A: La ricarica è finita mentre l'app era chiusa
+    if (now.isAfter(end)) {
+      debugPrint("🏁 Carica terminata offline. Forzo salvataggio...");
       
-      _socAtStartOfSim = savedStartSoc; 
+      // 🔥 FORZA IL SALVATAGGIO USANDO I DATI CONGELATI
+      currentSoc = targetSoc;
+      
+      // Crea la sessione usando i dati congelati
+      final double kwhEfettivi = ChargeEngine.calculateEnergy(
+        _socAtStartOfSim, 
+        targetSoc, 
+        currentBatteryCap
+      );
+      
+      final double costoCalcolato = CostCalculator.calculate(
+        totalKwh: kwhEfettivi,
+        wallboxPower: wallboxPwr,
+        startTime: TimeOfDay.fromDateTime(inizioReale),
+        date: now,
+        contract: myContract,
+      );
 
-      // CASO A: La ricarica è finita mentre l'app era chiusa
-      if (now.isAfter(end)) {
-        debugPrint("🏁 Carica terminata offline. Posticipo salvataggio per sbloccare l'UI.");
-        
-        // 🔥 TRUCCO ANTI-STALLO: Eseguiamo il salvataggio un istante DOPO l'avvio
-        Future.delayed(Duration.zero, () {
-          currentSoc = targetSoc; 
-          _saveCompletedCharge(); // Salvataggio effettivo
-          _showCompletionDialog = true;
-          isSimulating = false;
-          _clearSimulationProgress(); // Pulizia SharedPreferences
-          notifyListeners();
-        });
-      } 
-      // CASO B: La ricarica è ancora in corso
-      else {
-        debugPrint("⚡ Ripristino simulazione attiva...");
-        simService.restoreSimulation(
-          startDateTime: start, 
-          endDateTime: end, 
-          currentSoc: _socAtStartOfSim, 
-          targetSoc: targetSoc, 
-          pwr: wallboxPwr, 
-          cap: currentBatteryCap
-        );
-        isSimulating = true;
-        notifyListeners();
-      }
+      final session = ChargeSession(
+        id: "CHG_${now.millisecondsSinceEpoch}", 
+        date: now,
+        startDateTime: inizioReale,
+        endDateTime: now,
+        startSoc: _socAtStartOfSim,
+        endSoc: targetSoc,
+        kwh: kwhEfettivi,
+        cost: costoCalcolato,
+        location: "Home",
+        carBrand: selectedCar.brand,
+        carModel: selectedCar.model,
+        contractId: activeContractId,
+        wallboxPower: wallboxPwr,
+        fascia: CostCalculator.getFasciaLabel(
+          totalKwh: kwhEfettivi,
+          wallboxPower: wallboxPwr,
+          startTime: TimeOfDay.fromDateTime(inizioReale),
+          date: now,
+          isMonorario: myContract.isMonorario,
+        ),
+        f1PriceAtTime: myContract.f1Price,
+        f2PriceAtTime: myContract.f2Price,
+        f3PriceAtTime: myContract.f3Price,
+      );
+      
+      // Salva la sessione
+      chargeHistory.add(session);
+      await saveHistory();
+      
+      // 🔥 MOSTRA NOTIFICA
+      NotificationService().showChargingCompleteNotification(
+        socFinale: targetSoc,
+        energia: kwhEfettivi,
+        durata: end.difference(inizioReale),
+      );
+      
+      // Aggiorna UI
+      _showCompletionDialog = true;
+      isSimulating = false;
+      await _clearSimulationProgress();
+      
+      // Pulisci i dati congelati
+      await prefs.remove(KEY_SOC_INIZIALE_CONGELATO);
+      await prefs.remove(KEY_TIMESTAMP_INIZIO_CONGELATO);
+      
+      notifyListeners();
+    } 
+    // CASO B: La ricarica è ancora in corso
+    else {
+      debugPrint("⚡ Ripristino simulazione attiva...");
+      simService.restoreSimulation(
+        startDateTime: inizioReale, // 🔥 USA L'INIZIO REALE CONGELATO
+        endDateTime: end, 
+        currentSoc: _socAtStartOfSim, // 🔥 USA IL SOC CONGELATO
+        targetSoc: targetSoc, 
+        pwr: wallboxPwr, 
+        cap: currentBatteryCap
+      );
+      isSimulating = true;
+      notifyListeners();
     }
   }
+}
 
   Future<void> _clearSimulationProgress() async {
-    final prefs = await SharedPreferences.getInstance();
-    await prefs.remove(KEY_SIM_ACTIVE);
-    await prefs.remove(KEY_SIM_START);
-    await prefs.remove(KEY_SIM_END);
-    await prefs.remove(KEY_SIM_START_SOC);
-  }
+  final prefs = await SharedPreferences.getInstance();
+  await prefs.remove(KEY_SIM_ACTIVE);
+  await prefs.remove(KEY_SIM_START);
+  await prefs.remove(KEY_SIM_END);
+  await prefs.remove(KEY_SIM_START_SOC);
+  // 🔥 Pulisci anche i dati congelati
+  await prefs.remove(KEY_SOC_INIZIALE_CONGELATO);
+  await prefs.remove(KEY_TIMESTAMP_INIZIO_CONGELATO);
+}
 
   // --- CARICAMENTO DATI ---
   Future<void> _loadCarsFromJson() async {
