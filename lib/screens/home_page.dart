@@ -184,7 +184,82 @@ class HomePage extends StatelessWidget {
                           const SizedBox(height: 12),
                           
                           StatsRow(provider: provider),
-                          const SizedBox(height: 12),
+const SizedBox(height: 12),
+
+// 🔥 NUOVO: Avviso di rallentamento ricarica
+if (provider.showTaperingWarning)
+  Container(
+    margin: const EdgeInsets.only(bottom: 12),
+    padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+    decoration: BoxDecoration(
+      gradient: LinearGradient(
+        colors: [
+          Colors.amber.withOpacity(0.15),
+          Colors.orange.withOpacity(0.1),
+        ],
+        begin: Alignment.topLeft,
+        end: Alignment.bottomRight,
+      ),
+      borderRadius: BorderRadius.circular(16),
+      border: Border.all(
+        color: Colors.amber.withOpacity(0.3),
+        width: 1,
+      ),
+      boxShadow: [
+        BoxShadow(
+          color: Colors.amber.withOpacity(0.1),
+          blurRadius: 10,
+          spreadRadius: 1,
+        ),
+      ],
+    ),
+    child: Row(
+      children: [
+        Container(
+          padding: const EdgeInsets.all(8),
+          decoration: BoxDecoration(
+            color: Colors.amber.withOpacity(0.2),
+            shape: BoxShape.circle,
+          ),
+          child: Icon(
+            provider.targetSoc > 90 
+                ? Icons.speed_rounded 
+                : Icons.info_outline_rounded,
+            color: Colors.amber,
+            size: 20,
+          ),
+        ),
+        const SizedBox(width: 12),
+        Expanded(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                provider.targetSoc > 90 
+                    ? "Rallentamento significativo" 
+                    : "Rallentamento della ricarica",
+                style: const TextStyle(
+                  color: Colors.amber,
+                  fontSize: 13,
+                  fontWeight: FontWeight.w600,
+                  letterSpacing: 0.3,
+                ),
+              ),
+              const SizedBox(height: 4),
+              Text(
+                provider.taperingWarning,
+                style: TextStyle(
+                  color: Colors.white.withOpacity(0.7),
+                  fontSize: 12,
+                  height: 1.3,
+                ),
+              ),
+            ],
+          ),
+        ),
+      ],
+    ),
+  ),
                           
                           // CONTROLLI RICARICA
                           _glassContainer(
@@ -314,6 +389,9 @@ class HomePage extends StatelessWidget {
       },
     );
   }
+
+  
+
 
   String _formatDuration(Duration duration) {
     String twoDigits(int n) => n.toString().padLeft(2, '0');

@@ -157,6 +157,17 @@ class HomeProvider extends ChangeNotifier {
   );
 }
 
+String get taperingWarning {
+  if (targetSoc > 80) {
+    if (targetSoc <= 90) {
+      return "🔋 Oltre l'80% la ricarica rallenta (60% della potenza)";
+    } else {
+      return "⚡ Oltre il 90% la ricarica è molto lenta (20% della potenza)";
+    }
+  }
+  return "";
+}
+bool get showTaperingWarning => targetSoc > 80;
  Future<void> init() async {
   try {
     debugPrint("🚀 INIT: Inizio caricamento HomeProvider");
