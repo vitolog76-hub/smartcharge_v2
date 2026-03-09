@@ -116,6 +116,12 @@ abstract class AppLocalizations {
   /// **'Home'**
   String get home;
 
+  /// No description provided for @batteryRange.
+  ///
+  /// In it, this message translates to:
+  /// **'SOC INIZIALE - FINALE'**
+  String get batteryRange;
+
   /// No description provided for @totalKwh.
   ///
   /// In it, this message translates to:

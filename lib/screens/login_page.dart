@@ -73,7 +73,7 @@ class LoginPage extends StatelessWidget {
                     "OriGo",
                     style: TextStyle(
                       color: Colors.white,
-                      fontSize: 28,
+                      fontSize: 48,
                       fontWeight: FontWeight.bold,
                       letterSpacing: 2,
                       shadows: [

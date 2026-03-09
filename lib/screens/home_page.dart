@@ -62,7 +62,7 @@ class HomePage extends StatelessWidget {
                   l10n.appTitle,
                   style: const TextStyle(
                     fontWeight: FontWeight.w900,
-                    fontSize: 18,
+                    fontSize: 38,
                     letterSpacing: 2.5,
                     color: Colors.white,
                   ),
@@ -146,7 +146,7 @@ class HomePage extends StatelessWidget {
                                   "${l10n.hello}, ${provider.globalUserName.toUpperCase()}!", // 🔥 MODIFICATO
                                   style: const TextStyle(
                                     color: Colors.white,
-                                    fontSize: 24,
+                                    fontSize: 18,
                                     fontWeight: FontWeight.w900,
                                     letterSpacing: 1.5,
                                     shadows: [
@@ -157,11 +157,7 @@ class HomePage extends StatelessWidget {
                                 const SizedBox(height: 6),
                                 Row(
                                   children: [
-                                    Icon(
-                                      Icons.electric_bolt_rounded, 
-                                      color: Colors.cyanAccent.withOpacity(0.6), 
-                                      size: 14
-                                    ),
+                                    
                                     const SizedBox(width: 6),
                                     Text(
                                       "${l10n.contract}: ${provider.myContract.contractName.toUpperCase()}", // 🔥 MODIFICATO

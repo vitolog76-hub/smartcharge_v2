@@ -1,6 +1,7 @@
 {
   "appTitle": "OriGO",
   "home": "Home",
+  "batteryRange": "SOC RANGE",
   "public": "Pubblica",
   "costEuro": "Costo",
   "batteryIntelligence": "3 - BATTERY INTELLIGENCE",

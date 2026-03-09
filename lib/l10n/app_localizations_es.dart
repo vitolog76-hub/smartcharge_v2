@@ -15,6 +15,9 @@ class AppLocalizationsEs extends AppLocalizations {
   String get home => 'Hogar';
 
   @override
+  String get batteryRange => 'RANGO SOC';
+
+  @override
   String get totalKwh => 'TOTAL kWh';
 
   @override

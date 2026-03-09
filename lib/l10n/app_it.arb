@@ -1,6 +1,7 @@
 {
   "appTitle": "OriGO",
   "home": "Home",
+    "batteryRange": "SOC INIZIALE - FINALE",
   "totalKwh": "TOTALE kWh",
   "totalCost": "TOTALE €",
   "totalCharges": "N. RICARICHE",
