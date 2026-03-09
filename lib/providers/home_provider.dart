@@ -11,6 +11,7 @@ import 'package:smartcharge_v2/services/simulation_service.dart';
 import 'package:smartcharge_v2/services/sync_service.dart';
 import 'package:intl/intl.dart';
 import 'package:smartcharge_v2/services/notification_service.dart';
+import 'package:smartcharge_v2/l10n/app_localizations.dart';
 
 class HomeProvider extends ChangeNotifier {
   // --- STATO ---
@@ -43,8 +44,13 @@ class HomeProvider extends ChangeNotifier {
   String _batteryChemistry = "NMC / NCA";
   String get batteryChemistry => _batteryChemistry;
 
-  String getSmartBatteryAdvice() {
-  if (chargeHistory.isEmpty) return "Inizia a caricare per ricevere consigli basati sul tuo stile di guida.";
+  String getSmartBatteryAdvice([AppLocalizations? l10n]) {
+  // Se non abbiamo traduzioni, usiamo i testi di default (italiano)
+  final t = l10n;
+  
+  if (chargeHistory.isEmpty) {
+    return t?.batteryAdviceEmpty ?? "Inizia a caricare per ricevere consigli basati sul tuo stile di guida.";
+  }
 
   final ora = DateTime.now();
   
@@ -55,9 +61,9 @@ class HomeProvider extends ChangeNotifier {
     );
 
     if (!haCaricatoAl100Recentemente) {
-      return "⚠️ Non carichi al 100% da più di una settimana. Fallo stasera per allineare le celle (BMS).";
+      return t?.batteryAdviceLfp ?? "⚠️ Non carichi al 100% da più di una settimana. Fallo stasera per allineare le celle (BMS).";
     }
-    return "✅ Batteria ben calibrata. Mantieni il target tra 20-80% per il resto della settimana.";
+    return t?.batteryAdviceLfpGood ?? "✅ Batteria ben calibrata. Mantieni il target tra 20-80% per il resto della settimana.";
   }
 
   // --- LOGICA PER NMC (Stress chimico) ---
@@ -67,12 +73,13 @@ class HomeProvider extends ChangeNotifier {
     ).length;
 
     if (caricheEccessive > 4) {
-      return "⚠️ Hai caricato oltre l'80% ben $caricheEccessive volte nell'ultimo mese. Cerca di limitarlo per ridurre il degrado.";
+      String message = t?.batteryAdviceNmc ?? "⚠️ Hai caricato oltre l'80% ben %d volte nell'ultimo mese. Cerca di limitarlo per ridurre il degrado.";
+      return message.replaceAll('%d', caricheEccessive.toString());
     }
-    return "✅ Ottima gestione: stai preservando la chimica al nichel limitando i picchi di carica.";
+    return t?.batteryAdviceNmcGood ?? "✅ Ottima gestione: stai preservando la chimica al nichel limitando i picchi di carica.";
   }
 
-  return "Mantieni la carica tra 20-80% per una longevità ottimale.";
+  return t?.batteryAdviceGeneric ?? "Mantieni la carica tra 20-80% per una longevità ottimale.";
 }
 
   // --- GESTIONE PROFILO (ID + NOME) ---

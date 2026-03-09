@@ -4,11 +4,14 @@ import 'package:firebase_core/firebase_core.dart';
 import 'package:intl/date_symbol_data_local.dart';
 import 'package:smartcharge_v2/providers/auth_provider.dart';
 import 'package:smartcharge_v2/providers/home_provider.dart';
+import 'package:smartcharge_v2/providers/locale_provider.dart'; // 🔥 NUOVO
 import 'package:smartcharge_v2/screens/login_page.dart';
 import 'package:smartcharge_v2/screens/home_page.dart';
 import 'package:smartcharge_v2/services/notification_service.dart';
 import 'package:flutter_dotenv/flutter_dotenv.dart';
 import 'package:flutter/foundation.dart' show kIsWeb;
+import 'package:flutter_localizations/flutter_localizations.dart'; // 🔥 NUOVO
+import 'package:smartcharge_v2/l10n/app_localizations.dart';
 
 void main() async {
   // 1. OBBLIGATORIO: Inizializza i legami con il sistema operativo
@@ -86,22 +89,41 @@ class MyApp extends StatelessWidget {
       providers: [
         ChangeNotifierProvider(create: (_) => AuthProvider()),
         ChangeNotifierProvider(create: (_) => HomeProvider()..init()),
+        ChangeNotifierProvider(create: (_) => LocaleProvider()), // 🔥 NUOVO
       ],
-      child: MaterialApp(
-        debugShowCheckedModeBanner: false,
-        title: 'Smart Charge',
-        theme: ThemeData.dark().copyWith(
-          scaffoldBackgroundColor: Colors.black,
-          appBarTheme: const AppBarTheme(
-            backgroundColor: Colors.transparent,
-            elevation: 0,
-          ),
-        ),
-        home: Consumer<AuthProvider>(
-          builder: (_, auth, __) {
-            return auth.isAuthenticated ? const HomePage() : const LoginPage();
-          },
-        ),
+      child: Consumer<LocaleProvider>( // 🔥 CONSUMER PER LA LINGUA
+        builder: (context, localeProvider, child) {
+          return MaterialApp(
+            debugShowCheckedModeBanner: false,
+            title: 'Smart Charge',
+            locale: localeProvider.locale, // 🔥 LINGUA CORRENTE
+            supportedLocales: const [ // 🔥 LINGUE SUPPORTATE
+              Locale('it', 'IT'),
+              Locale('en', 'US'),
+              Locale('fr', 'FR'),
+              Locale('es', 'ES'),
+              Locale('de', 'DE'),
+            ],
+            localizationsDelegates: const [ // 🔥 DELEGATI
+              AppLocalizations.delegate,
+              GlobalMaterialLocalizations.delegate,
+              GlobalCupertinoLocalizations.delegate,
+              GlobalWidgetsLocalizations.delegate,
+            ],
+            theme: ThemeData.dark().copyWith(
+              scaffoldBackgroundColor: Colors.black,
+              appBarTheme: const AppBarTheme(
+                backgroundColor: Colors.transparent,
+                elevation: 0,
+              ),
+            ),
+            home: Consumer<AuthProvider>(
+              builder: (_, auth, __) {
+                return auth.isAuthenticated ? const HomePage() : const LoginPage();
+              },
+            ),
+          );
+        },
       ),
     );
   }

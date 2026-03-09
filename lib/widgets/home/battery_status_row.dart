@@ -2,11 +2,17 @@ import 'package:flutter/material.dart';
 import 'package:smartcharge_v2/providers/home_provider.dart';
 import 'package:smartcharge_v2/widgets/battery_indicator.dart';
 import 'package:smartcharge_v2/widgets/status_card.dart';
+import 'package:smartcharge_v2/l10n/app_localizations.dart'; // 🔥 IMPORT
 
 class BatteryStatusRow extends StatelessWidget {
   final HomeProvider provider;
+  final AppLocalizations l10n; // 🔥 PARAMETRO
 
-  const BatteryStatusRow({super.key, required this.provider});
+  const BatteryStatusRow({
+    super.key, 
+    required this.provider,
+    required this.l10n, // 🔥 COSTRUTTORE
+  });
 
   @override
   Widget build(BuildContext context) {
@@ -26,6 +32,7 @@ class BatteryStatusRow extends StatelessWidget {
             duration: provider.duration,
             energy: provider.energyNeeded,
             power: provider.wallboxPwr,
+            l10n: l10n, // 🔥 USO
           ),
         ),
       ],

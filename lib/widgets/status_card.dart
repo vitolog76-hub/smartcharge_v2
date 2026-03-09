@@ -1,22 +1,24 @@
 import 'package:flutter/material.dart';
 import 'package:smartcharge_v2/core/constants.dart';
+import 'package:smartcharge_v2/l10n/app_localizations.dart';
 
 class StatusCard extends StatelessWidget {
   final Duration duration;
   final double energy;
   final double power;
+  final AppLocalizations l10n;
 
   const StatusCard({
     super.key, 
     required this.duration, 
     required this.energy, 
-    required this.power
+    required this.power,
+    required this.l10n,
   });
 
   @override
   Widget build(BuildContext context) {
     return Container(
-      // Rimosso width: double.infinity per permettere l'affiancamento
       padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
       decoration: BoxDecoration(
         color: AppColors.cardBg,
@@ -42,7 +44,7 @@ class StatusCard extends StatelessWidget {
                   shadows: [
                     Shadow(
                       color: AppColors.accent.withOpacity(0.7),
-                      blurRadius: 12, // EFFETTO GLOW
+                      blurRadius: 12,
                     ),
                   ],
                 ),
@@ -54,9 +56,15 @@ class StatusCard extends StatelessWidget {
           Row(
             mainAxisSize: MainAxisSize.min,
             children: [
-              _buildSmallStat("ENERGIA", "${energy.toStringAsFixed(1)} kWh"),
+              _buildSmallStat(
+                l10n.energy, 
+                "${energy.toStringAsFixed(1)} ${l10n.kwh}"
+              ),
               const SizedBox(width: 12),
-              _buildSmallStat("POTENZA", "${power.toStringAsFixed(1)} kW"),
+              _buildSmallStat(
+                l10n.power, 
+                "${power.toStringAsFixed(1)} kW"
+              ),
             ],
           ),
         ],
@@ -64,7 +72,6 @@ class StatusCard extends StatelessWidget {
     );
   }
 
-  // Mantenuta la tua funzione originale ma resa più compatta
   Widget _buildSmallStat(String label, String value) {
     return Column(
       mainAxisSize: MainAxisSize.min,

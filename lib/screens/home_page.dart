@@ -12,6 +12,7 @@ import 'package:smartcharge_v2/widgets/charging_controls.dart';
 import 'package:smartcharge_v2/widgets/action_buttons.dart';
 import 'package:smartcharge_v2/screens/history_page.dart';
 import 'package:smartcharge_v2/screens/settings_page.dart';
+import 'package:smartcharge_v2/l10n/app_localizations.dart';
 
 class HomePage extends StatelessWidget {
   const HomePage({super.key});
@@ -21,6 +22,7 @@ class HomePage extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final authProvider = Provider.of<AuthProvider>(context, listen: false);
+    final l10n = AppLocalizations.of(context)!; // 🔥 NUOVO
     
     return WillPopScope(
       onWillPop: () async {
@@ -41,7 +43,7 @@ class HomePage extends StatelessWidget {
           if (provider.shouldShowCompletionDialog && !_completionDialogShown) {
             WidgetsBinding.instance.addPostFrameCallback((_) {
               if (context.mounted) {
-                _showCompletionDialog(context, provider);
+                _showCompletionDialog(context, provider, l10n); // 🔥 MODIFICATO
               }
             });
           }
@@ -56,9 +58,9 @@ class HomePage extends StatelessWidget {
                   begin: Alignment.topLeft,
                   end: Alignment.bottomRight,
                 ).createShader(bounds),
-                child: const Text(
-                  "SMART CHARGE",
-                  style: TextStyle(
+                child: Text( // 🔥 MODIFICATO
+                  l10n.appTitle,
+                  style: const TextStyle(
                     fontWeight: FontWeight.w900,
                     fontSize: 18,
                     letterSpacing: 2.5,
@@ -134,14 +136,14 @@ class HomePage extends StatelessWidget {
                         children: [
                           const SizedBox(height: 10),
 
-                          // --- SEZIONE SALUTO PERSONALE (UNICA E CORRETTA) ---
+                          // --- SEZIONE SALUTO PERSONALE ---
                           Padding(
                             padding: const EdgeInsets.only(left: 8.0, bottom: 20.0),
                             child: Column(
                               crossAxisAlignment: CrossAxisAlignment.start,
                               children: [
                                 Text(
-                                  "CIAO, ${provider.globalUserName.toUpperCase()}!", // 🔥 USA IL NOME GLOBALE
+                                  "${l10n.hello}, ${provider.globalUserName.toUpperCase()}!", // 🔥 MODIFICATO
                                   style: const TextStyle(
                                     color: Colors.white,
                                     fontSize: 24,
@@ -162,7 +164,7 @@ class HomePage extends StatelessWidget {
                                     ),
                                     const SizedBox(width: 6),
                                     Text(
-                                      "CONTRATTO: ${provider.myContract.contractName.toUpperCase()}",
+                                      "${l10n.contract}: ${provider.myContract.contractName.toUpperCase()}", // 🔥 MODIFICATO
                                       style: TextStyle(
                                         color: Colors.white.withOpacity(0.4),
                                         fontSize: 10,
@@ -176,90 +178,98 @@ class HomePage extends StatelessWidget {
                             ),
                           ),
 
-                          // --- CARDS PRINCIPALI (UNA SOLA VOLTA) ---
+                          // --- CARDS PRINCIPALI ---
                           _glassContainer(child: ReadyTimeCard(provider: provider)),
                           const SizedBox(height: 12),
                           
-                          BatteryStatusRow(provider: provider),
+                          BatteryStatusRow(
+  provider: provider,
+  l10n: l10n, 
+),
                           const SizedBox(height: 12),
                           
-                          StatsRow(provider: provider),
-const SizedBox(height: 12),
+                          StatsRow(
+  provider: provider,
+  l10n: l10n, 
+),
+                          const SizedBox(height: 12),
 
-// 🔥 NUOVO: Avviso di rallentamento ricarica
-if (provider.showTaperingWarning)
-  Container(
-    margin: const EdgeInsets.only(bottom: 12),
-    padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-    decoration: BoxDecoration(
-      gradient: LinearGradient(
-        colors: [
-          Colors.amber.withOpacity(0.15),
-          Colors.orange.withOpacity(0.1),
-        ],
-        begin: Alignment.topLeft,
-        end: Alignment.bottomRight,
-      ),
-      borderRadius: BorderRadius.circular(16),
-      border: Border.all(
-        color: Colors.amber.withOpacity(0.3),
-        width: 1,
-      ),
-      boxShadow: [
-        BoxShadow(
-          color: Colors.amber.withOpacity(0.1),
-          blurRadius: 10,
-          spreadRadius: 1,
-        ),
-      ],
-    ),
-    child: Row(
-      children: [
-        Container(
-          padding: const EdgeInsets.all(8),
-          decoration: BoxDecoration(
-            color: Colors.amber.withOpacity(0.2),
-            shape: BoxShape.circle,
-          ),
-          child: Icon(
-            provider.targetSoc > 90 
-                ? Icons.speed_rounded 
-                : Icons.info_outline_rounded,
-            color: Colors.amber,
-            size: 20,
-          ),
-        ),
-        const SizedBox(width: 12),
-        Expanded(
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Text(
-                provider.targetSoc > 90 
-                    ? "Rallentamento significativo" 
-                    : "Rallentamento della ricarica",
-                style: const TextStyle(
-                  color: Colors.amber,
-                  fontSize: 13,
-                  fontWeight: FontWeight.w600,
-                  letterSpacing: 0.3,
-                ),
-              ),
-              const SizedBox(height: 4),
-              Text(
-                provider.taperingWarning,
-                style: TextStyle(
-                  color: Colors.white.withOpacity(0.7),
-                  fontSize: 12,
-                  height: 1.3,
-                ),
-              ),
-            ],
-          ),
-        ),
-      ],
-    ),
-  ),
+                          // 🔥 AVVISO DI RALLENTAMENTO RICARICA
+                          if (provider.showTaperingWarning)
+                            Container(
+                              margin: const EdgeInsets.only(bottom: 12),
+                              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                              decoration: BoxDecoration(
+                                gradient: LinearGradient(
+                                  colors: [
+                                    Colors.amber.withOpacity(0.15),
+                                    Colors.orange.withOpacity(0.1),
+                                  ],
+                                  begin: Alignment.topLeft,
+                                  end: Alignment.bottomRight,
+                                ),
+                                borderRadius: BorderRadius.circular(16),
+                                border: Border.all(
+                                  color: Colors.amber.withOpacity(0.3),
+                                  width: 1,
+                                ),
+                                boxShadow: [
+                                  BoxShadow(
+                                    color: Colors.amber.withOpacity(0.1),
+                                    blurRadius: 10,
+                                    spreadRadius: 1,
+                                  ),
+                                ],
+                              ),
+                              child: Row(
+                                children: [
+                                  Container(
+                                    padding: const EdgeInsets.all(8),
+                                    decoration: BoxDecoration(
+                                      color: Colors.amber.withOpacity(0.2),
+                                      shape: BoxShape.circle,
+                                    ),
+                                    child: Icon(
+                                      provider.targetSoc > 90 
+                                          ? Icons.speed_rounded 
+                                          : Icons.info_outline_rounded,
+                                      color: Colors.amber,
+                                      size: 20,
+                                    ),
+                                  ),
+                                  const SizedBox(width: 12),
+                                  Expanded(
+                                    child: Column(
+                                      crossAxisAlignment: CrossAxisAlignment.start,
+                                      children: [
+                                        Text(
+                                          provider.targetSoc > 90 
+                                              ? l10n.taperingSignificant // 🔥 MODIFICATO
+                                              : l10n.taperingSlowdown, // 🔥 MODIFICATO
+                                          style: const TextStyle(
+                                            color: Colors.amber,
+                                            fontSize: 13,
+                                            fontWeight: FontWeight.w600,
+                                            letterSpacing: 0.3,
+                                          ),
+                                        ),
+                                        const SizedBox(height: 4),
+                                        Text(
+                                          provider.targetSoc > 90 
+                                              ? l10n.taperingWarning20 // 🔥 MODIFICATO
+                                              : l10n.taperingWarning60, // 🔥 MODIFICATO
+                                          style: TextStyle(
+                                            color: Colors.white.withOpacity(0.7),
+                                            fontSize: 12,
+                                            height: 1.3,
+                                          ),
+                                        ),
+                                      ],
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ),
                           
                           // CONTROLLI RICARICA
                           _glassContainer(
@@ -270,7 +280,7 @@ if (provider.showTaperingWarning)
                           
                           const SizedBox(height: 12),
 
-                          _buildBatteryCoach(provider),
+                          _buildBatteryCoach(provider, l10n), // 🔥 MODIFICATO
 
                           const SizedBox(height: 12),
                           
@@ -279,7 +289,10 @@ if (provider.showTaperingWarning)
                             children: [
                               Expanded(
                                 flex: 12,
-                                child: SimulationButton(provider: provider),
+                                child: SimulationButton(
+  provider: provider,
+  l10n: l10n,
+),
                               ),
                               const SizedBox(width: 12),
                               Expanded(
@@ -297,16 +310,15 @@ if (provider.showTaperingWarning)
                             child: ActionButtons(
                               onHomeTap: provider.isSimulating 
                                   ? () {} 
-                                  : () => _showAddDialog(context, provider, "Home"),
+                                  : () => _showAddDialog(context, provider, l10n.home, l10n), // 🔥 MODIFICATO
                               onPublicTap: provider.isSimulating 
                                   ? () {} 
-                                  : () => _showAddDialog(context, provider, "Pubblica"),
+                                  : () => _showAddDialog(context, provider, l10n.public, l10n), // 🔥 MODIFICATO
+                             l10n: l10n,
                             ),
                           ),
                           
                           const SizedBox(height: 12),
-                          
-                         
                           
                           const SizedBox(height: 30), // Padding finale per lo scroll
                         ],
@@ -324,11 +336,7 @@ if (provider.showTaperingWarning)
 
   // --- WIDGETS DI SUPPORTO ---
 
-  
-
-  
-
-  void _showCompletionDialog(BuildContext context, HomeProvider provider) {
+  void _showCompletionDialog(BuildContext context, HomeProvider provider, AppLocalizations l10n) { // 🔥 MODIFICATO
     _completionDialogShown = true;
     
     // Salvataggio dei dati (popola lastSavedEnergy e lastSavedCost)
@@ -341,9 +349,9 @@ if (provider.showTaperingWarning)
         return AlertDialog(
           backgroundColor: const Color(0xFF1E1E1E),
           shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
-          title: const Text(
-            '⚡ RICARICA COMPLETATA!',
-            style: TextStyle(color: Colors.cyanAccent, fontWeight: FontWeight.bold),
+          title: Text( // 🔥 MODIFICATO
+            l10n.chargingComplete,
+            style: const TextStyle(color: Colors.cyanAccent, fontWeight: FontWeight.bold),
             textAlign: TextAlign.center,
           ),
           content: Column(
@@ -352,18 +360,17 @@ if (provider.showTaperingWarning)
               const Icon(Icons.check_circle, color: Colors.green, size: 50),
               const SizedBox(height: 16),
               Text(
-                'SOC finale: ${provider.currentSoc.toStringAsFixed(1)}%',
+                '${l10n.finalSoc}: ${provider.currentSoc.toStringAsFixed(1)}%', // 🔥 MODIFICATO
                 style: const TextStyle(color: Colors.white70, fontSize: 16),
               ),
               const SizedBox(height: 12),
-              // Mostriamo solo i dati fondamentali "congelati"
               Text(
-                'Energia: ${provider.lastSavedEnergy.toStringAsFixed(1)} kWh',
+                '${l10n.energy}: ${provider.lastSavedEnergy.toStringAsFixed(1)} ${l10n.kwh}', // 🔥 MODIFICATO
                 style: const TextStyle(color: Colors.white, fontSize: 18, fontWeight: FontWeight.bold),
               ),
               const SizedBox(height: 4),
               Text(
-                'Costo: ${provider.lastSavedCost.toStringAsFixed(2)} €',
+                '${l10n.costEuro}: ${provider.lastSavedCost.toStringAsFixed(2)} ${l10n.euro}', // 🔥 MODIFICATO
                 style: const TextStyle(color: Colors.cyanAccent, fontSize: 20, fontWeight: FontWeight.bold),
               ),
             ],
@@ -381,7 +388,7 @@ if (provider.showTaperingWarning)
                   foregroundColor: Colors.cyanAccent,
                   shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
                 ),
-                child: const Text('CHIUDI'),
+                child: Text(l10n.close), // 🔥 MODIFICATO (dovrai aggiungere "close" in ARB)
               ),
             ),
           ],
@@ -389,9 +396,6 @@ if (provider.showTaperingWarning)
       },
     );
   }
-
-  
-
 
   String _formatDuration(Duration duration) {
     String twoDigits(int n) => n.toString().padLeft(2, '0');
@@ -468,7 +472,7 @@ if (provider.showTaperingWarning)
     );
   }
 
-  Widget _buildBatteryCoach(HomeProvider provider) {
+  Widget _buildBatteryCoach(HomeProvider provider, AppLocalizations l10n) { // 🔥 MODIFICATO
     String title;
     Color accentColor;
     IconData icon;
@@ -476,17 +480,17 @@ if (provider.showTaperingWarning)
     // Colori e Titoli cambiano per chimica, ma il TESTO (advice) sarà dinamico
     switch (provider.batteryChemistry) {
       case "LFP":
-        title = "ANALISI BATTERIA LFP";
+        title = l10n.batteryCoachLfp; // 🔥 MODIFICATO
         accentColor = Colors.greenAccent;
         icon = Icons.analytics_outlined;
         break;
       case "NMC / NCA":
-        title = "ANALISI BATTERIA NMC";
+        title = l10n.batteryCoachNmc; // 🔥 MODIFICATO
         accentColor = Colors.orangeAccent;
         icon = Icons.health_and_safety_outlined;
         break;
       default:
-        title = "CONSIGLIO GENERICO";
+        title = l10n.batteryCoachGeneric; // 🔥 MODIFICATO
         accentColor = Colors.blueAccent;
         icon = Icons.info_outline;
     }
@@ -504,11 +508,10 @@ if (provider.showTaperingWarning)
               children: [
                 Text(title, style: TextStyle(color: accentColor, fontSize: 9, fontWeight: FontWeight.w900, letterSpacing: 1.2)),
                 const SizedBox(height: 4),
-                // 🔥 QUI CHIAMIAMO LA FUNZIONE INTELLIGENTE
                 Text(
-                  provider.getSmartBatteryAdvice(), 
-                  style: const TextStyle(color: Colors.white70, fontSize: 11, height: 1.3),
-                ),
+  provider.getSmartBatteryAdvice(l10n), 
+  style: const TextStyle(color: Colors.white70, fontSize: 11, height: 1.3),
+),
               ],
             ),
           ),
@@ -554,11 +557,17 @@ if (provider.showTaperingWarning)
       ),
     );
   }
-
-  void _showAddDialog(BuildContext context, HomeProvider provider, String tipo) {
-    showDialog(context: context, builder: (_) => AddChargeDialog(provider: provider, tipo: tipo));
-  }
 }
+void _showAddDialog(BuildContext context, HomeProvider provider, String tipo, AppLocalizations l10n) {
+  showDialog(
+    context: context, 
+    builder: (_) => AddChargeDialog(
+      provider: provider, 
+      tipo: tipo,
+      l10n: l10n, // 🔥 AGGIUNGI QUESTO
+    )
+  );
+} 
 
 class _PulseIcon extends StatefulWidget {
   final Widget child;

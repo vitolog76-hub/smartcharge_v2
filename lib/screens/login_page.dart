@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:smartcharge_v2/providers/auth_provider.dart' as app;
+import 'package:smartcharge_v2/providers/locale_provider.dart';
 import 'package:smartcharge_v2/screens/register_page.dart';
 
 class LoginPage extends StatelessWidget {
@@ -67,7 +68,7 @@ class LoginPage extends StatelessWidget {
                   ),
                   const SizedBox(height: 20),
                   
-                  // Titolo
+                  // Title
                   const Text(
                     "SMART CHARGE",
                     style: TextStyle(
@@ -85,7 +86,7 @@ class LoginPage extends StatelessWidget {
                   ),
                   const SizedBox(height: 8),
                   Text(
-                    "Accedi per gestire le tue ricariche",
+                    "Sign in to manage your charging sessions",
                     style: TextStyle(
                       color: Colors.white.withOpacity(0.6),
                       fontSize: 14,
@@ -93,7 +94,7 @@ class LoginPage extends StatelessWidget {
                   ),
                   const SizedBox(height: 40),
                   
-                  // Campo Email
+                  // Email Field
                   Container(
                     decoration: BoxDecoration(
                       borderRadius: BorderRadius.circular(12),
@@ -127,7 +128,7 @@ class LoginPage extends StatelessWidget {
                   ),
                   const SizedBox(height: 16),
                   
-                  // Campo Password
+                  // Password Field
                   Container(
                     decoration: BoxDecoration(
                       borderRadius: BorderRadius.circular(12),
@@ -163,7 +164,7 @@ class LoginPage extends StatelessWidget {
                   
                   const SizedBox(height: 8),
                   
-                  // Link recupero password
+                  // Forgot password link
                   Align(
                     alignment: Alignment.centerRight,
                     child: TextButton(
@@ -171,13 +172,13 @@ class LoginPage extends StatelessWidget {
                       style: TextButton.styleFrom(
                         foregroundColor: Colors.blueAccent,
                       ),
-                      child: const Text("Password dimenticata?"),
+                      child: const Text("Forgot password?"),
                     ),
                   ),
                   
                   const SizedBox(height: 20),
                   
-                  // Pulsante Login
+                  // Login Button
                   SizedBox(
                     width: double.infinity,
                     child: ElevatedButton(
@@ -188,7 +189,7 @@ class LoginPage extends StatelessWidget {
                         if (email.isEmpty || password.isEmpty) {
                           ScaffoldMessenger.of(context).showSnackBar(
                             const SnackBar(
-                              content: Text("Inserisci email e password"),
+                              content: Text("Please enter email and password"),
                               backgroundColor: Colors.red,
                             ),
                           );
@@ -216,7 +217,7 @@ class LoginPage extends StatelessWidget {
                         shadowColor: Colors.blueAccent.withOpacity(0.5),
                       ),
                       child: const Text(
-                        "ACCEDI",
+                        "SIGN IN",
                         style: TextStyle(
                           fontSize: 16,
                           fontWeight: FontWeight.bold,
@@ -227,12 +228,12 @@ class LoginPage extends StatelessWidget {
                   
                   const SizedBox(height: 20),
                   
-                  // 🔥 SOLO LINK REGISTRAZIONE (SENZA GOOGLE)
+                  // Registration link
                   Row(
                     mainAxisAlignment: MainAxisAlignment.center,
                     children: [
                       Text(
-                        "Non hai un account? ",
+                        "Don't have an account? ",
                         style: TextStyle(color: Colors.white.withOpacity(0.5)),
                       ),
                       TextButton(
@@ -245,9 +246,48 @@ class LoginPage extends StatelessWidget {
                         style: TextButton.styleFrom(
                           foregroundColor: Colors.blueAccent,
                         ),
-                        child: const Text("Registrati"),
+                        child: const Text("Sign up"),
                       ),
                     ],
+                  ),
+                  
+                  const SizedBox(height: 20),
+                  
+                  // Language selector with flags
+                  Container(
+                    padding: const EdgeInsets.all(12),
+                    decoration: BoxDecoration(
+                      color: Colors.white.withOpacity(0.05),
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                    child: Row(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                        const Icon(Icons.language, color: Colors.blueAccent, size: 20),
+                        const SizedBox(width: 12),
+                        Consumer<LocaleProvider>(
+                          builder: (context, localeProvider, child) {
+                            return DropdownButton<Locale>(
+                              value: localeProvider.locale,
+                              dropdownColor: const Color(0xFF0F172A),
+                              icon: const Icon(Icons.arrow_drop_down, color: Colors.blueAccent),
+                              onChanged: (Locale? newLocale) {
+                                if (newLocale != null) {
+                                  localeProvider.setLocale(newLocale);
+                                }
+                              },
+                              items: [
+                                _buildDropdownItem('en', 'US', 'English', '🇬🇧'),
+                                _buildDropdownItem('it', 'IT', 'Italiano', '🇮🇹'),
+                                _buildDropdownItem('es', 'ES', 'Español', '🇪🇸'),
+                                _buildDropdownItem('de', 'DE', 'Deutsch', '🇩🇪'),
+                                _buildDropdownItem('fr', 'FR', 'Français', '🇫🇷'),
+                              ],
+                            );
+                          },
+                        ),
+                      ],
+                    ),
                   ),
                 ],
               ),
@@ -258,7 +298,25 @@ class LoginPage extends StatelessWidget {
     );
   }
 
-  // Dialog recupero password
+  DropdownMenuItem<Locale> _buildDropdownItem(
+    String languageCode, 
+    String countryCode, 
+    String name, 
+    String flag
+  ) {
+    return DropdownMenuItem(
+      value: Locale(languageCode, countryCode),
+      child: Row(
+        children: [
+          Text(flag, style: const TextStyle(fontSize: 20)),
+          const SizedBox(width: 8),
+          Text(name, style: const TextStyle(color: Colors.white)),
+        ],
+      ),
+    );
+  }
+
+  // Password reset dialog
   void _showResetPasswordDialog(BuildContext context) {
     final emailController = TextEditingController();
     
@@ -268,7 +326,7 @@ class LoginPage extends StatelessWidget {
         backgroundColor: const Color(0xFF1C1C1E),
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
         title: const Text(
-          "Recupera Password",
+          "Reset Password",
           style: TextStyle(color: Colors.white),
           textAlign: TextAlign.center,
         ),
@@ -276,7 +334,7 @@ class LoginPage extends StatelessWidget {
           mainAxisSize: MainAxisSize.min,
           children: [
             const Text(
-              "Inserisci la tua email per ricevere il link di reset",
+              "Enter your email to receive a reset link",
               style: TextStyle(color: Colors.white70, fontSize: 14),
               textAlign: TextAlign.center,
             ),
@@ -303,7 +361,7 @@ class LoginPage extends StatelessWidget {
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(ctx),
-            child: const Text("Annulla", style: TextStyle(color: Colors.white38)),
+            child: const Text("Cancel", style: TextStyle(color: Colors.white38)),
           ),
           ElevatedButton(
             onPressed: () => _resetPassword(context, emailController.text, ctx),
@@ -311,7 +369,7 @@ class LoginPage extends StatelessWidget {
               backgroundColor: Colors.blueAccent,
               foregroundColor: Colors.white,
             ),
-            child: const Text("INVIA"),
+            child: const Text("SEND"),
           ),
         ],
       ),
@@ -326,7 +384,7 @@ class LoginPage extends StatelessWidget {
     if (email.isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
-          content: Text("Inserisci un indirizzo email"),
+          content: Text("Please enter an email address"),
           backgroundColor: Colors.red,
         ),
       );
@@ -339,17 +397,17 @@ class LoginPage extends StatelessWidget {
       
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
-          content: Text("Link di reset inviato a $email"),
+          content: Text("Reset link sent to $email"),
           backgroundColor: Colors.green,
           duration: const Duration(seconds: 4),
         ),
       );
     } on FirebaseAuthException catch (e) {
-      String message = "Errore durante l'invio";
+      String message = "Error sending reset link";
       if (e.code == 'user-not-found') {
-        message = "Nessun utente trovato con questa email";
+        message = "No user found with this email";
       } else if (e.code == 'invalid-email') {
-        message = "Formato email non valido";
+        message = "Invalid email format";
       }
       
       ScaffoldMessenger.of(context).showSnackBar(
@@ -357,7 +415,7 @@ class LoginPage extends StatelessWidget {
       );
     } catch (e) {
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text("Errore: $e"), backgroundColor: Colors.red),
+        SnackBar(content: Text("Error: $e"), backgroundColor: Colors.red),
       );
     }
   }

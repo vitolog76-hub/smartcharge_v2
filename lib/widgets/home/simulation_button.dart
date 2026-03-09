@@ -2,10 +2,17 @@ import 'dart:ui';
 import 'package:flutter/material.dart';
 import 'package:smartcharge_v2/providers/home_provider.dart';
 import 'package:smartcharge_v2/widgets/home/add_charge_dialog.dart';
+import 'package:smartcharge_v2/l10n/app_localizations.dart';
 
 class SimulationButton extends StatelessWidget {
   final HomeProvider provider;
-  const SimulationButton({super.key, required this.provider});
+  final AppLocalizations l10n;
+
+  const SimulationButton({
+    super.key, 
+    required this.provider,
+    required this.l10n,
+  });
 
   @override
   Widget build(BuildContext context) {
@@ -23,7 +30,7 @@ class SimulationButton extends StatelessWidget {
 
     if (!isSimulating) {
       accentColor = Colors.cyanAccent;
-      statusText = "AVVIA";
+      statusText = l10n.start; // "AVVIA"
       statusIcon = Icons.play_arrow_rounded;
     } else if (isScheduled) {
       accentColor = Colors.orangeAccent;
@@ -31,7 +38,7 @@ class SimulationButton extends StatelessWidget {
       statusIcon = Icons.access_time_filled_rounded;
     } else {
       accentColor = Colors.redAccent;
-      statusText = "STOP";
+      statusText = l10n.stop; // "STOP"
       statusIcon = Icons.stop_rounded;
     }
 
@@ -83,7 +90,7 @@ class SimulationButton extends StatelessWidget {
               ),
             ),
 
-            // 3. CONTENUTO (Fix per l'overflow dei 140px)
+            // 3. CONTENUTO
             Padding(
               padding: const EdgeInsets.symmetric(horizontal: 8.0),
               child: Row(
@@ -93,19 +100,19 @@ class SimulationButton extends StatelessWidget {
                   Icon(
                     statusIcon,
                     color: Colors.white,
-                    size: 22, // Ridotto da 32
+                    size: 22,
                     shadows: [Shadow(color: accentColor, blurRadius: 10)],
                   ),
-                  const SizedBox(width: 8), // Ridotto da 15
+                  const SizedBox(width: 8),
                   Flexible(
                     child: Text(
                       statusText,
                       overflow: TextOverflow.ellipsis,
                       style: TextStyle(
                         color: Colors.white,
-                        fontSize: 14, // Ridotto da 20
+                        fontSize: 14,
                         fontWeight: FontWeight.w900,
-                        letterSpacing: 1.5, // Ridotto da 4.0
+                        letterSpacing: 1.5,
                         shadows: [
                           Shadow(color: accentColor, blurRadius: 10),
                         ],
@@ -148,15 +155,18 @@ class SimulationButton extends StatelessWidget {
               borderRadius: BorderRadius.circular(30),
               side: BorderSide(color: Colors.white.withOpacity(0.1))
           ),
-          title: const Text("INTERROMPI", style: TextStyle(color: Colors.orangeAccent, fontWeight: FontWeight.w900, fontSize: 16)),
-          content: Text("Ricarica al ${captureSoc.toStringAsFixed(1)}%. Vuoi salvare la sessione nello storico?", style: const TextStyle(color: Colors.white70, fontSize: 14)),
+          title: Text(l10n.interrupt, style: const TextStyle(color: Colors.orangeAccent, fontWeight: FontWeight.w900, fontSize: 16)),
+          content: Text(
+            l10n.interruptMessage(captureSoc.toStringAsFixed(1)),
+            style: const TextStyle(color: Colors.white70, fontSize: 14)
+          ),
           actions: [
             TextButton(
               onPressed: () { 
                 provider.stopSimulation(); 
                 Navigator.pop(ctx); 
               }, 
-              child: const Text("SCARTA", style: TextStyle(color: Colors.redAccent))
+              child: Text(l10n.discard, style: const TextStyle(color: Colors.redAccent))
             ),
             ElevatedButton(
               style: ElevatedButton.styleFrom(
@@ -166,9 +176,9 @@ class SimulationButton extends StatelessWidget {
               onPressed: () { 
                 provider.stopSimulation(); 
                 Navigator.pop(ctx); 
-                _showAddDialog(context, "Home", captureSoc); 
+                _showAddDialog(context, l10n.home, captureSoc); 
               },
-              child: const Text("SALVA", style: TextStyle(color: Colors.white))
+              child: Text(l10n.save, style: const TextStyle(color: Colors.white))
             ),
           ],
         ),
@@ -182,7 +192,8 @@ class SimulationButton extends StatelessWidget {
       builder: (_) => AddChargeDialog(
         provider: provider, 
         tipo: tipo, 
-        customEndSoc: customEndSoc
+        customEndSoc: customEndSoc,
+        l10n: l10n,
       )
     );
   }

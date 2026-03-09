@@ -8,9 +8,11 @@ environment:
 dependencies:
   flutter:
     sdk: flutter
-  flutter_local_notifications: ^17.0.0 # O l'ultima versione disponibile
-  timezone: ^0.9.4 # Necessario per programmare l'orario esatto
-
+  flutter_localizations:  # 🔥 NUOVO
+    sdk: flutter           # 🔥 NUOVO
+  
+  flutter_local_notifications: ^17.0.0
+  timezone: ^0.9.4
   
   # UI & Fonts
   google_fonts: ^6.1.0
@@ -20,7 +22,8 @@ dependencies:
   # State Management & Storage
   provider: ^6.1.1
   shared_preferences: ^2.5.4
-  intl: ^0.19.0
+  intl: ^0.20.2
+
   image_picker: ^1.0.4
   
   # AI & FILE PICKER
@@ -28,7 +31,7 @@ dependencies:
   file_picker: ^8.0.0
   
   # ESTRAZIONE PDF
-  syncfusion_flutter_pdf: ^24.2.3
+  syncfusion_flutter_pdf: ^32.2.8
   
   # Grafici e PDF
   fl_chart: ^0.66.0
@@ -46,9 +49,7 @@ dependencies:
   # Effetti Visivi
   fluid_background: ^1.0.5
   
-  # Notifiche & Permessi
-  
-  
+  # Permessi
   permission_handler: ^11.3.0
 
 dev_dependencies:
@@ -67,6 +68,7 @@ flutter_launcher_icons:
   remove_alpha_ios: true
 
 flutter:
+  generate: true  # 🔥 NUOVO (fondamentale!)
   uses-material-design: true
   
   fonts:

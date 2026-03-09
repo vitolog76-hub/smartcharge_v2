@@ -5,17 +5,20 @@ import 'package:smartcharge_v2/models/charge_session.dart';
 import 'package:smartcharge_v2/models/contract_model.dart';
 import 'package:smartcharge_v2/services/charge_engine.dart';
 import 'package:smartcharge_v2/services/cost_calculator.dart'; 
+import 'package:smartcharge_v2/l10n/app_localizations.dart';
 
 class AddChargeDialog extends StatefulWidget {
   final HomeProvider provider;
   final String tipo;
   final double? customEndSoc;
+  final AppLocalizations l10n;
 
   const AddChargeDialog({
     super.key,
     required this.provider,
     required this.tipo,
     this.customEndSoc,
+    required this.l10n,
   });
 
   @override
@@ -61,22 +64,22 @@ class _AddChargeDialogState extends State<AddChargeDialog> {
   }
 
   void _updateEndTimeFromKwh() {
-  final kwh = double.tryParse(kwhCtrl.text.replaceAll(',', '.')) ?? 0;
-  final power = double.tryParse(wallboxPowerCtrl.text.replaceAll(',', '.')) ?? widget.provider.wallboxPwr;
+    final kwh = double.tryParse(kwhCtrl.text.replaceAll(',', '.')) ?? 0;
+    final power = double.tryParse(wallboxPowerCtrl.text.replaceAll(',', '.')) ?? widget.provider.wallboxPwr;
 
-  if (kwh > 0 && power > 0) {
-    final hoursNeeded = kwh / power;
-    final minutesNeeded = (hoursNeeded * 60).round();
-    
-    // Partiamo da un DateTime fittizio con l'ora di inizio selezionata
-    final startRef = DateTime(2024, 1, 1, selectedStartTime.hour, selectedStartTime.minute);
-    final endRef = startRef.add(Duration(minutes: minutesNeeded));
-    
-    setState(() {
-      selectedEndTime = TimeOfDay.fromDateTime(endRef);
-    });
+    if (kwh > 0 && power > 0) {
+      final hoursNeeded = kwh / power;
+      final minutesNeeded = (hoursNeeded * 60).round();
+      
+      // Partiamo da un DateTime fittizio con l'ora di inizio selezionata
+      final startRef = DateTime(2024, 1, 1, selectedStartTime.hour, selectedStartTime.minute);
+      final endRef = startRef.add(Duration(minutes: minutesNeeded));
+      
+      setState(() {
+        selectedEndTime = TimeOfDay.fromDateTime(endRef);
+      });
+    }
   }
-}
 
   double _calculateKwhValue(double start, double end) {
     final batteryCap = widget.provider.currentBatteryCap;
@@ -113,11 +116,13 @@ class _AddChargeDialogState extends State<AddChargeDialog> {
 
   @override
   Widget build(BuildContext context) {
+    final l10n = widget.l10n;
+    
     return AlertDialog(
       backgroundColor: const Color(0xFF1C1C1E),
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
       title: Text(
-        "Registra Ricarica ${widget.tipo}",
+        l10n.addManualCharge,
         style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold),
         textAlign: TextAlign.center,
       ),
@@ -134,13 +139,13 @@ class _AddChargeDialogState extends State<AddChargeDialog> {
               ),
               child: Column(
                 children: [
-                  _buildDateTile(),
+                  _buildDateTile(l10n),
                   const SizedBox(height: 8),
                   Row(
                     children: [
-                      Expanded(child: _buildStartTimeTile()),
+                      Expanded(child: _buildStartTimeTile(l10n)),
                       const SizedBox(width: 8),
-                      Expanded(child: _buildEndTimeTile()),
+                      Expanded(child: _buildEndTimeTile(l10n)),
                     ],
                   ),
                 ],
@@ -164,11 +169,11 @@ class _AddChargeDialogState extends State<AddChargeDialog> {
                           controller: startSocCtrl,
                           keyboardType: const TextInputType.numberWithOptions(decimal: true),
                           style: const TextStyle(color: Colors.blueAccent),
-                          decoration: const InputDecoration(
-                            labelText: "SOC INIZIALE %",
-                            labelStyle: TextStyle(color: Colors.white38, fontSize: 10),
+                          decoration: InputDecoration(
+                            labelText: l10n.initialSoc,
+                            labelStyle: const TextStyle(color: Colors.white38, fontSize: 10),
                             suffixText: "%",
-                            suffixStyle: TextStyle(color: Colors.white38),
+                            suffixStyle: const TextStyle(color: Colors.white38),
                           ),
                           onChanged: (_) => _updateKwhFromSoc(),
                         ),
@@ -179,11 +184,11 @@ class _AddChargeDialogState extends State<AddChargeDialog> {
                           controller: endSocCtrl,
                           keyboardType: const TextInputType.numberWithOptions(decimal: true),
                           style: const TextStyle(color: Colors.greenAccent),
-                          decoration: const InputDecoration(
-                            labelText: "SOC FINALE %",
-                            labelStyle: TextStyle(color: Colors.white38, fontSize: 10),
+                          decoration: InputDecoration(
+                            labelText: l10n.finalSoc,
+                            labelStyle: const TextStyle(color: Colors.white38, fontSize: 10),
                             suffixText: "%",
-                            suffixStyle: TextStyle(color: Colors.white38),
+                            suffixStyle: const TextStyle(color: Colors.white38),
                           ),
                           onChanged: (_) => _updateKwhFromSoc(),
                         ),
@@ -192,19 +197,19 @@ class _AddChargeDialogState extends State<AddChargeDialog> {
                   ),
                   const SizedBox(height: 8),
                   TextField(
-  controller: kwhCtrl,
-  keyboardType: const TextInputType.numberWithOptions(decimal: true),
-  style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold),
-  onChanged: (_) {
-    _updateSocFromKwh();      // Sincronizza il SOC finale
-    _updateEndTimeFromKwh();  // 🔥 Sincronizza l'orario di fine
-  },
-  decoration: const InputDecoration(
-    labelText: "ENERGIA (kWh)",
-    labelStyle: TextStyle(color: Colors.white38, fontSize: 10),
-    suffixText: "kWh",
-  ),
-),
+                    controller: kwhCtrl,
+                    keyboardType: const TextInputType.numberWithOptions(decimal: true),
+                    style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold),
+                    onChanged: (_) {
+                      _updateSocFromKwh();
+                      _updateEndTimeFromKwh();
+                    },
+                    decoration: InputDecoration(
+                      labelText: l10n.energyNeeded,
+                      labelStyle: const TextStyle(color: Colors.white38, fontSize: 10),
+                      suffixText: l10n.kwh,
+                    ),
+                  ),
                 ],
               ),
             ),
@@ -221,22 +226,21 @@ class _AddChargeDialogState extends State<AddChargeDialog> {
                 controller: wallboxPowerCtrl,
                 keyboardType: const TextInputType.numberWithOptions(decimal: true),
                 style: const TextStyle(color: Colors.orangeAccent),
-                decoration: const InputDecoration(
-                  labelText: "POTENZA WALLBOX (kW)",
-                  labelStyle: TextStyle(color: Colors.white38, fontSize: 10),
+                decoration: InputDecoration(
+                  labelText: l10n.power,
+                  labelStyle: const TextStyle(color: Colors.white38, fontSize: 10),
                   suffixText: "kW",
-                  suffixStyle: TextStyle(color: Colors.white38),
+                  suffixStyle: const TextStyle(color: Colors.white38),
                 ),
               ),
             ),
-            // 🔥 DURATA STIMATA RIMOSSA COME RICHIESTO
           ],
         ),
       ),
       actions: [
         TextButton(
           onPressed: () => Navigator.pop(context),
-          child: const Text("Annulla", style: TextStyle(color: Colors.white38)),
+          child: Text(l10n.cancel, style: const TextStyle(color: Colors.white38)),
         ),
         ElevatedButton(
           onPressed: _handleSave,
@@ -244,7 +248,7 @@ class _AddChargeDialogState extends State<AddChargeDialog> {
             backgroundColor: Colors.blueAccent,
             foregroundColor: Colors.white,
           ),
-          child: const Text("SALVA"),
+          child: Text(l10n.save),
         ),
       ],
     );
@@ -252,31 +256,31 @@ class _AddChargeDialogState extends State<AddChargeDialog> {
 
   // --- WIDGETS DI SUPPORTO ---
 
-  Widget _buildDateTile() {
+  Widget _buildDateTile(AppLocalizations l10n) {
     return ListTile(
       contentPadding: EdgeInsets.zero,
       leading: const Icon(Icons.calendar_today, color: Colors.blueAccent, size: 20),
-      title: const Text("Data", style: TextStyle(color: Colors.white38, fontSize: 10)),
+      title: Text(l10n.date, style: const TextStyle(color: Colors.white38, fontSize: 10)),
       subtitle: Text(DateFormat('dd/MM/yyyy').format(selectedDate), style: const TextStyle(color: Colors.white, fontSize: 14)),
       onTap: _selectDate,
     );
   }
 
-  Widget _buildStartTimeTile() {
+  Widget _buildStartTimeTile(AppLocalizations l10n) {
     return ListTile(
       contentPadding: EdgeInsets.zero,
       leading: const Icon(Icons.timer, color: Colors.blueAccent, size: 16),
-      title: const Text("Inizio", style: TextStyle(color: Colors.white38, fontSize: 8)),
+      title: Text(l10n.start, style: const TextStyle(color: Colors.white38, fontSize: 8)),
       subtitle: Text(selectedStartTime.format(context), style: const TextStyle(color: Colors.white, fontSize: 12)),
       onTap: _selectStartTime,
     );
   }
 
-  Widget _buildEndTimeTile() {
+  Widget _buildEndTimeTile(AppLocalizations l10n) {
     return ListTile(
       contentPadding: EdgeInsets.zero,
       leading: const Icon(Icons.timer_off, color: Colors.orangeAccent, size: 16),
-      title: const Text("Fine", style: TextStyle(color: Colors.white38, fontSize: 8)),
+      title: Text(l10n.end, style: const TextStyle(color: Colors.white38, fontSize: 8)),
       subtitle: Text(selectedEndTime.format(context), style: const TextStyle(color: Colors.white, fontSize: 12)),
       onTap: _selectEndTime,
     );
@@ -298,73 +302,72 @@ class _AddChargeDialogState extends State<AddChargeDialog> {
   }
 
   void _handleSave() {
-  try {
-    final startSoc = double.tryParse(startSocCtrl.text.replaceAll(',', '.')) ?? 0;
-    final endSoc = double.tryParse(endSocCtrl.text.replaceAll(',', '.')) ?? 0;
-    final kwh = double.tryParse(kwhCtrl.text.replaceAll(',', '.')) ?? 0;
-    final wallboxPower = double.tryParse(wallboxPowerCtrl.text.replaceAll(',', '.')) ?? 3.7;
+    try {
+      final startSoc = double.tryParse(startSocCtrl.text.replaceAll(',', '.')) ?? 0;
+      final endSoc = double.tryParse(endSocCtrl.text.replaceAll(',', '.')) ?? 0;
+      final kwh = double.tryParse(kwhCtrl.text.replaceAll(',', '.')) ?? 0;
+      final wallboxPower = double.tryParse(wallboxPowerCtrl.text.replaceAll(',', '.')) ?? 3.7;
 
-    // Capiamo se è una ricarica domestica o pubblica
-    final bool isHome = widget.tipo.toLowerCase().contains("home") || widget.tipo.toLowerCase().contains("casa");
+      // Capiamo se è una ricarica domestica o pubblica
+      final bool isHome = widget.tipo.toLowerCase().contains("home") || widget.tipo.toLowerCase().contains("casa");
 
-    // Costruiamo i DateTime
-    DateTime startDT = DateTime(
-      selectedDate.year, selectedDate.month, selectedDate.day,
-      selectedStartTime.hour, selectedStartTime.minute,
-    );
+      // Costruiamo i DateTime
+      DateTime startDT = DateTime(
+        selectedDate.year, selectedDate.month, selectedDate.day,
+        selectedStartTime.hour, selectedStartTime.minute,
+      );
 
-    DateTime endDT = DateTime(
-      selectedDate.year, selectedDate.month, selectedDate.day,
-      selectedEndTime.hour, selectedEndTime.minute,
-    );
+      DateTime endDT = DateTime(
+        selectedDate.year, selectedDate.month, selectedDate.day,
+        selectedEndTime.hour, selectedEndTime.minute,
+      );
 
-    if (endDT.isBefore(startDT)) {
-      endDT = endDT.add(const Duration(days: 1));
+      if (endDT.isBefore(startDT)) {
+        endDT = endDT.add(const Duration(days: 1));
+      }
+
+      // Calcolo costo e fascia (solo se casa, altrimenti usiamo dati manuali se presenti)
+      final double finalCost = CostCalculator.calculate(
+        totalKwh: kwh,
+        wallboxPower: wallboxPower,
+        startTime: selectedStartTime,
+        date: selectedDate,
+        contract: widget.provider.myContract,
+      );
+
+      final String fasciaEtichetta = CostCalculator.getFasciaLabel(
+        totalKwh: kwh,
+        wallboxPower: wallboxPower,
+        startTime: selectedStartTime,
+        date: selectedDate,
+        isMonorario: widget.provider.myContract.isMonorario,
+      );
+
+      // Creazione della sessione con i nuovi campi "Prezzi al momento"
+      final session = ChargeSession(
+        id: DateTime.now().millisecondsSinceEpoch.toString(),
+        date: selectedDate,
+        startDateTime: startDT,
+        endDateTime: endDT,
+        startSoc: startSoc,
+        endSoc: endSoc,
+        kwh: kwh,
+        cost: finalCost,
+        location: widget.tipo,
+        carBrand: widget.provider.selectedCar.brand,
+        carModel: widget.provider.selectedCar.model,
+        wallboxPower: wallboxPower,
+        fascia: isHome ? fasciaEtichetta : "Public",
+        contractId: isHome ? widget.provider.activeContractId : "PUBLIC_GENERIC",
+        f1PriceAtTime: isHome ? widget.provider.myContract.f1Price : (finalCost / kwh),
+        f2PriceAtTime: isHome ? widget.provider.myContract.f2Price : (finalCost / kwh),
+        f3PriceAtTime: isHome ? widget.provider.myContract.f3Price : (finalCost / kwh),
+      );
+
+      widget.provider.addChargeSession(session);
+      Navigator.pop(context);
+    } catch (e) {
+      print("Errore nel salvataggio: $e");
     }
-
-    // Calcolo costo e fascia (solo se casa, altrimenti usiamo dati manuali se presenti)
-    final double finalCost = CostCalculator.calculate(
-      totalKwh: kwh,
-      wallboxPower: wallboxPower,
-      startTime: selectedStartTime,
-      date: selectedDate,
-      contract: widget.provider.myContract,
-    );
-
-    final String fasciaEtichetta = CostCalculator.getFasciaLabel(
-      totalKwh: kwh,
-      wallboxPower: wallboxPower,
-      startTime: selectedStartTime,
-      date: selectedDate,
-      isMonorario: widget.provider.myContract.isMonorario,
-    );
-
-    // Creazione della sessione con i nuovi campi "Prezzi al momento"
-    final session = ChargeSession(
-      id: DateTime.now().millisecondsSinceEpoch.toString(),
-      date: selectedDate,
-      startDateTime: startDT,
-      endDateTime: endDT,
-      startSoc: startSoc,
-      endSoc: endSoc,
-      kwh: kwh,
-      cost: finalCost,
-      location: widget.tipo,
-      carBrand: widget.provider.selectedCar.brand,
-      carModel: widget.provider.selectedCar.model,
-      wallboxPower: wallboxPower,
-      fascia: isHome ? fasciaEtichetta : "Public",
-      // 🔥 NUOVI CAMPI PER IL CONFRONTO:
-      contractId: isHome ? widget.provider.activeContractId : "PUBLIC_GENERIC",
-      f1PriceAtTime: isHome ? widget.provider.myContract.f1Price : (finalCost / kwh),
-      f2PriceAtTime: isHome ? widget.provider.myContract.f2Price : (finalCost / kwh),
-      f3PriceAtTime: isHome ? widget.provider.myContract.f3Price : (finalCost / kwh),
-    );
-
-    widget.provider.addChargeSession(session);
-    Navigator.pop(context);
-  } catch (e) {
-    print("Errore nel salvataggio: $e");
   }
-}
 }

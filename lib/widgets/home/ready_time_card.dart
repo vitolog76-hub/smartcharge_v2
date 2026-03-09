@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:smartcharge_v2/providers/home_provider.dart';
+import 'package:smartcharge_v2/l10n/app_localizations.dart';
 
 class ReadyTimeCard extends StatelessWidget {
   final HomeProvider provider;
@@ -8,6 +9,8 @@ class ReadyTimeCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final l10n = AppLocalizations.of(context)!;
+    
     return GestureDetector(
       onTap: provider.isSimulating ? null : () => _selectTime(context),
       child: Container(
@@ -25,8 +28,8 @@ class ReadyTimeCard extends StatelessWidget {
                 children: [
                   Text(
                     provider.isSimulating
-                        ? (provider.isChargingReal ? "IN CARICA" : "IN ATTESA")
-                        : "PRONTA ALLE",
+                        ? (provider.isChargingReal ? l10n.charging : l10n.waiting)
+                        : l10n.readyAt,
                     style: TextStyle(
                       color: provider.isSimulating
                           ? (provider.isChargingReal
@@ -55,9 +58,8 @@ class ReadyTimeCard extends StatelessWidget {
                       ],
                     ),
                   ),
-                  // 🔥 NUOVO: Piccolo indicatore della potenza utilizzata per il calcolo
                   Text(
-                    "Calcolato su ${provider.wallboxPwr} kW",
+                    l10n.calculatedOnPower(provider.wallboxPwr.toString()),
                     style: TextStyle(
                       color: Colors.white.withOpacity(0.3),
                       fontSize: 8,

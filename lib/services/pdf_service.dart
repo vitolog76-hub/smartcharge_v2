@@ -8,6 +8,7 @@ import 'package:path_provider/path_provider.dart';
 import 'package:share_plus/share_plus.dart';
 import 'package:intl/intl.dart';
 import 'package:smartcharge_v2/models/charge_session.dart';
+import 'package:smartcharge_v2/l10n/app_localizations.dart';
 
 // --- CORREZIONE PER IOS: Usiamo universal_html per evitare errori di compilazione ---
 import 'package:universal_html/html.dart' as html;
@@ -20,7 +21,11 @@ class PdfService {
     String userName = "UTENTE",
     String provider = "PRIVATO",
     String carModel = "",
+    AppLocalizations? l10n,
   }) async {
+    // Usa le traduzioni se disponibili, altrimenti italiano
+    final t = l10n;
+    
     final pdf = pw.Document();
     
     // Carica il font
@@ -44,21 +49,20 @@ class PdfService {
       filteredHistory = List<ChargeSession>.from(history);
     }
 
-    // Ordinamento: Dalla più vecchia alla più recente per il PDF (ordine di lettura naturale)
-    // Se preferisci la più recente in alto, usa: b.date.compareTo(a.date)
+    // Ordinamento: Dalla più vecchia alla più recente per il PDF
     filteredHistory.sort((a, b) => a.date.compareTo(b.date));
 
     pdf.addPage(
       pw.MultiPage(
         pageFormat: PdfPageFormat.a4,
         margin: const pw.EdgeInsets.all(32),
-        header: (context) => _buildHeader(logoImage, ttf, userName, provider, carModel),
+        header: (context) => _buildHeader(logoImage, ttf, userName, provider, carModel, t),
         build: (context) => [
-          _buildTitle(ttf, filterMonth, filterYear),
-          _buildStats(ttf, filteredHistory),
-          _buildLineChart(ttf, filteredHistory, filterMonth, filterYear),
-          _buildTable(ttf, filteredHistory),
-          _buildFooter(ttf),
+          _buildTitle(ttf, filterMonth, filterYear, t),
+          _buildStats(ttf, filteredHistory, t),
+          _buildLineChart(ttf, filteredHistory, filterMonth, filterYear, t),
+          _buildTable(ttf, filteredHistory, t),
+          _buildFooter(ttf, t),
         ],
       ),
     );
@@ -77,13 +81,11 @@ class PdfService {
       final file = File("${output.path}/report_ricariche_${DateTime.now().millisecondsSinceEpoch}.pdf");
       await file.writeAsBytes(pdfBytes);
       
-      await Share.shareXFiles([XFile(file.path)], text: 'Report Ricariche SmartCharge');
+      await Share.shareXFiles([XFile(file.path)], text: '${t?.history ?? 'Report Ricariche'} SmartCharge');
     }
   }
 
-  // ... (Metodi _buildHeader, _buildTitle, _buildStats, _buildLineChart rimangono uguali) ...
-
-  static pw.Widget _buildHeader(pw.MemoryImage logoImage, pw.Font ttf, String userName, String provider, String carModel) {
+  static pw.Widget _buildHeader(pw.MemoryImage logoImage, pw.Font ttf, String userName, String provider, String carModel, AppLocalizations? t) {
     return pw.Row(
       mainAxisAlignment: pw.MainAxisAlignment.spaceBetween,
       children: [
@@ -103,7 +105,7 @@ class PdfService {
                   style: pw.TextStyle(font: ttf, fontSize: 20, fontWeight: pw.FontWeight.bold, color: PdfColors.blue),
                 ),
                 pw.Text(
-                  "Report Ricariche",
+                  t?.history ?? "Report Ricariche",
                   style: pw.TextStyle(font: ttf, fontSize: 12, color: PdfColors.grey700),
                 ),
               ],
@@ -122,13 +124,13 @@ class PdfService {
     );
   }
 
-  static pw.Widget _buildTitle(pw.Font ttf, int? month, int? year) {
-    String title = "RIEPILOGO COMPLETO";
+  static pw.Widget _buildTitle(pw.Font ttf, int? month, int? year, AppLocalizations? t) {
+    String title = t?.total ?? "RIEPILOGO COMPLETO";
     if (month != null && year != null) {
-      final monthName = DateFormat('MMMM', 'it_IT').format(DateTime(year, month));
-      title = "RIEPILOGO ${monthName.toUpperCase()} $year";
+      final monthName = DateFormat('MMMM', t?.localeName ?? 'it').format(DateTime(year, month));
+      title = "${t?.month ?? 'RIEPILOGO'} ${monthName.toUpperCase()} $year";
     } else if (year != null) {
-      title = "RIEPILOGO ANNO $year";
+      title = "${t?.year ?? 'RIEPILOGO ANNO'} $year";
     }
     
     return pw.Padding(
@@ -140,7 +142,7 @@ class PdfService {
     );
   }
 
-  static pw.Widget _buildStats(pw.Font ttf, List<ChargeSession> history) {
+  static pw.Widget _buildStats(pw.Font ttf, List<ChargeSession> history, AppLocalizations? t) {
     if (history.isEmpty) return pw.Container();
 
     double totalKwh = 0;
@@ -160,9 +162,9 @@ class PdfService {
       child: pw.Row(
         mainAxisAlignment: pw.MainAxisAlignment.spaceAround,
         children: [
-          _buildStatItem(ttf, "TOTALE kWh", "${totalKwh.toStringAsFixed(1)} kWh"),
-          _buildStatItem(ttf, "TOTALE €", "${totalCost.toStringAsFixed(2)} €"),
-          _buildStatItem(ttf, "N. RICARICHE", "${history.length}"),
+          _buildStatItem(ttf, t?.totalKwh ?? "TOTALE kWh", "${totalKwh.toStringAsFixed(1)} ${t?.kwh ?? 'kWh'}"),
+          _buildStatItem(ttf, t?.totalCost ?? "TOTALE €", "${totalCost.toStringAsFixed(2)} €"),
+          _buildStatItem(ttf, t?.totalCharges ?? "N. RICARICHE", "${history.length}"),
         ],
       ),
     );
@@ -178,7 +180,7 @@ class PdfService {
     );
   }
 
-  static pw.Widget _buildLineChart(pw.Font ttf, List<ChargeSession> history, int? filterMonth, int? filterYear) {
+  static pw.Widget _buildLineChart(pw.Font ttf, List<ChargeSession> history, int? filterMonth, int? filterYear, AppLocalizations? t) {
     if (history.isEmpty) return pw.Container();
 
     List<MapEntry<String, double>> dataPoints = [];
@@ -218,7 +220,9 @@ class PdfService {
       crossAxisAlignment: pw.CrossAxisAlignment.start,
       children: [
         pw.Text(
-          filterMonth != null ? "Andamento Giornaliero (kWh)" : "Andamento Mensile (kWh)",
+          filterMonth != null 
+            ? (t?.dailyTrend ?? "Andamento Giornaliero (kWh)")
+            : (t?.monthlyTrend ?? "Andamento Mensile (kWh)"),
           style: pw.TextStyle(font: ttf, fontSize: 12, fontWeight: pw.FontWeight.bold),
         ),
         pw.SizedBox(height: 10),
@@ -265,14 +269,20 @@ class PdfService {
     );
   }
 
-  // --- 2. AGGIORNAMENTO TABELLA CON COLONNA FASCIA ---
-  static pw.Widget _buildTable(pw.Font ttf, List<ChargeSession> history) {
+  static pw.Widget _buildTable(pw.Font ttf, List<ChargeSession> history, AppLocalizations? t) {
     if (history.isEmpty) {
-      return pw.Center(child: pw.Text("Nessuna ricarica", style: pw.TextStyle(font: ttf)));
+      return pw.Center(child: pw.Text(t?.noCharges ?? "Nessuna ricarica", style: pw.TextStyle(font: ttf)));
     }
 
     return pw.TableHelper.fromTextArray(
-      headers: ["DATA", "kWh", "COSTO", "FASCIA", "LUOGO", "DURATA"], // 🔥 Aggiunto FASCIA
+      headers: [
+        t?.date ?? "DATA",
+        t?.energy ?? "kWh",
+        t?.cost ?? "COSTO",
+        t?.fascia ?? "FASCIA",
+        t?.location ?? "LUOGO",
+        t?.duration ?? "DURATA",
+      ],
       data: history.map((s) {
         final duration = s.endDateTime.difference(s.startDateTime);
         final hours = duration.inHours;
@@ -282,7 +292,7 @@ class PdfService {
           DateFormat('dd/MM/yy').format(s.date),
           "${s.kwh.toStringAsFixed(1)}",
           "€ ${s.cost.toStringAsFixed(2)}",
-          s.fascia, // 🔥 Visualizza il campo Fascia
+          s.fascia,
           s.location,
           "${hours}h ${minutes}m",
         ];
@@ -301,14 +311,14 @@ class PdfService {
     );
   }
 
-  static pw.Widget _buildFooter(pw.Font ttf) {
+  static pw.Widget _buildFooter(pw.Font ttf, AppLocalizations? t) {
     return pw.Padding(
       padding: const pw.EdgeInsets.only(top: 20),
       child: pw.Row(
         mainAxisAlignment: pw.MainAxisAlignment.spaceBetween,
         children: [
           pw.Text(
-            "Generato il ${DateFormat('dd/MM/yyyy HH:mm').format(DateTime.now())}",
+            "${t?.generatedOn ?? 'Generato il'} ${DateFormat('dd/MM/yyyy HH:mm').format(DateTime.now())}",
             style: pw.TextStyle(font: ttf, fontSize: 8, color: PdfColors.grey700),
           ),
           pw.Text(

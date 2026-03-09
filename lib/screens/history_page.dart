@@ -10,6 +10,7 @@ import 'package:smartcharge_v2/widgets/history/history_year_folder.dart';
 import 'package:smartcharge_v2/widgets/history/history_export_dialog.dart';
 import 'package:provider/provider.dart';
 import 'package:smartcharge_v2/providers/home_provider.dart';
+import 'package:smartcharge_v2/l10n/app_localizations.dart';
 
 class HistoryPage extends StatefulWidget {
   final List<ChargeSession> history;
@@ -30,12 +31,15 @@ class HistoryPage extends StatefulWidget {
 }
 
 class _HistoryPageState extends State<HistoryPage> {
+  late AppLocalizations _l10n;
   late List<ChargeSession> _localHistory;
+  late String _locale;
 
   @override
   void initState() {
     super.initState();
     _localHistory = List.from(widget.history);
+    _locale = 'it';
   }
 
   @override
@@ -98,7 +102,7 @@ class _HistoryPageState extends State<HistoryPage> {
 
     for (var session in sorted) {
       String year = DateFormat('yyyy').format(session.date);
-      String month = DateFormat('MMMM', 'it_IT').format(session.date);
+      String month = DateFormat('MMMM', _locale).format(session.date);
       month = month[0].toUpperCase() + month.substring(1);
       
       grouped.putIfAbsent(year, () => {});
@@ -118,24 +122,19 @@ class _HistoryPageState extends State<HistoryPage> {
       }
     });
     
-    // 🔥 Salva la modifica nel Provider
     final provider = Provider.of<HomeProvider>(context, listen: false);
     provider.saveHistory(); 
-    provider.syncUserProfile(provider.globalUserName); // Questo scatena l'upload al cloud
+    provider.syncUserProfile(provider.globalUserName);
     
     widget.onHistoryChanged?.call(_localHistory);
   }
 
   void _onDeleteSessionById(String sessionId) {
-    // 1. Aggiorna l'interfaccia locale subito per fluidità
     setState(() {
       _localHistory.removeWhere((session) => session.id == sessionId);
     });
 
-    // 2. 🔥 COMANDO CRUCIALE: Dice al Provider di cancellare ovunque (Disco e Cloud)
     Provider.of<HomeProvider>(context, listen: false).deleteChargeSession(sessionId);
-
-    // 3. Notifica il cambiamento se necessario
     widget.onHistoryChanged?.call(_localHistory);
   }
 
@@ -165,34 +164,40 @@ class _HistoryPageState extends State<HistoryPage> {
   // --- PDF & EXPORT ---
 
   void _showExportDialog() {
-    showModalBottomSheet(
-      context: context,
-      backgroundColor: const Color(0xFF1C1C1E),
-      shape: const RoundedRectangleBorder(borderRadius: BorderRadius.vertical(top: Radius.circular(20))),
-      builder: (_) => HistoryExportDialog(onExport: _generatePdf),
-    );
-  }
+  showModalBottomSheet(
+    context: context,
+    backgroundColor: const Color(0xFF1C1C1E),
+    shape: const RoundedRectangleBorder(borderRadius: BorderRadius.vertical(top: Radius.circular(20))),
+    builder: (_) => HistoryExportDialog(
+      onExport: (month, year) => _generatePdf(month, year, _l10n), // 🔥 USA _l10n
+    ),
+  );
+}
 
-  void _generatePdf(int? month, int? year) {
-    // 1. Creiamo una copia della lista per non alterare quella visualizzata a schermo
-    List<ChargeSession> sortedHistory = List.from(_localHistory);
 
-    // 2. Ordiniamo la lista cronologicamente (dal più recente al più vecchio)
-    sortedHistory.sort((a, b) => b.date.compareTo(a.date));
 
-    // 3. Passiamo la lista ordinata al servizio PDF
-    PdfService.generateHistoryPdf(
-      sortedHistory, // 🔥 Passiamo la lista ordinata!
-      filterMonth: month,
-      filterYear: year,
-      userName: Provider.of<HomeProvider>(context, listen: false).globalUserName.toUpperCase(),
-      provider: widget.contract.provider.isEmpty ? "PRIVATO" : widget.contract.provider.toUpperCase(),
-      carModel: "${widget.selectedCar.brand} ${widget.selectedCar.model}".toUpperCase(),
-    );
-  }
+  void _generatePdf(int? month, int? year, AppLocalizations l10n) {
+  List<ChargeSession> sortedHistory = List.from(_localHistory);
+  sortedHistory.sort((a, b) => b.date.compareTo(a.date));
+
+  PdfService.generateHistoryPdf(
+    sortedHistory,
+    filterMonth: month,
+    filterYear: year,
+    userName: Provider.of<HomeProvider>(context, listen: false).globalUserName.toUpperCase(),
+    provider: widget.contract.provider.isEmpty ? "PRIVATO" : widget.contract.provider.toUpperCase(),
+    carModel: "${widget.selectedCar.brand} ${widget.selectedCar.model}".toUpperCase(),
+    l10n: l10n,
+  );
+}
 
   @override
   Widget build(BuildContext context) {
+    _l10n = AppLocalizations.of(context)!;
+    final l10n = AppLocalizations.of(context)!;
+    final locale = Localizations.localeOf(context).languageCode;
+    _locale = Localizations.localeOf(context).languageCode;
+    
     // Calcolo Dati Grafico
     final monthlyData = _getAggregatedMonthlyData();
     final chartKeys = monthlyData.keys.toList();
@@ -209,7 +214,7 @@ class _HistoryPageState extends State<HistoryPage> {
     );
     final kwhMese = ricaricheMese.fold(0.0, (sum, s) => sum + s.kwh);
     final spesaMese = ricaricheMese.fold(0.0, (sum, s) => sum + s.cost);
-    final String nomeMese = DateFormat('MMMM', 'it_IT').format(ora).toUpperCase();
+    final String nomeMese = DateFormat('MMMM', _locale).format(ora).toUpperCase();
 
     double maxKwh = chartValues.isEmpty ? 50 : chartValues.reduce((a, b) => a > b ? a : b);
     maxKwh = (maxKwh / 10).ceil() * 10.0 + 20;
@@ -217,7 +222,10 @@ class _HistoryPageState extends State<HistoryPage> {
     return Scaffold(
       backgroundColor: Colors.black,
       appBar: AppBar(
-        title: const Text("CRONOLOGIA RICARICHE", style: TextStyle(fontSize: 14, fontWeight: FontWeight.bold)),
+        title: Text(
+          l10n.history,
+          style: const TextStyle(fontSize: 14, fontWeight: FontWeight.bold),
+        ),
         centerTitle: true,
         backgroundColor: Colors.transparent,
         elevation: 0,
@@ -234,17 +242,28 @@ class _HistoryPageState extends State<HistoryPage> {
       ),
       body: Column(
         children: [
-          // 1. Grafico andamento
-          HistoryChart(keys: chartKeys, values: chartValues, maxKwh: maxKwh),
+          HistoryChart(
+  key: ValueKey(locale), // 🔥 FORZA IL REBUILD QUANDO CAMBIA LINGUA
+  keys: chartKeys, 
+  values: chartValues, 
+  maxKwh: maxKwh
+),
           
-          // 2. Riepilogo Statistico Mese Corrente
           Padding(
             padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 15),
             child: Row(
               children: [
-                _buildStatTile("ENERGIA $nomeMese", "${kwhMese.toStringAsFixed(1)} kWh", Colors.blueAccent),
+                _buildStatTile(
+                  "${l10n.energy} $nomeMese", 
+                  "${kwhMese.toStringAsFixed(1)} ${l10n.kwh}", 
+                  Colors.blueAccent
+                ),
                 const SizedBox(width: 12),
-                _buildStatTile("SPESA $nomeMese", "€ ${spesaMese.toStringAsFixed(2)}", Colors.greenAccent),
+                _buildStatTile(
+                  "${l10n.cost} $nomeMese", 
+                  "${l10n.euro} ${spesaMese.toStringAsFixed(2)}", 
+                  Colors.greenAccent
+                ),
               ],
             ),
           ),
@@ -254,10 +273,14 @@ class _HistoryPageState extends State<HistoryPage> {
             child: Divider(color: Colors.white10, thickness: 1),
           ),
 
-          // 3. Lista Storico Raggruppata
           Expanded(
             child: _localHistory.isEmpty
-                ? const Center(child: Text("Nessuna ricarica", style: TextStyle(color: Colors.white24)))
+                ? Center(
+                    child: Text(
+                      l10n.noCharges,
+                      style: const TextStyle(color: Colors.white24),
+                    ),
+                  )
                 : ListView(
                     padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
                     children: groupedHistory.entries.map((entry) {

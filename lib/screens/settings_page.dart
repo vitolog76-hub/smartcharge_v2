@@ -12,6 +12,8 @@ import 'package:provider/provider.dart';
 import 'package:smartcharge_v2/pages/add_contract_page.dart';
 import 'package:smartcharge_v2/services/cost_calculator.dart';
 import 'package:flutter/services.dart';
+import 'package:smartcharge_v2/providers/locale_provider.dart';
+import 'package:smartcharge_v2/l10n/app_localizations.dart';
 
 class SettingsPage extends StatefulWidget {
   final EnergyContract contract;
@@ -41,6 +43,12 @@ class _SettingsPageState extends State<SettingsPage> {
   late TextEditingController _f2Controller;
   late TextEditingController _f3Controller;
   late TextEditingController _batteryController;
+  DropdownMenuItem<String> _buildBatteryMenuItem(String value, String displayText) {
+  return DropdownMenuItem(
+    value: value,
+    child: Text(displayText),
+  );
+}
   
   bool _isSyncing = false;
   late bool _isMonorario;
@@ -181,6 +189,7 @@ class _SettingsPageState extends State<SettingsPage> {
       if (data != null) {
         await context.read<HomeProvider>().refreshAfterSettings();
         final homeProv = context.read<HomeProvider>();
+        final l10n = AppLocalizations.of(context)!;
         final prefs = await SharedPreferences.getInstance();
         setState(() {
           _nameController.text = homeProv.globalUserName;
@@ -226,6 +235,7 @@ class _SettingsPageState extends State<SettingsPage> {
 
   @override
   Widget build(BuildContext context) {
+    final l10n = AppLocalizations.of(context)!;
     return Scaffold(
       body: Container(
         width: double.infinity,
@@ -244,8 +254,10 @@ class _SettingsPageState extends State<SettingsPage> {
         child: Column(
           children: [
             AppBar(
-              title: const Text("IMPOSTAZIONI SISTEMA", 
-                  style: TextStyle(fontSize: 14, fontWeight: FontWeight.w900, letterSpacing: 2)),
+              title: Text(
+  l10n.settingsSystem,
+  style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w900, letterSpacing: 2)
+),
               centerTitle: true,
               backgroundColor: Colors.transparent,
               elevation: 0,
@@ -266,7 +278,7 @@ class _SettingsPageState extends State<SettingsPage> {
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    _buildSectionTitle("1 - SINCRONIZZAZIONE CLOUD"),
+                   _buildSectionTitle(l10n.cloudSync),  // "1 - SINCRONIZZAZIONE CLOUD"
                     _buildCard(
                       child: Row(
                         children: [
@@ -278,11 +290,11 @@ class _SettingsPageState extends State<SettingsPage> {
                             child: TextField(
                               controller: _idController,
                               style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold),
-                              decoration: const InputDecoration(
-                                labelText: "ID SINCRONIZZAZIONE",
-                                labelStyle: TextStyle(color: Colors.white38, fontSize: 10),
-                                border: InputBorder.none,
-                              ),
+                              decoration: InputDecoration(
+  labelText: l10n.userId,  // "ID SINCRONIZZAZIONE"
+  labelStyle: const TextStyle(color: Colors.white38, fontSize: 10),
+  border: InputBorder.none,
+),
                             ),
                           ),
                           IconButton(
@@ -295,13 +307,17 @@ class _SettingsPageState extends State<SettingsPage> {
 
                     const SizedBox(height: 25),
 
-                    _buildSectionTitle("2 - DATI UTENTE E VEICOLO"),
+                    _buildSectionTitle(l10n.userVehicleData),
 _buildCard(
   child: Column(
     children: [
-      _buildInput("NOME UTENTE / AZIENDA", _nameController, Icons.person_outline),
+      _buildInput(l10n.userName, _nameController, Icons.person_outline),
       const Divider(color: Colors.white10, indent: 50),
-      _buildStaticRow(Icons.directions_car, "AUTO SELEZIONATA", widget.selectedCar.model.toUpperCase()),
+      _buildStaticRow(
+  Icons.directions_car, 
+  l10n.selectedCar, 
+  widget.selectedCar.model.toUpperCase()
+),
       const Divider(color: Colors.white10, indent: 50),
       
       // --- CAPACITÀ BATTERIA EDITABILE ---
@@ -336,29 +352,29 @@ Container(
       const SizedBox(width: 16),
       
       // Testo informativo a doppia riga
-      const Expanded(
+      Expanded(
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Text(
-              "VALORE NOMINALE",
-              style: TextStyle(
-                color: Colors.cyanAccent, 
-                fontSize: 8, 
-                fontWeight: FontWeight.w900,
-                letterSpacing: 1.5
-              ),
-            ),
-            SizedBox(height: 2),
-            Text(
-              "CAPACITÀ (kWh)",
-              style: TextStyle(
-                color: Colors.white, 
-                fontSize: 13, 
-                fontWeight: FontWeight.bold
-              ),
-            ),
-          ],
+  Text(
+    l10n.nominalValue,  // "VALORE NOMINALE"
+    style: TextStyle(
+      color: Colors.cyanAccent, 
+      fontSize: 8, 
+      fontWeight: FontWeight.w900,
+      letterSpacing: 1.5
+    ),
+  ),
+  SizedBox(height: 2),
+  Text(
+    l10n.batteryCapacity,  // "CAPACITÀ (kWh)"
+    style: TextStyle(
+      color: Colors.white, 
+      fontSize: 13, 
+      fontWeight: FontWeight.bold
+    ),
+  ),
+],
         ),
       ),
 
@@ -400,46 +416,47 @@ Container(
   ),
 ),
 // --- NUOVA SEZIONE BATTERIA ---
-                    _buildSectionTitle("3 - INTELLIGENZA BATTERIA"),
-                    _buildCard(
-                      child: Padding(
-                        padding: const EdgeInsets.all(16.0),
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            const Text("CHIMICA DELLE CELLE", 
-                              style: TextStyle(color: Colors.cyanAccent, fontSize: 10, fontWeight: FontWeight.bold)),
-                            const SizedBox(height: 10),
-                            DropdownButtonHideUnderline(
-                              child: DropdownButton<String>(
-                                value: _selectedBatteryType,
-                                isExpanded: true, // <--- QUI C'ERA L'ERRORE "协议"
-                                dropdownColor: const Color(0xFF0F172A),
-                                style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold),
-                                items: ["NMC / NCA", "LFP", "SCONOSCIUTA"].map((String type) {
-                                  return DropdownMenuItem(value: type, child: Text(type));
-                                }).toList(),
-                                onChanged: (val) {
-                                  setState(() {
-                                    _selectedBatteryType = val!;
-                                  });
-                                },
-                              ),
-                            ),
-                            const Divider(color: Colors.white10, height: 20),
-                            Text(
-  _selectedBatteryType == "LFP" 
-    ? "CONSIGLIO LFP: Mantieni tra 20-80% quotidianamente. Carica al 100% una volta a settimana per calibrare il BMS."
-    : _selectedBatteryType == "NMC / NCA"
-        ? "CONSIGLIO NMC: Evita di superare l'80% per l'uso quotidiano. Carica al 100% solo per lunghi viaggi."
-        : "CONSIGLIO: Se non conosci la chimica, resta tra il 20% e l'80%. È la fascia di sicurezza universale per ogni batteria al litio.",
-  style: const TextStyle(color: Colors.white38, fontSize: 11, fontStyle: FontStyle.italic),
+_buildSectionTitle(l10n.batteryIntelligence), // "3 - INTELLIGENZA BATTERIA"
+_buildCard(
+  child: Padding(
+    padding: const EdgeInsets.all(16.0),
+    child: Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(l10n.batteryChemistry, style: TextStyle(color: Colors.cyanAccent, fontSize: 10, fontWeight: FontWeight.bold)),
+        const SizedBox(height: 10),
+        DropdownButtonHideUnderline(
+          child: DropdownButton<String>(
+            value: _selectedBatteryType,
+            isExpanded: true, 
+            dropdownColor: const Color(0xFF0F172A),
+            style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold),
+            items: [
+              _buildBatteryMenuItem("NMC / NCA", l10n.batteryChemistryNmc),
+              _buildBatteryMenuItem("LFP", l10n.batteryChemistryLfp),
+              _buildBatteryMenuItem("UNKNOWN", l10n.batteryChemistryUnknown),
+            ],
+            onChanged: (val) {
+              setState(() {
+                _selectedBatteryType = val!;
+              });
+            },
+          ),
+        ),
+        const Divider(color: Colors.white10, height: 20),
+        Text(
+          _selectedBatteryType == "LFP" 
+            ? l10n.adviceLfpFull
+            : _selectedBatteryType == "NMC / NCA"
+                ? l10n.adviceNmcFull
+                : l10n.adviceGenericFull,
+          style: const TextStyle(color: Colors.white38, fontSize: 11, fontStyle: FontStyle.italic),
+        ),
+      ],
+    ),
+  ),
 ),
-                          ],
-                        ),
-                      ),
-                    ),
-                    _buildSectionTitle("4 - GESTIONE CONTRATTI ENERGIA"),
+                    _buildSectionTitle(l10n.contracts), // "4 - GESTIONE CONTRATTI ENERGIA"
                     _buildCard(
                       child: Padding(
                         padding: const EdgeInsets.all(16.0),
@@ -454,13 +471,12 @@ Container(
                                   borderRadius: BorderRadius.circular(10),
                                   border: Border.all(color: Colors.cyanAccent.withOpacity(0.3)),
                                 ),
-                                child: const Row(
+                                child: Row(
                                   children: [
                                     Icon(Icons.pie_chart, color: Colors.cyanAccent, size: 20),
                                     SizedBox(width: 12),
                                     Expanded(
-                                      child: Text("DETTAGLI E TRASPARENZA COSTI",
-                                        style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 12)),
+                                      child: Text(l10n.contractDetails, style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 12)),
                                     ),
                                     Icon(Icons.arrow_forward, color: Colors.cyanAccent, size: 16),
                                   ],
@@ -468,10 +484,9 @@ Container(
                               ),
                             ),
                             const Divider(color: Colors.white10, height: 30),
-                            const Align(
+                            Align(
                               alignment: Alignment.centerLeft,
-                              child: Text("I TUOI PIANI TARIFFARI",
-                                  style: TextStyle(color: Colors.white38, fontSize: 10, fontWeight: FontWeight.bold)),
+                              child: Text(l10n.yourPlans, style: TextStyle(color: Colors.white38, fontSize: 10, fontWeight: FontWeight.bold)),
                             ),
                             const SizedBox(height: 10),
 
@@ -547,8 +562,16 @@ Container(
                                                         children: [
                                                           Icon(differenzaTotale >= 0 ? Icons.trending_down : Icons.trending_up, color: differenzaTotale >= 0 ? Colors.greenAccent : Colors.redAccent, size: 14),
                                                           const SizedBox(width: 6),
-                                                          Text(differenzaTotale >= 0 ? "RISPARMIO: +${differenzaTotale.toStringAsFixed(2)}€" : "COSTO EXTRA: ${differenzaTotale.abs().toStringAsFixed(2)}€",
-                                                            style: TextStyle(color: differenzaTotale >= 0 ? Colors.greenAccent : Colors.redAccent, fontSize: 10, fontWeight: FontWeight.w900)),
+                                                          Text(
+  differenzaTotale >= 0 
+      ? l10n.savingsMessage(differenzaTotale.toStringAsFixed(2))
+      : l10n.extraCostMessage(differenzaTotale.abs().toStringAsFixed(2)),
+  style: TextStyle(
+    color: differenzaTotale >= 0 ? Colors.greenAccent : Colors.redAccent,
+    fontSize: 10, 
+    fontWeight: FontWeight.w900
+  ),
+),
                                                         ],
                                                       ),
                                                     ),
@@ -586,13 +609,19 @@ Container(
                                           borderRadius: BorderRadius.circular(10),
                                           border: Border.all(color: Colors.white10),
                                         ),
-                                        child: const Row(
+                                        child: Row(
                                           mainAxisAlignment: MainAxisAlignment.center,
                                           children: [
                                             Icon(Icons.add_circle_outline, color: Colors.cyanAccent, size: 18),
                                             SizedBox(width: 8),
-                                            Text("AGGIUNGI NUOVO CONTRATTO",
-                                                style: TextStyle(color: Colors.cyanAccent, fontWeight: FontWeight.bold, fontSize: 11)),
+                                            Text(
+  l10n.addContract,
+  style: const TextStyle(
+    color: Colors.cyanAccent, 
+    fontWeight: FontWeight.bold, 
+    fontSize: 11
+  ),
+),
                                           ],
                                         ),
                                       ),
@@ -607,11 +636,50 @@ Container(
                     ),
 
                     const SizedBox(height: 25),
+
+                    _buildSectionTitle(l10n.languageSection),
+_buildCard(
+  child: Consumer<LocaleProvider>(
+    builder: (context, localeProvider, child) {
+      return ListTile(
+        leading: const Icon(Icons.language, color: Colors.cyanAccent),
+        title: const Text("Lingua / Language"),
+        subtitle: Row(
+          children: [
+            _getFlag(localeProvider.locale.languageCode),
+            const SizedBox(width: 8),
+            Text(_getLanguageName(localeProvider.locale)),
+          ],
+        ),
+        trailing: DropdownButton<Locale>(
+          value: localeProvider.locale,
+          dropdownColor: const Color(0xFF0F172A),
+          icon: const Icon(Icons.arrow_drop_down, color: Colors.cyanAccent),
+          onChanged: (Locale? newLocale) {
+            if (newLocale != null) {
+              localeProvider.setLocale(newLocale);
+            }
+          },
+          items: [
+            _buildDropdownItem('it', 'IT', 'Italiano', '🇮🇹'),
+            _buildDropdownItem('en', 'US', 'English', '🇬🇧'),
+            _buildDropdownItem('es', 'ES', 'Español', '🇪🇸'),
+            _buildDropdownItem('de', 'DE', 'Deutsch', '🇩🇪'),
+            _buildDropdownItem('fr', 'FR', 'Français', '🇫🇷'),
+          ],
+        ),
+      );
+    },
+  ),
+),
+
+const SizedBox(height: 25),
+                    
                     _buildSectionTitle("5 - ACCOUNT"),
                     _buildCard(
                       child: ListTile(
                         leading: const Icon(Icons.logout, color: Colors.redAccent),
-                        title: const Text("Esci dall'account", style: TextStyle(color: Colors.redAccent)),
+                        title: Text(l10n.logout, style: const TextStyle(color: Colors.redAccent)),
                         onTap: () async {
                           final confirm = await _showLogoutConfirmDialog();
                           if (confirm == true) {
@@ -640,8 +708,10 @@ Container(
                         onPressed: _isSyncing ? null : _saveAll,
                         child: _isSyncing 
                           ? const CircularProgressIndicator(color: Colors.black)
-                          : const Text("CONFERMA TUTTE LE MODIFICHE", 
-                              style: TextStyle(fontWeight: FontWeight.w900, letterSpacing: 1.5)),
+                          : Text(
+  l10n.saveAllChanges,
+  style: const TextStyle(fontWeight: FontWeight.w900, letterSpacing: 1.5),
+),
                       ),
                     ),
                   ],
@@ -773,4 +843,44 @@ Container(
     ),
   );
 }
+String _getLanguageName(Locale locale) {
+  switch (locale.languageCode) {
+    case 'it': return 'Italiano';
+    case 'en': return 'English';
+    case 'es': return 'Español';
+    case 'de': return 'Deutsch';
+    case 'fr': return 'Français';
+    default: return 'Italiano';
+  }
+}
+DropdownMenuItem<Locale> _buildDropdownItem(
+  String languageCode, 
+  String countryCode, 
+  String name, 
+  String flag
+) {
+  return DropdownMenuItem(
+    value: Locale(languageCode, countryCode),
+    child: Row(
+      children: [
+        Text(flag, style: const TextStyle(fontSize: 20)),
+        const SizedBox(width: 8),
+        Text(name),
+      ],
+    ),
+  );
+}
+
+Widget _getFlag(String languageCode) {
+  switch (languageCode) {
+    case 'it': return const Text('🇮🇹', style: TextStyle(fontSize: 20));
+    case 'en': return const Text('🇬🇧', style: TextStyle(fontSize: 20));
+    case 'es': return const Text('🇪🇸', style: TextStyle(fontSize: 20));
+    case 'de': return const Text('🇩🇪', style: TextStyle(fontSize: 20));
+    case 'fr': return const Text('🇫🇷', style: TextStyle(fontSize: 20));
+    default: return const Text('🇮🇹', style: TextStyle(fontSize: 20));
+  }
+}
+
+
 }

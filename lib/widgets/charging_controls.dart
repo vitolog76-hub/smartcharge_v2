@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:smartcharge_v2/providers/home_provider.dart';
+import 'package:smartcharge_v2/l10n/app_localizations.dart';
 
 class ChargingControls extends StatelessWidget {
   final HomeProvider provider;
@@ -8,17 +9,17 @@ class ChargingControls extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final l10n = AppLocalizations.of(context)!;
+    
     return Container(
-      // Ridotto padding verticale da 16 a 8 per salvare spazio
       padding: const EdgeInsets.symmetric(vertical: 8, horizontal: 20),
       child: LayoutBuilder(
         builder: (context, constraints) {
           return Column(
-            // Manteniamo spaceAround per distribuire, ma con meno padding esterno respira meglio
             mainAxisAlignment: MainAxisAlignment.spaceAround,
             children: [
               _buildSliderRow(
-                label: "POTENZA",
+                label: l10n.power,
                 value: provider.wallboxPwr,
                 min: 1.0,
                 max: 22.0,
@@ -38,7 +39,7 @@ class ChargingControls extends StatelessWidget {
                 },
               ),
               _buildSliderRow(
-                label: "SOC INIZIALE",
+                label: l10n.initialSoc,
                 value: provider.currentSoc,
                 min: 0,
                 max: 100,
@@ -58,7 +59,7 @@ class ChargingControls extends StatelessWidget {
                 },
               ),
               _buildSliderRow(
-                label: "SOC FINALE",
+                label: l10n.finalSoc,
                 value: provider.targetSoc,
                 min: 0,
                 max: 100,
@@ -131,15 +132,15 @@ class ChargingControls extends StatelessWidget {
             ),
           ],
         ),
-        const SizedBox(height: 4), // Ridotto da 8 a 4 per compattare verticalmente
+        const SizedBox(height: 4),
         Row(
           children: [
             _buildSmallButton(Icons.remove, color, onDecrement),
             Expanded(
               child: SliderTheme(
                 data: SliderThemeData(
-                  trackHeight: 2.5, // Ridotto da 4.0 a 2.5 (giusto compromesso)
-                  thumbShape: const RoundSliderThumbShape(enabledThumbRadius: 8), // Ridotto da 10 a 8
+                  trackHeight: 2.5,
+                  thumbShape: const RoundSliderThumbShape(enabledThumbRadius: 8),
                   overlayShape: const RoundSliderOverlayShape(overlayRadius: 16),
                   activeTrackColor: color,
                   inactiveTrackColor: color.withOpacity(0.1),
@@ -168,14 +169,14 @@ class ChargingControls extends StatelessWidget {
         onTap: onTap,
         borderRadius: BorderRadius.circular(12),
         child: Container(
-          width: 32, // Ridotto da 36 a 32 per salvare altezza
+          width: 32,
           height: 32,
           decoration: BoxDecoration(
             color: color.withOpacity(0.08),
             shape: BoxShape.circle,
             border: Border.all(color: color.withOpacity(0.2)),
           ),
-          child: Icon(icon, color: color, size: 16), // Ridotto size da 18 a 16
+          child: Icon(icon, color: color, size: 16),
         ),
       ),
     );

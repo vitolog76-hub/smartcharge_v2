@@ -1,13 +1,16 @@
 import 'package:flutter/material.dart';
+import 'package:smartcharge_v2/l10n/app_localizations.dart';
 
 class ActionButtons extends StatelessWidget {
   final VoidCallback onHomeTap;
   final VoidCallback onPublicTap;
+  final AppLocalizations l10n;
 
   const ActionButtons({
     super.key, 
     required this.onHomeTap, 
-    required this.onPublicTap
+    required this.onPublicTap,
+    required this.l10n,
   });
 
   @override
@@ -16,7 +19,7 @@ class ActionButtons extends StatelessWidget {
       children: [
         Expanded(
           child: _buildBtn(
-            "INSERISCI\nRICARICA HOME", 
+            l10n.addHomeCharge, 
             Colors.blueAccent, 
             Icons.home, 
             onHomeTap
@@ -25,7 +28,7 @@ class ActionButtons extends StatelessWidget {
         const SizedBox(width: 12),
         Expanded(
           child: _buildBtn(
-            "INSERISCI\nRICARICA PUBBLICA", 
+            l10n.addPublicCharge, 
             Colors.greenAccent, 
             Icons.ev_station, 
             onPublicTap

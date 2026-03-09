@@ -1,4 +1,6 @@
 import 'package:flutter/material.dart';
+import 'package:intl/intl.dart';
+import 'package:smartcharge_v2/l10n/app_localizations.dart';
 
 class HistoryExportDialog extends StatelessWidget {
   final Function(int?, int?) onExport;
@@ -10,44 +12,47 @@ class HistoryExportDialog extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final l10n = AppLocalizations.of(context)!;
+    final now = DateTime.now();
+
     return Container(
       padding: const EdgeInsets.all(24),
       child: Column(
         mainAxisSize: MainAxisSize.min,
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          const Text(
-            "Esporta Report",
-            style: TextStyle(color: Colors.white, fontSize: 20, fontWeight: FontWeight.bold),
+          Text(
+            l10n.exportReport,
+            style: const TextStyle(color: Colors.white, fontSize: 20, fontWeight: FontWeight.bold),
           ),
           const SizedBox(height: 8),
-          const Text(
-            "Scegli il periodo da includere nel PDF",
-            style: TextStyle(color: Colors.white38, fontSize: 14),
+          Text(
+            l10n.exportSubtitle,
+            style: const TextStyle(color: Colors.white38, fontSize: 14),
           ),
           const SizedBox(height: 24),
           _buildOption(
             context,
             Icons.calendar_view_month,
-            "Mese Corrente",
+            "${l10n.currentMonth} (${DateFormat('MMMM').format(now)})",
             () {
               Navigator.pop(context);
-              onExport(DateTime.now().month, DateTime.now().year);
+              onExport(now.month, now.year);
             },
           ),
           _buildOption(
             context,
             Icons.calendar_today,
-            "Anno Corrente",
+            "${l10n.currentYear} (${now.year})",
             () {
               Navigator.pop(context);
-              onExport(null, DateTime.now().year);
+              onExport(null, now.year);
             },
           ),
           _buildOption(
             context,
             Icons.all_inclusive,
-            "Tutto lo Storico",
+            l10n.allHistory,
             () {
               Navigator.pop(context);
               onExport(null, null);

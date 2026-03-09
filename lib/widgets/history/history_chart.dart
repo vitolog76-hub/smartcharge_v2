@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:fl_chart/fl_chart.dart';
 import 'package:intl/intl.dart';
+import 'package:smartcharge_v2/l10n/app_localizations.dart';
 
 class HistoryChart extends StatelessWidget {
   final List<String> keys;
@@ -14,13 +15,11 @@ class HistoryChart extends StatelessWidget {
     required this.maxKwh,
   });
 
-  String _getMonthAbbr(String monthNum) {
-    const months = ["GEN", "FEB", "MAR", "APR", "MAG", "GIU", "LUG", "AGO", "SET", "OTT", "NOV", "DIC"];
-    return months[int.parse(monthNum) - 1];
-  }
-
   @override
   Widget build(BuildContext context) {
+    final l10n = AppLocalizations.of(context)!;
+    final locale = Localizations.localeOf(context).languageCode;
+    
     double chartWidth = keys.length * 60.0;
     if (chartWidth < MediaQuery.of(context).size.width) {
       chartWidth = MediaQuery.of(context).size.width;
@@ -58,7 +57,7 @@ class HistoryChart extends StatelessWidget {
                     getTitlesWidget: (value, meta) => SideTitleWidget(
                       axisSide: meta.axisSide,
                       child: Text(
-                        "${value.toInt()}kWh",
+                        "${value.toInt()}${l10n.kwh}",
                         style: const TextStyle(color: Colors.white24, fontSize: 8, fontWeight: FontWeight.bold),
                       ),
                     ),
@@ -77,8 +76,13 @@ class HistoryChart extends StatelessWidget {
                       final day = key.substring(0, 2);
                       final monthYear = key.substring(3);
                       final parts = monthYear.split('-');
-                      final month = _getMonthAbbr(parts[0]);
-                      final yearShort = parts[1].substring(2);
+                      final monthNum = int.parse(parts[0]);
+                      final year = parts[1];
+                      final yearShort = year.substring(2);
+                      
+                      // Crea una data per il mese e formattala secondo il locale
+                      final date = DateTime(int.parse(year), monthNum, 1);
+                      final monthName = DateFormat('MMM', locale).format(date).toUpperCase();
 
                       final now = DateTime.now();
                       final currentMonthKey = DateFormat('MM-yyyy').format(now);
@@ -99,7 +103,7 @@ class HistoryChart extends StatelessWidget {
                               ),
                             ),
                             Text(
-                              month,
+                              monthName,
                               style: TextStyle(
                                 color: isCurrentMonth ? Colors.blueAccent : Colors.white38,
                                 fontSize: 9,
@@ -157,11 +161,14 @@ class HistoryChart extends StatelessWidget {
                         final day = key.substring(0, 2);
                         final monthYear = key.substring(3);
                         final parts = monthYear.split('-');
-                        final month = _getMonthAbbr(parts[0]);
+                        final monthNum = int.parse(parts[0]);
                         final year = parts[1];
+                        
+                        final date = DateTime(int.parse(year), monthNum, 1);
+                        final monthName = DateFormat('MMMM', locale).format(date);
 
                         return LineTooltipItem(
-                          "$day $month $year\n${touchedSpot.y.toStringAsFixed(1)} kWh",
+                          "$day $monthName $year\n${touchedSpot.y.toStringAsFixed(1)} ${l10n.kwh}",
                           const TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 11),
                         );
                       }

@@ -1,18 +1,24 @@
 import 'package:flutter/material.dart';
 import 'package:smartcharge_v2/providers/home_provider.dart';
 import 'package:smartcharge_v2/services/cost_calculator.dart';
+import 'package:smartcharge_v2/l10n/app_localizations.dart';
 
 class StatsRow extends StatelessWidget {
   final HomeProvider provider;
+  final AppLocalizations l10n;
 
-  const StatsRow({super.key, required this.provider});
+  const StatsRow({
+    super.key, 
+    required this.provider,
+    required this.l10n,
+  });
 
   @override
   Widget build(BuildContext context) {
     // 1. Calcoliamo il costo totale reale usando la variabile corretta del provider
     final double costoTotaleReale = CostCalculator.calculate(
       totalKwh: provider.energyNeeded,
-      wallboxPower: provider.wallboxPwr, // 🔥 Nome variabile corretto: wallboxPwr
+      wallboxPower: provider.wallboxPwr,
       startTime: TimeOfDay.now(),
       date: DateTime.now(),
       contract: provider.myContract,
@@ -52,7 +58,7 @@ class StatsRow extends StatelessWidget {
                   ),
                 ),
                 Text(
-                  "finito: ${prezzoUnitarioFinito.toStringAsFixed(3)}/kWh",
+                  "${l10n.finalPrice}: ${prezzoUnitarioFinito.toStringAsFixed(3)}/kWh",
                   textAlign: TextAlign.center,
                   style: TextStyle(
                     color: Colors.greenAccent.withOpacity(0.5), 
@@ -60,9 +66,9 @@ class StatsRow extends StatelessWidget {
                     fontWeight: FontWeight.w500
                   ),
                 ),
-                const Text(
-                  "COSTO",
-                  style: TextStyle(color: Colors.white38, fontSize: 9),
+                Text(
+                  l10n.cost,
+                  style: const TextStyle(color: Colors.white38, fontSize: 9),
                 ),
               ],
             ),
@@ -71,7 +77,7 @@ class StatsRow extends StatelessWidget {
           // --- COLONNA DURATA ---
           Expanded(
             child: _buildStatItem(
-              "DURATA",
+              l10n.duration,
               "${provider.duration.inHours}h ${provider.duration.inMinutes % 60}m",
               Colors.blueAccent,
               Icons.timer,
@@ -81,7 +87,7 @@ class StatsRow extends StatelessWidget {
           // --- COLONNA INIZIO ---
           Expanded(
             child: _buildStatItem(
-              "INIZIO",
+              l10n.start,
               provider.startTimeDisplay,
               Colors.orangeAccent,
               Icons.schedule,
