@@ -2,8 +2,8 @@ import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'dart:convert';
-import 'package:smartcharge_v2/services/sync_service.dart';
-import 'package:smartcharge_v2/models/contract_model.dart';
+import 'package:origo/services/sync_service.dart';
+import 'package:origo/models/contract_model.dart';
 import 'package:google_sign_in/google_sign_in.dart'; // 🔥 IMPORT AGGIUNTO
 
 class AuthProvider extends ChangeNotifier {

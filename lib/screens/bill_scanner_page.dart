@@ -2,11 +2,11 @@ import 'dart:typed_data';
 import 'package:flutter/material.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:file_picker/file_picker.dart';
-import 'package:smartcharge_v2/services/ai_billing_service.dart';
-import 'package:smartcharge_v2/providers/home_provider.dart';
+import 'package:origo/services/ai_billing_service.dart';
+import 'package:origo/providers/home_provider.dart';
 import 'package:firebase_auth/firebase_auth.dart'; // Aggiunto per l'ID utente
 import 'package:intl/intl.dart';
-import 'package:smartcharge_v2/models/contract_model.dart';
+import 'package:origo/models/contract_model.dart';
 
 class BillScannerPage extends StatefulWidget {
   final HomeProvider provider;

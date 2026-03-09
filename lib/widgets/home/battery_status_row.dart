@@ -1,8 +1,8 @@
 import 'package:flutter/material.dart';
-import 'package:smartcharge_v2/providers/home_provider.dart';
-import 'package:smartcharge_v2/widgets/battery_indicator.dart';
-import 'package:smartcharge_v2/widgets/status_card.dart';
-import 'package:smartcharge_v2/l10n/app_localizations.dart'; // 🔥 IMPORT
+import 'package:origo/providers/home_provider.dart';
+import 'package:origo/widgets/battery_indicator.dart';
+import 'package:origo/widgets/status_card.dart';
+import 'package:origo/l10n/app_localizations.dart'; // 🔥 IMPORT
 
 class BatteryStatusRow extends StatelessWidget {
   final HomeProvider provider;

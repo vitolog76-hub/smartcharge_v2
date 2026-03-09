@@ -1,16 +1,16 @@
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
-import 'package:smartcharge_v2/core/constants.dart';
-import 'package:smartcharge_v2/models/charge_session.dart';
-import 'package:smartcharge_v2/models/contract_model.dart';
-import 'package:smartcharge_v2/models/car_model.dart';
-import 'package:smartcharge_v2/services/pdf_service.dart';
-import 'package:smartcharge_v2/widgets/history/history_chart.dart';
-import 'package:smartcharge_v2/widgets/history/history_year_folder.dart';
-import 'package:smartcharge_v2/widgets/history/history_export_dialog.dart';
+import 'package:origo/core/constants.dart';
+import 'package:origo/models/charge_session.dart';
+import 'package:origo/models/contract_model.dart';
+import 'package:origo/models/car_model.dart';
+import 'package:origo/services/pdf_service.dart';
+import 'package:origo/widgets/history/history_chart.dart';
+import 'package:origo/widgets/history/history_year_folder.dart';
+import 'package:origo/widgets/history/history_export_dialog.dart';
 import 'package:provider/provider.dart';
-import 'package:smartcharge_v2/providers/home_provider.dart';
-import 'package:smartcharge_v2/l10n/app_localizations.dart';
+import 'package:origo/providers/home_provider.dart';
+import 'package:origo/l10n/app_localizations.dart';
 
 class HistoryPage extends StatefulWidget {
   final List<ChargeSession> history;

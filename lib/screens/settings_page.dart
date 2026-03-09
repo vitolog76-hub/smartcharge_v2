@@ -1,19 +1,19 @@
 import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:shared_preferences/shared_preferences.dart';
-import 'package:smartcharge_v2/models/contract_model.dart';
-import 'package:smartcharge_v2/models/charge_session.dart';
-import 'package:smartcharge_v2/models/car_model.dart';
-import 'package:smartcharge_v2/services/sync_service.dart';
-import 'package:smartcharge_v2/providers/auth_provider.dart';
-import 'package:smartcharge_v2/providers/home_provider.dart';
-import 'package:smartcharge_v2/screens/contract_summary_page.dart';
+import 'package:origo/models/contract_model.dart';
+import 'package:origo/models/charge_session.dart';
+import 'package:origo/models/car_model.dart';
+import 'package:origo/services/sync_service.dart';
+import 'package:origo/providers/auth_provider.dart';
+import 'package:origo/providers/home_provider.dart';
+import 'package:origo/screens/contract_summary_page.dart';
 import 'package:provider/provider.dart';
-import 'package:smartcharge_v2/pages/add_contract_page.dart';
-import 'package:smartcharge_v2/services/cost_calculator.dart';
+import 'package:origo/pages/add_contract_page.dart';
+import 'package:origo/services/cost_calculator.dart';
 import 'package:flutter/services.dart';
-import 'package:smartcharge_v2/providers/locale_provider.dart';
-import 'package:smartcharge_v2/l10n/app_localizations.dart';
+import 'package:origo/providers/locale_provider.dart';
+import 'package:origo/l10n/app_localizations.dart';
 
 class SettingsPage extends StatefulWidget {
   final EnergyContract contract;

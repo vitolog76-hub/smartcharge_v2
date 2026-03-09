@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
-import 'package:smartcharge_v2/providers/auth_provider.dart' as app;
+import 'package:origo/providers/auth_provider.dart' as app;
 
 class RegisterPage extends StatefulWidget {
   const RegisterPage({super.key});

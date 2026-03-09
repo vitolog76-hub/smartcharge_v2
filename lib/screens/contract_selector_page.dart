@@ -1,9 +1,9 @@
 import 'dart:ui';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
-import 'package:smartcharge_v2/providers/home_provider.dart';
-import 'package:smartcharge_v2/models/contract_model.dart';
-import 'package:smartcharge_v2/screens/bill_scanner_page.dart';
+import 'package:origo/providers/home_provider.dart';
+import 'package:origo/models/contract_model.dart';
+import 'package:origo/screens/bill_scanner_page.dart';
 
 class ContractSelectorPage extends StatelessWidget {
   const ContractSelectorPage({super.key});

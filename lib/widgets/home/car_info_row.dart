@@ -1,5 +1,5 @@
 import 'package:flutter/material.dart';
-import 'package:smartcharge_v2/providers/home_provider.dart';
+import 'package:origo/providers/home_provider.dart';
 
 class CarInfoRow extends StatelessWidget {
   final HomeProvider provider;

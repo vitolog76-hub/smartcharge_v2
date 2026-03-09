@@ -1,8 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
-import 'package:smartcharge_v2/models/contract_model.dart';
-import 'package:smartcharge_v2/providers/home_provider.dart';
-import 'package:smartcharge_v2/services/cost_calculator.dart'; 
+import 'package:origo/models/contract_model.dart';
+import 'package:origo/providers/home_provider.dart';
+import 'package:origo/services/cost_calculator.dart'; 
 
 class ContractSummaryPage extends StatelessWidget {
   const ContractSummaryPage({super.key});

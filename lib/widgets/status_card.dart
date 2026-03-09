@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
-import 'package:smartcharge_v2/core/constants.dart';
-import 'package:smartcharge_v2/l10n/app_localizations.dart';
+import 'package:origo/core/constants.dart';
+import 'package:origo/l10n/app_localizations.dart';
 
 class StatusCard extends StatelessWidget {
   final Duration duration;

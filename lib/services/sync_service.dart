@@ -1,6 +1,6 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
-import 'package:smartcharge_v2/models/charge_session.dart';
-import 'package:smartcharge_v2/models/contract_model.dart';
+import 'package:origo/models/charge_session.dart';
+import 'package:origo/models/contract_model.dart';
 
 class SyncService {
   final FirebaseFirestore _db = FirebaseFirestore.instance;

@@ -1,5 +1,5 @@
 import 'package:flutter/material.dart';
-import 'package:smartcharge_v2/core/constants.dart';
+import 'package:origo/core/constants.dart';
 
 class PowerSlider extends StatelessWidget {
   final double currentPower;

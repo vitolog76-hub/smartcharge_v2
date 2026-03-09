@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
-import 'package:smartcharge_v2/l10n/app_localizations.dart';
+import 'package:origo/l10n/app_localizations.dart';
 
 class HistoryExportDialog extends StatelessWidget {
   final Function(int?, int?) onExport;

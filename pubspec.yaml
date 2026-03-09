@@ -1,5 +1,5 @@
-name: smartcharge_v2
-description: "A new Flutter project for Smart EV Charging."
+name: origo  
+description: "OriGo - EV Charging Scheduler"
 version: 1.0.0+1
 
 environment:

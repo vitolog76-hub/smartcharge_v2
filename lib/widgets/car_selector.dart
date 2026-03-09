@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
-import 'package:smartcharge_v2/models/car_model.dart';
-import 'package:smartcharge_v2/core/constants.dart';
+import 'package:origo/models/car_model.dart';
+import 'package:origo/core/constants.dart';
 
 class CarSelector extends StatelessWidget {
   final CarModel selectedCar;

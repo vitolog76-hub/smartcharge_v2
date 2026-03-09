@@ -1,5 +1,5 @@
 import 'package:flutter/material.dart';
-import 'package:smartcharge_v2/l10n/app_localizations.dart';
+import 'package:origo/l10n/app_localizations.dart';
 
 class ActionButtons extends StatelessWidget {
   final VoidCallback onHomeTap;

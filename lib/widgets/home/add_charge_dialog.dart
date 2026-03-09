@@ -1,11 +1,11 @@
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
-import 'package:smartcharge_v2/providers/home_provider.dart';
-import 'package:smartcharge_v2/models/charge_session.dart';
-import 'package:smartcharge_v2/models/contract_model.dart';
-import 'package:smartcharge_v2/services/charge_engine.dart';
-import 'package:smartcharge_v2/services/cost_calculator.dart'; 
-import 'package:smartcharge_v2/l10n/app_localizations.dart';
+import 'package:origo/providers/home_provider.dart';
+import 'package:origo/models/charge_session.dart';
+import 'package:origo/models/contract_model.dart';
+import 'package:origo/services/charge_engine.dart';
+import 'package:origo/services/cost_calculator.dart'; 
+import 'package:origo/l10n/app_localizations.dart';
 
 class AddChargeDialog extends StatefulWidget {
   final HomeProvider provider;

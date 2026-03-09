@@ -7,8 +7,8 @@ import 'package:pdf/pdf.dart';
 import 'package:path_provider/path_provider.dart';
 import 'package:share_plus/share_plus.dart';
 import 'package:intl/intl.dart';
-import 'package:smartcharge_v2/models/charge_session.dart';
-import 'package:smartcharge_v2/l10n/app_localizations.dart';
+import 'package:origo/models/charge_session.dart';  // 🔥 CAMBIA DA smartcharge_v2
+import 'package:origo/l10n/app_localizations.dart';  // 🔥 CAMBIA DA smartcharge_v2
 
 // --- CORREZIONE PER IOS: Usiamo universal_html per evitare errori di compilazione ---
 import 'package:universal_html/html.dart' as html;
@@ -81,7 +81,7 @@ class PdfService {
       final file = File("${output.path}/report_ricariche_${DateTime.now().millisecondsSinceEpoch}.pdf");
       await file.writeAsBytes(pdfBytes);
       
-      await Share.shareXFiles([XFile(file.path)], text: '${t?.history ?? 'Report Ricariche'} SmartCharge');
+      await Share.shareXFiles([XFile(file.path)], text: '${t?.history ?? 'Report Ricariche'} OriGo');
     }
   }
 
@@ -101,7 +101,7 @@ class PdfService {
               crossAxisAlignment: pw.CrossAxisAlignment.start,
               children: [
                 pw.Text(
-                  "SMART CHARGE",
+                  "ORIGO",  // 🔥 CAMBIA DA "SMART CHARGE"
                   style: pw.TextStyle(font: ttf, fontSize: 20, fontWeight: pw.FontWeight.bold, color: PdfColors.blue),
                 ),
                 pw.Text(
@@ -322,7 +322,7 @@ class PdfService {
             style: pw.TextStyle(font: ttf, fontSize: 8, color: PdfColors.grey700),
           ),
           pw.Text(
-            "SmartCharge v2",
+            "OriGo v2",  // 🔥 CAMBIA DA "SmartCharge v2"
             style: pw.TextStyle(font: ttf, fontSize: 8, color: PdfColors.grey700),
           ),
         ],

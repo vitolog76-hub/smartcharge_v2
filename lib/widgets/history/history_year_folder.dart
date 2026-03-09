@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
-import 'package:smartcharge_v2/models/charge_session.dart';
+import 'package:origo/models/charge_session.dart';
 import 'history_edit_dialog.dart';
 
 class HistoryYearFolder extends StatelessWidget {

@@ -1,18 +1,18 @@
 import 'dart:ui';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
-import 'package:smartcharge_v2/providers/home_provider.dart';
-import 'package:smartcharge_v2/providers/auth_provider.dart';
-import 'package:smartcharge_v2/widgets/home/ready_time_card.dart';
-import 'package:smartcharge_v2/widgets/home/battery_status_row.dart';
-import 'package:smartcharge_v2/widgets/home/stats_row.dart';
-import 'package:smartcharge_v2/widgets/home/simulation_button.dart';
-import 'package:smartcharge_v2/widgets/home/add_charge_dialog.dart';
-import 'package:smartcharge_v2/widgets/charging_controls.dart';
-import 'package:smartcharge_v2/widgets/action_buttons.dart';
-import 'package:smartcharge_v2/screens/history_page.dart';
-import 'package:smartcharge_v2/screens/settings_page.dart';
-import 'package:smartcharge_v2/l10n/app_localizations.dart';
+import 'package:origo/providers/home_provider.dart';
+import 'package:origo/providers/auth_provider.dart';
+import 'package:origo/widgets/home/ready_time_card.dart';
+import 'package:origo/widgets/home/battery_status_row.dart';
+import 'package:origo/widgets/home/stats_row.dart';
+import 'package:origo/widgets/home/simulation_button.dart';
+import 'package:origo/widgets/home/add_charge_dialog.dart';
+import 'package:origo/widgets/charging_controls.dart';
+import 'package:origo/widgets/action_buttons.dart';
+import 'package:origo/screens/history_page.dart';
+import 'package:origo/screens/settings_page.dart';
+import 'package:origo/l10n/app_localizations.dart';
 
 class HomePage extends StatelessWidget {
   const HomePage({super.key});

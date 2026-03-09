@@ -1,7 +1,7 @@
 import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
-import 'package:smartcharge_v2/services/notification_service.dart';
+import 'package:origo/services/notification_service.dart';
 
 class SimulationService {
   Timer? _timer;

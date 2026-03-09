@@ -9,7 +9,7 @@ class AppLocalizationsIt extends AppLocalizations {
   AppLocalizationsIt([String locale = 'it']) : super(locale);
 
   @override
-  String get appTitle => 'Smart Charge';
+  String get appTitle => 'OriGO';
 
   @override
   String get home => 'Home';

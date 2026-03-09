@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:fl_chart/fl_chart.dart';
 import 'package:intl/intl.dart';
-import 'package:smartcharge_v2/l10n/app_localizations.dart';
+import 'package:origo/l10n/app_localizations.dart';
 
 class HistoryChart extends StatelessWidget {
   final List<String> keys;

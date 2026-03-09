@@ -1,9 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:firebase_auth/firebase_auth.dart';
-import 'package:smartcharge_v2/providers/auth_provider.dart' as app;
-import 'package:smartcharge_v2/providers/locale_provider.dart';
-import 'package:smartcharge_v2/screens/register_page.dart';
+import 'package:origo/providers/auth_provider.dart' as app;
+import 'package:origo/providers/locale_provider.dart';
+import 'package:origo/screens/register_page.dart';
 
 class LoginPage extends StatelessWidget {
   const LoginPage({super.key});
@@ -70,7 +70,7 @@ class LoginPage extends StatelessWidget {
                   
                   // Title
                   const Text(
-                    "SMART CHARGE",
+                    "OriGo",
                     style: TextStyle(
                       color: Colors.white,
                       fontSize: 28,

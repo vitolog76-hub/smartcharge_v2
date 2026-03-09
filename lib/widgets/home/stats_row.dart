@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
-import 'package:smartcharge_v2/providers/home_provider.dart';
-import 'package:smartcharge_v2/services/cost_calculator.dart';
-import 'package:smartcharge_v2/l10n/app_localizations.dart';
+import 'package:origo/providers/home_provider.dart';
+import 'package:origo/services/cost_calculator.dart';
+import 'package:origo/l10n/app_localizations.dart';
 
 class StatsRow extends StatelessWidget {
   final HomeProvider provider;

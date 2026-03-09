@@ -107,7 +107,7 @@ abstract class AppLocalizations {
   /// No description provided for @appTitle.
   ///
   /// In it, this message translates to:
-  /// **'Smart Charge'**
+  /// **'OriGO'**
   String get appTitle;
 
   /// No description provided for @home.
