@@ -207,12 +207,13 @@ class ReadyTimeCard extends StatelessWidget {
                       provider.readyTime.minute,
                     ),
                     onDateTimeChanged: (DateTime newDateTime) {
-                      // Feedback tattile di sistema ad ogni scatto
-                      HapticFeedback.selectionClick();
-                      provider.updateReadyTime(
-                        TimeOfDay(hour: newDateTime.hour, minute: newDateTime.minute),
-                      );
-                    },
+  // selectionClick è molto leggero, mediumImpact si sente sicuramente
+  HapticFeedback.mediumImpact(); 
+  
+  provider.updateReadyTime(
+    TimeOfDay(hour: newDateTime.hour, minute: newDateTime.minute),
+  );
+},
                   ),
                 ),
               ),
