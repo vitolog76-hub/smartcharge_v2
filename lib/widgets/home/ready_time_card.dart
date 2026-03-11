@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
-import 'package:flutter/cupertino.dart'; 
-import 'package:flutter/services.dart';  
+import 'package:flutter/cupertino.dart';
+import 'package:flutter/services.dart';
 import 'package:origo/providers/home_provider.dart';
 import 'package:origo/l10n/app_localizations.dart';
 
@@ -102,12 +102,12 @@ class ReadyTimeCard extends StatelessWidget {
   void _showCupertinoTimePicker(BuildContext context, AppLocalizations l10n) {
     showCupertinoModalPopup(
       context: context,
-      barrierColor: Colors.black.withOpacity(0.7), // Oscura lo sfondo per focus
+      barrierColor: Colors.black.withOpacity(0.7),
       builder: (BuildContext context) => Container(
-        height: 340,
-        margin: const EdgeInsets.all(16), // Effetto "floating" staccato dai bordi
+        height: 350,
+        margin: const EdgeInsets.all(16),
+        padding: const EdgeInsets.only(top: 10),
         decoration: BoxDecoration(
-          // Gradiente scuro per dare profondità alle rotelle
           gradient: const LinearGradient(
             begin: Alignment.topCenter,
             end: Alignment.bottomCenter,
@@ -117,7 +117,6 @@ class ReadyTimeCard extends StatelessWidget {
             ],
           ),
           borderRadius: BorderRadius.circular(32),
-          // Bordino neon sottile
           border: Border.all(
             color: Colors.cyanAccent.withOpacity(0.2),
             width: 1.5,
@@ -125,7 +124,7 @@ class ReadyTimeCard extends StatelessWidget {
           boxShadow: [
             BoxShadow(
               color: Colors.cyanAccent.withOpacity(0.1),
-              blurRadius: 20,
+              blurRadius: 25,
               spreadRadius: 2,
             ),
           ],
@@ -134,8 +133,7 @@ class ReadyTimeCard extends StatelessWidget {
           top: false,
           child: Column(
             children: [
-              // 1. Maniglia decorativa superiore
-              const SizedBox(height: 12),
+              // Indicatore superiore (Maniglia iOS)
               Container(
                 width: 36,
                 height: 4,
@@ -145,7 +143,7 @@ class ReadyTimeCard extends StatelessWidget {
                 ),
               ),
               
-              // 2. Header Personalizzato
+              // Header con i comandi e titolo
               Padding(
                 padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 16),
                 child: Row(
@@ -158,6 +156,7 @@ class ReadyTimeCard extends StatelessWidget {
                       onPressed: () => Navigator.pop(context),
                     ),
                     Column(
+                      mainAxisSize: MainAxisSize.min,
                       children: [
                         Text(
                           l10n.readyAt.toUpperCase(),
@@ -182,7 +181,7 @@ class ReadyTimeCard extends StatelessWidget {
                 ),
               ),
 
-              // 3. Il Selettore Cupertino (Rotelle)
+              // Selettore a rotella con HAPTIC FEEDBACK
               Expanded(
                 child: CupertinoTheme(
                   data: CupertinoThemeData(
@@ -190,9 +189,9 @@ class ReadyTimeCard extends StatelessWidget {
                     textTheme: CupertinoTextThemeData(
                       dateTimePickerTextStyle: TextStyle(
                         color: Colors.white.withOpacity(0.9),
-                        fontSize: 24,
-                        fontWeight: FontWeight.w300, // Look più "thin" ed elegante
-                        letterSpacing: 1.2,
+                        fontSize: 25,
+                        fontWeight: FontWeight.w300, 
+                        letterSpacing: 1.5,
                       ),
                     ),
                   ),
@@ -207,13 +206,16 @@ class ReadyTimeCard extends StatelessWidget {
                       provider.readyTime.minute,
                     ),
                     onDateTimeChanged: (DateTime newDateTime) {
-  // selectionClick è molto leggero, mediumImpact si sente sicuramente
-  HapticFeedback.mediumImpact(); 
-  
-  provider.updateReadyTime(
-    TimeOfDay(hour: newDateTime.hour, minute: newDateTime.minute),
-  );
-},
+                      // ✅ SOLUZIONE 1: Usare Feedback (il più semplice)
+                      Feedback.forTap(context);
+                      
+                      // ✅ SOLUZIONE 2: Usare HapticFeedback (più controllato)
+                      // HapticFeedback.selectionClick();
+                      
+                      provider.updateReadyTime(
+                        TimeOfDay(hour: newDateTime.hour, minute: newDateTime.minute),
+                      );
+                    },
                   ),
                 ),
               ),
