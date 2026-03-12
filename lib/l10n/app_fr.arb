@@ -18,6 +18,7 @@
   "batteryChemistryLfp": "LFP",
   "batteryChemistryUnknown": "INCONNUE",
   "exportSubtitle": "Choisissez la période à inclure dans le PDF",
+  "saveAllChanges": "ENREGISTRER TOUS LES CHANGEMENTS",
   "currentMonth": "Mois en Cours",
   "currentYear": "Année en Cours",
   "allHistory": "Tout l'Historique",

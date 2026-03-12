@@ -31,7 +31,7 @@ class UserVehicleSection extends StatelessWidget {
     final l10n = AppLocalizations.of(context)!;
     
     return ExpandableSection(
-      title: "DATI UTENTE E VEICOLO",
+      title: l10n.userVehicleData,  // <-- CAMBIATO: ora usa la traduzione
       icon: Icons.directions_car,
       isExpanded: isExpanded,
       animation: animation,

@@ -346,7 +346,7 @@ class AppLocalizationsDe extends AppLocalizations {
   String get account => 'KONTO';
 
   @override
-  String get saveAllChanges => 'CONFERMA TUTTE LE MODIFICHE';
+  String get saveAllChanges => 'ALLE ÄNDERUNGEN SPEICHERN';
 
   @override
   String get batteryChemistry => 'ZELLENCHEMIE';

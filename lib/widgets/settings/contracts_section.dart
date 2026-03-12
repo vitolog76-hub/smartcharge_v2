@@ -1,5 +1,5 @@
 import 'package:flutter/material.dart';
-import 'package:origo/l10n/app_localizations.dart';
+import 'package:origo/l10n/app_localizations.dart';  // AGGIUNGI
 import 'package:origo/models/contract_model.dart';
 import 'package:origo/providers/home_provider.dart';
 import 'package:origo/screens/contract_summary_page.dart';
@@ -29,10 +29,10 @@ class ContractsSection extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final l10n = AppLocalizations.of(context)!;
+    final l10n = AppLocalizations.of(context)!;  // AGGIUNGI
     
     return ExpandableSection(
-      title: "GESTIONE CONTRATTI ENERGIA",
+      title: l10n.contracts,  // CAMBIA (contracts è la chiave che hai)
       icon: Icons.pie_chart,
       isExpanded: isExpanded,
       animation: animation,
@@ -76,7 +76,7 @@ class ContractsSection extends StatelessWidget {
                 ),
               ),
               ...homeProv.allContracts.map((contract) => 
-                _buildContractTile(context, contract, homeProv)
+                _buildContractTile(context, contract, homeProv, l10n)
               ),
             ],
           );
@@ -85,7 +85,7 @@ class ContractsSection extends StatelessWidget {
     );
   }
 
-  Widget _buildContractTile(BuildContext context, EnergyContract contract, HomeProvider homeProv) {
+  Widget _buildContractTile(BuildContext context, EnergyContract contract, HomeProvider homeProv, AppLocalizations l10n) {
     final isSelected = contract.id == homeProv.activeContractId;
     
     return Container(

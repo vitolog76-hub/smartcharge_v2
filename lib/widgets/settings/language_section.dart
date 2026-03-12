@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:origo/l10n/app_localizations.dart';  // AGGIUNGI QUESTO IMPORT
 import 'package:origo/providers/locale_provider.dart';
 import 'package:provider/provider.dart';
 import 'expandable_section.dart';
@@ -17,8 +18,10 @@ class LanguageSection extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final l10n = AppLocalizations.of(context)!;  // AGGIUNGI QUESTA RIGA
+    
     return ExpandableSection(
-      title: "LINGUA",
+      title: l10n.languageSection,  // CAMBIA DA "LINGUA" A l10n.languageSection
       icon: Icons.language,
       isExpanded: isExpanded,
       animation: animation,
@@ -34,7 +37,7 @@ class LanguageSection extends StatelessWidget {
               ),
               child: const Icon(Icons.language, color: Colors.purple),
             ),
-            title: const Text("Lingua / Language"),
+            title: const Text("Lingua / Language"),  // QUESTO PUOI LASCIARLO COSÌ
             subtitle: Text(_getLanguageName(localeProvider.locale)),
             trailing: DropdownButton<Locale>(
               value: localeProvider.locale,
@@ -50,6 +53,8 @@ class LanguageSection extends StatelessWidget {
                 DropdownMenuItem(value: Locale('it', 'IT'), child: Text('🇮🇹 Italiano')),
                 DropdownMenuItem(value: Locale('en', 'US'), child: Text('🇬🇧 English')),
                 DropdownMenuItem(value: Locale('es', 'ES'), child: Text('🇪🇸 Español')),
+                DropdownMenuItem(value: Locale('fr', 'FR'), child: Text('🇫🇷 Français')),
+                DropdownMenuItem(value: Locale('de', 'DE'), child: Text('🇩🇪 Deutsch')),
               ],
             ),
           );
@@ -63,6 +68,8 @@ class LanguageSection extends StatelessWidget {
       case 'it': return 'Italiano';
       case 'en': return 'English';
       case 'es': return 'Español';
+      case 'fr': return 'Français';
+      case 'de': return 'Deutsch';
       default: return 'Italiano';
     }
   }

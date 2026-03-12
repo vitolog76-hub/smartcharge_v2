@@ -371,7 +371,7 @@ class _SettingsPageState extends State<SettingsPage> with TickerProviderStateMix
                         child: _isSyncing 
                           ? const CircularProgressIndicator(color: Colors.black)
                           : Text(
-                              l10n.saveAllChanges,
+                              l10n.saveAllChanges,  // <-- AGGIUNTA LA TRADUZIONE
                               style: const TextStyle(fontWeight: FontWeight.w900, letterSpacing: 1.5),
                             ),
                       ),
