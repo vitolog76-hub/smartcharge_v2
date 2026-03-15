@@ -357,107 +357,70 @@ class HomePage extends StatelessWidget {
   // --- WIDGETS DI SUPPORTO ---
 
   void _showCompletionDialog(BuildContext context, HomeProvider provider, AppLocalizations l10n) {
-    _completionDialogShown = true;
-    
-    // Salvataggio dei dati
+  _completionDialogShown = true;
+  
+  showDialog(
+    context: context,
+    barrierDismissible: false,
+    builder: (ctx) {
+      return AlertDialog(
+        backgroundColor: const Color(0xFF1E1E1E),
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+        title: Text(
+          l10n.chargingComplete,
+          style: const TextStyle(color: Colors.cyanAccent, fontWeight: FontWeight.bold),
+          textAlign: TextAlign.center,
+        ),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            const Icon(Icons.check_circle, color: Colors.green, size: 50),
+            const SizedBox(height: 16),
+            Text(
+              '${l10n.finalSoc}: ${provider.currentSoc.toStringAsFixed(1)}%',
+              style: const TextStyle(color: Colors.white70, fontSize: 16),
+            ),
+            const SizedBox(height: 12),
+            Text(
+              '${l10n.energy}: ${provider.lastSavedEnergy.toStringAsFixed(1)} ${l10n.kwh}',
+              style: const TextStyle(color: Colors.white, fontSize: 18, fontWeight: FontWeight.bold),
+            ),
+            const SizedBox(height: 4),
+            Text(
+              '${l10n.costEuro}: ${provider.lastSavedCost.toStringAsFixed(2)} ${l10n.euro}',
+              style: const TextStyle(color: Colors.cyanAccent, fontSize: 20, fontWeight: FontWeight.bold),
+            ),
+          ],
+        ),
+        actions: [
+          TextButton(
+            onPressed: () {
+              provider.resetCompletionDialog();
+              Navigator.of(ctx).pop();
+              _completionDialogShown = false;
+            },
+            child: Text("SCARTA", style: const TextStyle(color: Colors.grey)),
+          ),
+         ElevatedButton(
+  onPressed: () async {
+    // 🔥 Chiama saveCurrentCharge SOLO qui
     provider.saveCurrentCharge();
-    
-    showDialog(
-      context: context,
-      barrierDismissible: false,
-      builder: (ctx) {
-        return Consumer<HomeProvider>(
-          builder: (context, provider, child) {
-            // Se sta salvando, mostra progress dialog
-            if (provider.isSaving || provider.saveError != null || provider.saveSuccess) {
-              return SavingProgressDialog(
-                progress: provider.saveProgress,
-                step: provider.saveStep,
-                error: provider.saveError,
-                isComplete: provider.saveSuccess,
-                onRetry: () {
-                  provider.resetSaveState();
-                  provider.saveCurrentCharge();
-                },
-                onViewHistory: () {
-                  Navigator.of(ctx).pop();
-                  Navigator.push(
-                    context,
-                    MaterialPageRoute(
-                      builder: (_) => HistoryPage(
-                        history: provider.chargeHistory,
-                        contract: provider.myContract,
-                        selectedCar: provider.selectedCar,
-                        onHistoryChanged: (updatedHistory) {
-                          provider.chargeHistory = updatedHistory;
-                          provider.saveHistory();
-                        },
-                      ),
-                    ),
-                  );
-                  _completionDialogShown = false;
-                },
-                onClose: () {
-                  provider.resetSaveState();
-                  Navigator.of(ctx).pop();
-                  _completionDialogShown = false;
-                },
-              );
-            }
-            
-            // Altrimenti mostra il dialog normale
-            return AlertDialog(
-              backgroundColor: const Color(0xFF1E1E1E),
-              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
-              title: Text(
-                l10n.chargingComplete,
-                style: const TextStyle(color: Colors.cyanAccent, fontWeight: FontWeight.bold),
-                textAlign: TextAlign.center,
-              ),
-              content: Column(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  const Icon(Icons.check_circle, color: Colors.green, size: 50),
-                  const SizedBox(height: 16),
-                  Text(
-                    '${l10n.finalSoc}: ${provider.currentSoc.toStringAsFixed(1)}%',
-                    style: const TextStyle(color: Colors.white70, fontSize: 16),
-                  ),
-                  const SizedBox(height: 12),
-                  Text(
-                    '${l10n.energy}: ${provider.lastSavedEnergy.toStringAsFixed(1)} ${l10n.kwh}',
-                    style: const TextStyle(color: Colors.white, fontSize: 18, fontWeight: FontWeight.bold),
-                  ),
-                  const SizedBox(height: 4),
-                  Text(
-                    '${l10n.costEuro}: ${provider.lastSavedCost.toStringAsFixed(2)} ${l10n.euro}',
-                    style: const TextStyle(color: Colors.cyanAccent, fontSize: 20, fontWeight: FontWeight.bold),
-                  ),
-                ],
-              ),
-              actions: [
-                Center(
-                  child: ElevatedButton(
-                    onPressed: () {
-                      provider.resetCompletionDialog();
-                      Navigator.of(ctx).pop();
-                      _completionDialogShown = false;
-                    },
-                    style: ElevatedButton.styleFrom(
-                      backgroundColor: Colors.cyanAccent.withOpacity(0.2),
-                      foregroundColor: Colors.cyanAccent,
-                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-                    ),
-                    child: Text(l10n.close),
-                  ),
-                ),
-              ],
-            );
-          },
-        );
-      },
-    );
-  }
+    provider.resetCompletionDialog();
+    Navigator.of(ctx).pop();
+    _completionDialogShown = false;
+  },
+  style: ElevatedButton.styleFrom(
+    backgroundColor: Colors.green,
+    foregroundColor: Colors.white,
+  ),
+  child: const Text("SALVA RICARICA"),
+),
+          
+        ],
+      );
+    },
+  );
+}
 
   String _formatDuration(Duration duration) {
     String twoDigits(int n) => n.toString().padLeft(2, '0');
