@@ -34,27 +34,58 @@ class HomeProvider extends ChangeNotifier {
   final SimulationService simService = SimulationService();
   bool isSimulating = false;
   bool _showCompletionDialog = false;
-  bool _isSavingCompletion = false; // 🔥 NUOVO: stato salvataggio
-  bool _showErrorDialog = false; // 🔥 NUOVO: stato errore
+  bool _isSavingCompletion = false;
+  bool _showErrorDialog = false;
   List<EnergyContract> allContracts = [];
 
   String activeContractId = "";
 
-  // 🔥 NOME UTENTE GLOBALE (PROFILO) - INDIPENDENTE DAI CONTRATTI
+  // 🔥 STATO DI SALVATAGGIO (PROGRESS BAR)
+  bool _isSaving = false;
+  int _saveProgress = 0;
+  String _saveStep = "";
+  String? _saveError;
+  bool _saveSuccess = false;
+
+  // 🔥 STATO DI INIZIALIZZAZIONE (SPLASH SCREEN)
+  bool _isInitializing = true;
+  double _initProgress = 0.0;
+  String _initMessage = "Avvio applicazione...";
+  String? _initSubMessage;
+
+  // Getter
+  bool get isSaving => _isSaving;
+  int get saveProgress => _saveProgress;
+  String get saveStep => _saveStep;
+  String? get saveError => _saveError;
+  bool get saveSuccess => _saveSuccess;
+  bool get isInitializing => _isInitializing;
+  double get initProgress => _initProgress;
+  String get initMessage => _initMessage;
+  String? get initSubMessage => _initSubMessage;
+  bool get isSavingCompletion => _isSavingCompletion;
+  bool get shouldShowErrorDialog => _showErrorDialog;
+
+  // 🔥 NOME UTENTE GLOBALE (PROFILO)
   String _globalUserName = "Utente";
   String get globalUserName => _globalUserName;
   String _batteryChemistry = "NMC / NCA";
   String get batteryChemistry => _batteryChemistry;
 
-  // 🔥 NUOVI GETTER
-  bool get isSavingCompletion => _isSavingCompletion;
-  bool get shouldShowErrorDialog => _showErrorDialog;
-  
   // 🔥 METODO PER RESET ERRORI
   void resetErrorDialog() => _showErrorDialog = false;
 
+  // Metodo per resettare lo stato di salvataggio
+  void resetSaveState() {
+    _isSaving = false;
+    _saveProgress = 0;
+    _saveStep = "";
+    _saveError = null;
+    _saveSuccess = false;
+    notifyListeners();
+  }
+
   String getSmartBatteryAdvice([AppLocalizations? l10n]) {
-    // Se non abbiamo traduzioni, usiamo i testi di default (italiano)
     final t = l10n;
     
     if (chargeHistory.isEmpty) {
@@ -63,7 +94,6 @@ class HomeProvider extends ChangeNotifier {
 
     final ora = DateTime.now();
     
-    // --- LOGICA PER LFP (Calibrazione) ---
     if (_batteryChemistry == "LFP") {
       bool haCaricatoAl100Recentemente = chargeHistory.any((s) => 
         s.endSoc >= 99 && ora.difference(s.date).inDays <= 7
@@ -75,7 +105,6 @@ class HomeProvider extends ChangeNotifier {
       return t?.batteryAdviceLfpGood ?? "✅ Batteria ben calibrata. Mantieni il target tra 20-80% per il resto della settimana.";
     }
 
-    // --- LOGICA PER NMC (Stress chimico) ---
     if (_batteryChemistry == "NMC / NCA") {
       int caricheEccessive = chargeHistory.where((s) => 
         s.endSoc > 85 && ora.difference(s.date).inDays <= 30
@@ -91,7 +120,7 @@ class HomeProvider extends ChangeNotifier {
     return t?.batteryAdviceGeneric ?? "Mantieni la carica tra 20-80% per una longevità ottimale.";
   }
 
-  // --- GESTIONE PROFILO (ID + NOME) ---
+  // --- GESTIONE PROFILO ---
   Future<void> syncUserProfile(String nuovoNome) async {
     _globalUserName = nuovoNome;
     final prefs = await SharedPreferences.getInstance();
@@ -112,7 +141,7 @@ class HomeProvider extends ChangeNotifier {
     notifyListeners(); 
   }
   
-  // Getter per ottenere il contratto attivo corrente
+  // Getter per il contratto attivo
   EnergyContract get myContract {
     if (allContracts.isEmpty) return EnergyContract(id: 'default', contractName: 'Contratto Base');
     return allContracts.firstWhere(
@@ -134,7 +163,7 @@ class HomeProvider extends ChangeNotifier {
   static const String KEY_SIM_END = 'simulation_end';
   static const String KEY_SIM_START_SOC = 'simulation_start_soc';
 
-  // --- COSTRUTTORE (CORRETTO) ---
+  // --- COSTRUTTORE ---
   HomeProvider() {
     currentSoc = -1.0; 
     _socAtStartOfSim = -1.0;
@@ -154,10 +183,8 @@ class HomeProvider extends ChangeNotifier {
         notifyListeners();
       },
       onSimulationComplete: () {
-        // 🔥 FIX: Gestione asincrona del salvataggio
         if (currentSoc == -1.0) return;
         
-        // Eseguiamo il salvataggio in modo asincrono senza bloccare l'UI
         WidgetsBinding.instance.addPostFrameCallback((_) {
           _handleSimulationCompletion();
         });
@@ -165,7 +192,7 @@ class HomeProvider extends ChangeNotifier {
     );
   }
 
-  // 🔥 NUOVO METODO: Gestione completion simulazione
+  // 🔥 Gestione completion simulazione
   Future<void> _handleSimulationCompletion() async {
     _isSavingCompletion = true;
     notifyListeners();
@@ -196,10 +223,20 @@ class HomeProvider extends ChangeNotifier {
   
   bool get showTaperingWarning => targetSoc > 80;
   
+  // --- INIT CON PROGRESS BAR ---
   Future<void> init() async {
     try {
       debugPrint("🚀 INIT: Inizio caricamento HomeProvider");
       
+      _isInitializing = true;
+      _initProgress = 0.0;
+      _initMessage = "Avvio applicazione...";
+      notifyListeners();
+      
+      // STEP 1: Carica parametri (20%)
+      _initProgress = 0.2;
+      _initMessage = "Caricamento parametri...";
+      notifyListeners();
       await _loadSimulationParameters(); 
       
       if (currentSoc == -1.0) {
@@ -207,15 +244,40 @@ class HomeProvider extends ChangeNotifier {
         _socAtStartOfSim = 20.0;
       }
 
-      await _loadCarsFromJson();  
+      // STEP 2: Carica auto (40%)
+      _initProgress = 0.4;
+      _initMessage = "Caricamento modelli auto...";
+      notifyListeners();
+      await _loadCarsFromJson();
       
+      // STEP 3: Pronto per UI (60%)
+      _initProgress = 0.6;
+      _initMessage = "Preparazione interfaccia...";
       carsLoaded = true;
       notifyListeners();
       
-      debugPrint("🚀 INIT: UI sbloccata, carico dati secondari in background");
+      // STEP 4: Caricamento secondario (80%)
+      _initProgress = 0.8;
+      _initMessage = "Caricamento dati aggiuntivi...";
+      _initSubMessage = "Questo potrebbe richiedere qualche secondo";
+      notifyListeners();
       
       WidgetsBinding.instance.addPostFrameCallback((_) {
-        _loadSecondaryData();
+        _loadSecondaryDataWithProgress();
+      });
+      
+      // STEP 5: Completato (90%)
+      _initProgress = 0.9;
+      _initMessage = "Quasi pronto...";
+      notifyListeners();
+      
+      // Timeout di sicurezza
+      Future.delayed(const Duration(seconds: 10), () {
+        if (_isInitializing) {
+          debugPrint("⏱️ Timeout caricamento secondario, forzo visualizzazione");
+          _isInitializing = false;
+          notifyListeners();
+        }
       });
       
       debugPrint("🚀 INIT: Completato con successo");
@@ -227,7 +289,41 @@ class HomeProvider extends ChangeNotifier {
       if (allCars.isEmpty) {
         selectedCar = CarModel(brand: "Default", model: "EV", batteryCapacity: 50.0);
       }
+      _isInitializing = false;
       carsLoaded = true;
+      notifyListeners();
+    }
+  }
+
+  Future<void> _loadSecondaryDataWithProgress() async {
+    try {
+      debugPrint("🔄 Caricamento dati secondari in background...");
+      
+      await loadBatteryConfig();
+      _initProgress = 0.95;
+      _initMessage = "Caricamento contratti...";
+      notifyListeners();
+      
+      await _loadContract();
+      _initProgress = 0.97;
+      _initMessage = "Caricamento storico...";
+      notifyListeners();
+      
+      await _loadHistory();
+      _initProgress = 0.99;
+      _initMessage = "Sincronizzazione...";
+      notifyListeners();
+      
+      await _loadSimulationProgress();
+      _startBackgroundSync();
+      
+      _isInitializing = false;
+      notifyListeners();
+      
+      debugPrint("✅ Dati secondari caricati");
+    } catch (e) {
+      debugPrint("❌ Errore caricamento dati secondari: $e");
+      _isInitializing = false;
       notifyListeners();
     }
   }
@@ -472,24 +568,37 @@ class HomeProvider extends ChangeNotifier {
     }
   }
 
-  // 🔥 METODO CORRETTO: _saveCompletedCharge con gestione errori e await
+  // 🔥 SALVATAGGIO CON PROGRESS BAR
   Future<bool> _saveCompletedCharge() async {
+    _isSaving = true;
+    _saveProgress = 0;
+    _saveSuccess = false;
+    _saveError = null;
+    notifyListeners();
+
     try {
+      // STEP 1: Preparazione dati (10%)
+      _saveStep = "Preparazione dati...";
+      _saveProgress = 10;
+      notifyListeners();
+      await Future.delayed(const Duration(milliseconds: 300));
+
       final now = DateTime.now();
       final double socIniziale = _socAtStartOfSim;
       final double socFinale = currentSoc;
       final double capacita = currentBatteryCap;
       
-      // Validazione dati
       if (socIniziale < 0 || socFinale < 0 || capacita <= 0) {
         debugPrint("❌ Dati non validi per salvataggio");
+        _saveError = "Dati non validi";
         return false;
       }
       
       final kwhEffettivi = ChargeEngine.calculateEnergy(socIniziale, socFinale, capacita);
       
       if (kwhEffettivi <= 0.05) {
-        debugPrint("⚠️ Energia troppo bassa, salvataggio ignorato");
+        _saveError = "Energia troppo bassa per essere registrata";
+        _saveProgress = 0;
         return false;
       }
 
@@ -502,9 +611,17 @@ class HomeProvider extends ChangeNotifier {
         
         if (stessaOra && stessoSoc && stessoKwh) {
           debugPrint("🚫 Salvataggio ignorato: sessione già registrata.");
+          _isSaving = false;
+          notifyListeners();
           return false;
         }
       }
+
+      // STEP 2: Calcolo costi (25%)
+      _saveStep = "Calcolo costi energetici...";
+      _saveProgress = 25;
+      notifyListeners();
+      await Future.delayed(const Duration(milliseconds: 300));
 
       final contrattoAttivo = myContract;
       final costoCalcolato = CostCalculator.calculate(
@@ -516,7 +633,7 @@ class HomeProvider extends ChangeNotifier {
       );
 
       final session = ChargeSession(
-        id: "CHG_${now.millisecondsSinceEpoch}_${DateTime.now().microsecond}", 
+        id: "CHG_${now.millisecondsSinceEpoch}_${now.microsecond}", 
         date: now,
         startDateTime: simService.scheduledStart ?? now,
         endDateTime: now,
@@ -542,36 +659,71 @@ class HomeProvider extends ChangeNotifier {
       );
       
       chargeHistory.add(session);
+
+      // STEP 3: Salvataggio locale (50%)
+      _saveStep = "Salvataggio su dispositivo...";
+      _saveProgress = 50;
+      notifyListeners();
+      await Future.delayed(const Duration(milliseconds: 300));
       
-      // ATTENDI il salvataggio!
       final saved = await saveHistory();
       
       if (!saved) {
-        // Se il salvataggio principale fallisce, prova backup
         await _createBackup(session);
       }
-      
-      // Sincronizzazione Cloud (non bloccare)
-      _syncHistoryIfPossible().catchError((e) => 
-        debugPrint("☁️ Errore sync (non critico): $e")
-      );
 
+      // STEP 4: Sincronizzazione Cloud (75%)
+      _saveStep = "Sincronizzazione con Cloud...";
+      _saveProgress = 75;
+      notifyListeners();
+      
+      final prefs = await SharedPreferences.getInstance();
+      final userId = prefs.getString('user_sync_id');
+      
+      if (userId != null && userId.isNotEmpty) {
+        await SyncService().uploadData(
+          userId, 
+          chargeHistory, 
+          allContracts, 
+          activeContractId, 
+          _globalUserName
+        );
+      }
+
+      // STEP 5: Verifica finale (90%)
+      _saveStep = "Verifica finale...";
+      _saveProgress = 90;
+      notifyListeners();
+      await Future.delayed(const Duration(milliseconds: 500));
+
+      // STEP 6: Completato! (100%)
       lastSavedEnergy = kwhEffettivi;
       lastSavedCost = costoCalcolato;
       _socAtStartOfSim = currentSoc;
       
-      debugPrint("✅ Ricarica salvata: ${kwhEffettivi.toStringAsFixed(2)} kWh, ${costoCalcolato.toStringAsFixed(2)} €");
+      _saveStep = "Completato!";
+      _saveProgress = 100;
+      _saveSuccess = true;
       notifyListeners();
+      
+      await Future.delayed(const Duration(seconds: 1));
+      
+      debugPrint("✅ Ricarica salvata: ${kwhEffettivi.toStringAsFixed(2)} kWh, ${costoCalcolato.toStringAsFixed(2)} €");
       return true;
       
     } catch (e, stackTrace) {
+      _saveError = "Errore: $e";
+      _saveProgress = 0;
       debugPrint("❌ ERRORE GRAVE salvataggio: $e");
       debugPrint("❌ STACKTRACE: $stackTrace");
       return false;
+    } finally {
+      _isSaving = false;
+      notifyListeners();
     }
   }
 
-  // 🔥 NUOVO METODO: Backup di emergenza
+  // 🔥 Backup di emergenza
   Future<void> _createBackup(ChargeSession session) async {
     try {
       final prefs = await SharedPreferences.getInstance();
@@ -587,7 +739,6 @@ class HomeProvider extends ChangeNotifier {
   }
 
   // --- PERSISTENZA E SYNC ---
-  // 🔥 METODO CORRETTO: saveHistory con verifica
   Future<bool> saveHistory() async {
     try {
       final prefs = await SharedPreferences.getInstance();
@@ -619,6 +770,17 @@ class HomeProvider extends ChangeNotifier {
       return false;
     }
   }
+
+  void deleteChargeSession(String id) async {
+  // 1. Toglie dalla lista
+  chargeHistory.removeWhere((s) => s.id == id);
+  // 2. Aggiorna il file locale subito
+  await saveHistory();
+  // 3. Aggiorna il Cloud subito (sovrascrive con la lista pulita)
+  await _syncHistoryIfPossible();
+  
+  notifyListeners();
+}
 
   Future<void> _syncHistoryIfPossible() async {
     final prefs = await SharedPreferences.getInstance();

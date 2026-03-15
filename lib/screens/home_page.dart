@@ -13,6 +13,8 @@ import 'package:origo/widgets/action_buttons.dart';
 import 'package:origo/screens/history_page.dart';
 import 'package:origo/screens/settings_page.dart';
 import 'package:origo/l10n/app_localizations.dart';
+import 'package:origo/widgets/saving_progress_dialog.dart';
+import 'package:origo/widgets/loading_splash_screen.dart';
 
 class HomePage extends StatelessWidget {
   const HomePage({super.key});
@@ -22,7 +24,7 @@ class HomePage extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final authProvider = Provider.of<AuthProvider>(context, listen: false);
-    final l10n = AppLocalizations.of(context)!; // 🔥 NUOVO
+    final l10n = AppLocalizations.of(context)!;
     
     return WillPopScope(
       onWillPop: () async {
@@ -32,6 +34,15 @@ class HomePage extends StatelessWidget {
       },
       child: Consumer<HomeProvider>(
         builder: (context, provider, child) {
+          // 🔥 MOSTRA SPLASH SCREEN DURANTE L'INIT
+          if (provider.isInitializing) {
+            return LoadingSplashScreen(
+              progress: provider.initProgress,
+              message: provider.initMessage,
+              subMessage: provider.initSubMessage,
+            );
+          }
+          
           if (!provider.carsLoaded) {
             return const Scaffold(
               backgroundColor: Color(0xFF0A0F1E),
@@ -43,7 +54,7 @@ class HomePage extends StatelessWidget {
           if (provider.shouldShowCompletionDialog && !_completionDialogShown) {
             WidgetsBinding.instance.addPostFrameCallback((_) {
               if (context.mounted) {
-                _showCompletionDialog(context, provider, l10n); // 🔥 MODIFICATO
+                _showCompletionDialog(context, provider, l10n);
               }
             });
           }
@@ -58,7 +69,7 @@ class HomePage extends StatelessWidget {
                   begin: Alignment.topLeft,
                   end: Alignment.bottomRight,
                 ).createShader(bounds),
-                child: Text( // 🔥 MODIFICATO
+                child: Text(
                   l10n.appTitle,
                   style: const TextStyle(
                     fontWeight: FontWeight.w900,
@@ -109,6 +120,20 @@ class HomePage extends StatelessWidget {
                   },
                 ),
                 const SizedBox(width: 8),
+                if (provider.isSaving)
+                  Padding(
+                    padding: const EdgeInsets.all(8.0),
+                    child: SizedBox(
+                      width: 20,
+                      height: 20,
+                      child: CircularProgressIndicator(
+                        strokeWidth: 2,
+                        valueColor: AlwaysStoppedAnimation<Color>(
+                          provider.saveError != null ? Colors.red : Colors.cyanAccent,
+                        ),
+                      ),
+                    ),
+                  ),
               ],
             ),
             body: Stack(
@@ -143,7 +168,7 @@ class HomePage extends StatelessWidget {
                               crossAxisAlignment: CrossAxisAlignment.start,
                               children: [
                                 Text(
-                                  "${l10n.hello}, ${provider.globalUserName.toUpperCase()}!", // 🔥 MODIFICATO
+                                  "${l10n.hello}, ${provider.globalUserName.toUpperCase()}!",
                                   style: const TextStyle(
                                     color: Colors.white,
                                     fontSize: 18,
@@ -157,10 +182,9 @@ class HomePage extends StatelessWidget {
                                 const SizedBox(height: 6),
                                 Row(
                                   children: [
-                                    
                                     const SizedBox(width: 6),
                                     Text(
-                                      "${l10n.contract}: ${provider.myContract.contractName.toUpperCase()}", // 🔥 MODIFICATO
+                                      "${l10n.contract}: ${provider.myContract.contractName.toUpperCase()}",
                                       style: TextStyle(
                                         color: Colors.white.withOpacity(0.4),
                                         fontSize: 10,
@@ -179,15 +203,15 @@ class HomePage extends StatelessWidget {
                           const SizedBox(height: 12),
                           
                           BatteryStatusRow(
-  provider: provider,
-  l10n: l10n, 
-),
+                            provider: provider,
+                            l10n: l10n, 
+                          ),
                           const SizedBox(height: 12),
                           
                           StatsRow(
-  provider: provider,
-  l10n: l10n, 
-),
+                            provider: provider,
+                            l10n: l10n, 
+                          ),
                           const SizedBox(height: 12),
 
                           // 🔥 AVVISO DI RALLENTAMENTO RICARICA
@@ -240,8 +264,8 @@ class HomePage extends StatelessWidget {
                                       children: [
                                         Text(
                                           provider.targetSoc > 90 
-                                              ? l10n.taperingSignificant // 🔥 MODIFICATO
-                                              : l10n.taperingSlowdown, // 🔥 MODIFICATO
+                                              ? l10n.taperingSignificant
+                                              : l10n.taperingSlowdown,
                                           style: const TextStyle(
                                             color: Colors.amber,
                                             fontSize: 13,
@@ -252,8 +276,8 @@ class HomePage extends StatelessWidget {
                                         const SizedBox(height: 4),
                                         Text(
                                           provider.targetSoc > 90 
-                                              ? l10n.taperingWarning20 // 🔥 MODIFICATO
-                                              : l10n.taperingWarning60, // 🔥 MODIFICATO
+                                              ? l10n.taperingWarning20
+                                              : l10n.taperingWarning60,
                                           style: TextStyle(
                                             color: Colors.white.withOpacity(0.7),
                                             fontSize: 12,
@@ -276,7 +300,7 @@ class HomePage extends StatelessWidget {
                           
                           const SizedBox(height: 12),
 
-                          _buildBatteryCoach(provider, l10n), // 🔥 MODIFICATO
+                          _buildBatteryCoach(provider, l10n),
 
                           const SizedBox(height: 12),
                           
@@ -286,9 +310,9 @@ class HomePage extends StatelessWidget {
                               Expanded(
                                 flex: 12,
                                 child: SimulationButton(
-  provider: provider,
-  l10n: l10n,
-),
+                                  provider: provider,
+                                  l10n: l10n,
+                                ),
                               ),
                               const SizedBox(width: 12),
                               Expanded(
@@ -306,11 +330,11 @@ class HomePage extends StatelessWidget {
                             child: ActionButtons(
                               onHomeTap: provider.isSimulating 
                                   ? () {} 
-                                  : () => _showAddDialog(context, provider, l10n.home, l10n), // 🔥 MODIFICATO
+                                  : () => _showAddDialog(context, provider, l10n.home, l10n),
                               onPublicTap: provider.isSimulating 
                                   ? () {} 
-                                  : () => _showAddDialog(context, provider, l10n.public, l10n), // 🔥 MODIFICATO
-                             l10n: l10n,
+                                  : () => _showAddDialog(context, provider, l10n.public, l10n),
+                              l10n: l10n,
                             ),
                           ),
                           
@@ -332,62 +356,104 @@ class HomePage extends StatelessWidget {
 
   // --- WIDGETS DI SUPPORTO ---
 
-  void _showCompletionDialog(BuildContext context, HomeProvider provider, AppLocalizations l10n) { // 🔥 MODIFICATO
+  void _showCompletionDialog(BuildContext context, HomeProvider provider, AppLocalizations l10n) {
     _completionDialogShown = true;
     
-    // Salvataggio dei dati (popola lastSavedEnergy e lastSavedCost)
+    // Salvataggio dei dati
     provider.saveCurrentCharge();
     
     showDialog(
       context: context,
       barrierDismissible: false,
       builder: (ctx) {
-        return AlertDialog(
-          backgroundColor: const Color(0xFF1E1E1E),
-          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
-          title: Text( // 🔥 MODIFICATO
-            l10n.chargingComplete,
-            style: const TextStyle(color: Colors.cyanAccent, fontWeight: FontWeight.bold),
-            textAlign: TextAlign.center,
-          ),
-          content: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              const Icon(Icons.check_circle, color: Colors.green, size: 50),
-              const SizedBox(height: 16),
-              Text(
-                '${l10n.finalSoc}: ${provider.currentSoc.toStringAsFixed(1)}%', // 🔥 MODIFICATO
-                style: const TextStyle(color: Colors.white70, fontSize: 16),
-              ),
-              const SizedBox(height: 12),
-              Text(
-                '${l10n.energy}: ${provider.lastSavedEnergy.toStringAsFixed(1)} ${l10n.kwh}', // 🔥 MODIFICATO
-                style: const TextStyle(color: Colors.white, fontSize: 18, fontWeight: FontWeight.bold),
-              ),
-              const SizedBox(height: 4),
-              Text(
-                '${l10n.costEuro}: ${provider.lastSavedCost.toStringAsFixed(2)} ${l10n.euro}', // 🔥 MODIFICATO
-                style: const TextStyle(color: Colors.cyanAccent, fontSize: 20, fontWeight: FontWeight.bold),
-              ),
-            ],
-          ),
-          actions: [
-            Center(
-              child: ElevatedButton(
-                onPressed: () {
-                  provider.resetCompletionDialog();
+        return Consumer<HomeProvider>(
+          builder: (context, provider, child) {
+            // Se sta salvando, mostra progress dialog
+            if (provider.isSaving || provider.saveError != null || provider.saveSuccess) {
+              return SavingProgressDialog(
+                progress: provider.saveProgress,
+                step: provider.saveStep,
+                error: provider.saveError,
+                isComplete: provider.saveSuccess,
+                onRetry: () {
+                  provider.resetSaveState();
+                  provider.saveCurrentCharge();
+                },
+                onViewHistory: () {
+                  Navigator.of(ctx).pop();
+                  Navigator.push(
+                    context,
+                    MaterialPageRoute(
+                      builder: (_) => HistoryPage(
+                        history: provider.chargeHistory,
+                        contract: provider.myContract,
+                        selectedCar: provider.selectedCar,
+                        onHistoryChanged: (updatedHistory) {
+                          provider.chargeHistory = updatedHistory;
+                          provider.saveHistory();
+                        },
+                      ),
+                    ),
+                  );
+                  _completionDialogShown = false;
+                },
+                onClose: () {
+                  provider.resetSaveState();
                   Navigator.of(ctx).pop();
                   _completionDialogShown = false;
                 },
-                style: ElevatedButton.styleFrom(
-                  backgroundColor: Colors.cyanAccent.withOpacity(0.2),
-                  foregroundColor: Colors.cyanAccent,
-                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-                ),
-                child: Text(l10n.close), // 🔥 MODIFICATO (dovrai aggiungere "close" in ARB)
+              );
+            }
+            
+            // Altrimenti mostra il dialog normale
+            return AlertDialog(
+              backgroundColor: const Color(0xFF1E1E1E),
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+              title: Text(
+                l10n.chargingComplete,
+                style: const TextStyle(color: Colors.cyanAccent, fontWeight: FontWeight.bold),
+                textAlign: TextAlign.center,
               ),
-            ),
-          ],
+              content: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  const Icon(Icons.check_circle, color: Colors.green, size: 50),
+                  const SizedBox(height: 16),
+                  Text(
+                    '${l10n.finalSoc}: ${provider.currentSoc.toStringAsFixed(1)}%',
+                    style: const TextStyle(color: Colors.white70, fontSize: 16),
+                  ),
+                  const SizedBox(height: 12),
+                  Text(
+                    '${l10n.energy}: ${provider.lastSavedEnergy.toStringAsFixed(1)} ${l10n.kwh}',
+                    style: const TextStyle(color: Colors.white, fontSize: 18, fontWeight: FontWeight.bold),
+                  ),
+                  const SizedBox(height: 4),
+                  Text(
+                    '${l10n.costEuro}: ${provider.lastSavedCost.toStringAsFixed(2)} ${l10n.euro}',
+                    style: const TextStyle(color: Colors.cyanAccent, fontSize: 20, fontWeight: FontWeight.bold),
+                  ),
+                ],
+              ),
+              actions: [
+                Center(
+                  child: ElevatedButton(
+                    onPressed: () {
+                      provider.resetCompletionDialog();
+                      Navigator.of(ctx).pop();
+                      _completionDialogShown = false;
+                    },
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: Colors.cyanAccent.withOpacity(0.2),
+                      foregroundColor: Colors.cyanAccent,
+                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                    ),
+                    child: Text(l10n.close),
+                  ),
+                ),
+              ],
+            );
+          },
         );
       },
     );
@@ -468,25 +534,24 @@ class HomePage extends StatelessWidget {
     );
   }
 
-  Widget _buildBatteryCoach(HomeProvider provider, AppLocalizations l10n) { // 🔥 MODIFICATO
+  Widget _buildBatteryCoach(HomeProvider provider, AppLocalizations l10n) {
     String title;
     Color accentColor;
     IconData icon;
 
-    // Colori e Titoli cambiano per chimica, ma il TESTO (advice) sarà dinamico
     switch (provider.batteryChemistry) {
       case "LFP":
-        title = l10n.batteryCoachLfp; // 🔥 MODIFICATO
+        title = l10n.batteryCoachLfp;
         accentColor = Colors.greenAccent;
         icon = Icons.analytics_outlined;
         break;
       case "NMC / NCA":
-        title = l10n.batteryCoachNmc; // 🔥 MODIFICATO
+        title = l10n.batteryCoachNmc;
         accentColor = Colors.orangeAccent;
         icon = Icons.health_and_safety_outlined;
         break;
       default:
-        title = l10n.batteryCoachGeneric; // 🔥 MODIFICATO
+        title = l10n.batteryCoachGeneric;
         accentColor = Colors.blueAccent;
         icon = Icons.info_outline;
     }
@@ -505,9 +570,9 @@ class HomePage extends StatelessWidget {
                 Text(title, style: TextStyle(color: accentColor, fontSize: 9, fontWeight: FontWeight.w900, letterSpacing: 1.2)),
                 const SizedBox(height: 4),
                 Text(
-  provider.getSmartBatteryAdvice(l10n), 
-  style: const TextStyle(color: Colors.white70, fontSize: 11, height: 1.3),
-),
+                  provider.getSmartBatteryAdvice(l10n), 
+                  style: const TextStyle(color: Colors.white70, fontSize: 11, height: 1.3),
+                ),
               ],
             ),
           ),
@@ -554,13 +619,14 @@ class HomePage extends StatelessWidget {
     );
   }
 }
+
 void _showAddDialog(BuildContext context, HomeProvider provider, String tipo, AppLocalizations l10n) {
   showDialog(
     context: context, 
     builder: (_) => AddChargeDialog(
       provider: provider, 
       tipo: tipo,
-      l10n: l10n, // 🔥 AGGIUNGI QUESTO
+      l10n: l10n,
     )
   );
 } 
