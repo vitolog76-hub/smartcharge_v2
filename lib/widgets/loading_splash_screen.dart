@@ -69,7 +69,7 @@ class LoadingSplashScreen extends StatelessWidget {
                     end: Alignment.bottomRight,
                   ).createShader(bounds),
                   child: const Text(
-                    'SMARTCHARGE',
+                    'ORIGO',
                     style: TextStyle(
                       fontSize: 42,
                       fontWeight: FontWeight.w900,
