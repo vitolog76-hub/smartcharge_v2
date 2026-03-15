@@ -34,6 +34,8 @@ class HomeProvider extends ChangeNotifier {
   final SimulationService simService = SimulationService();
   bool isSimulating = false;
   bool _showCompletionDialog = false;
+  bool _isSavingCompletion = false; // 🔥 NUOVO: stato salvataggio
+  bool _showErrorDialog = false; // 🔥 NUOVO: stato errore
   List<EnergyContract> allContracts = [];
 
   String activeContractId = "";
@@ -44,57 +46,60 @@ class HomeProvider extends ChangeNotifier {
   String _batteryChemistry = "NMC / NCA";
   String get batteryChemistry => _batteryChemistry;
 
+  // 🔥 NUOVI GETTER
+  bool get isSavingCompletion => _isSavingCompletion;
+  bool get shouldShowErrorDialog => _showErrorDialog;
+  
+  // 🔥 METODO PER RESET ERRORI
+  void resetErrorDialog() => _showErrorDialog = false;
+
   String getSmartBatteryAdvice([AppLocalizations? l10n]) {
-  // Se non abbiamo traduzioni, usiamo i testi di default (italiano)
-  final t = l10n;
-  
-  if (chargeHistory.isEmpty) {
-    return t?.batteryAdviceEmpty ?? "Inizia a caricare per ricevere consigli basati sul tuo stile di guida.";
-  }
-
-  final ora = DateTime.now();
-  
-  // --- LOGICA PER LFP (Calibrazione) ---
-  if (_batteryChemistry == "LFP") {
-    bool haCaricatoAl100Recentemente = chargeHistory.any((s) => 
-      s.endSoc >= 99 && ora.difference(s.date).inDays <= 7
-    );
-
-    if (!haCaricatoAl100Recentemente) {
-      return t?.batteryAdviceLfp ?? "⚠️ Non carichi al 100% da più di una settimana. Fallo stasera per allineare le celle (BMS).";
+    // Se non abbiamo traduzioni, usiamo i testi di default (italiano)
+    final t = l10n;
+    
+    if (chargeHistory.isEmpty) {
+      return t?.batteryAdviceEmpty ?? "Inizia a caricare per ricevere consigli basati sul tuo stile di guida.";
     }
-    return t?.batteryAdviceLfpGood ?? "✅ Batteria ben calibrata. Mantieni il target tra 20-80% per il resto della settimana.";
-  }
 
-  // --- LOGICA PER NMC (Stress chimico) ---
-  if (_batteryChemistry == "NMC / NCA") {
-    int caricheEccessive = chargeHistory.where((s) => 
-      s.endSoc > 85 && ora.difference(s.date).inDays <= 30
-    ).length;
+    final ora = DateTime.now();
+    
+    // --- LOGICA PER LFP (Calibrazione) ---
+    if (_batteryChemistry == "LFP") {
+      bool haCaricatoAl100Recentemente = chargeHistory.any((s) => 
+        s.endSoc >= 99 && ora.difference(s.date).inDays <= 7
+      );
 
-    if (caricheEccessive > 4) {
-      String message = t?.batteryAdviceNmc ?? "⚠️ Hai caricato oltre l'80% ben %d volte nell'ultimo mese. Cerca di limitarlo per ridurre il degrado.";
-      return message.replaceAll('%d', caricheEccessive.toString());
+      if (!haCaricatoAl100Recentemente) {
+        return t?.batteryAdviceLfp ?? "⚠️ Non carichi al 100% da più di una settimana. Fallo stasera per allineare le celle (BMS).";
+      }
+      return t?.batteryAdviceLfpGood ?? "✅ Batteria ben calibrata. Mantieni il target tra 20-80% per il resto della settimana.";
     }
-    return t?.batteryAdviceNmcGood ?? "✅ Ottima gestione: stai preservando la chimica al nichel limitando i picchi di carica.";
-  }
 
-  return t?.batteryAdviceGeneric ?? "Mantieni la carica tra 20-80% per una longevità ottimale.";
-}
+    // --- LOGICA PER NMC (Stress chimico) ---
+    if (_batteryChemistry == "NMC / NCA") {
+      int caricheEccessive = chargeHistory.where((s) => 
+        s.endSoc > 85 && ora.difference(s.date).inDays <= 30
+      ).length;
+
+      if (caricheEccessive > 4) {
+        String message = t?.batteryAdviceNmc ?? "⚠️ Hai caricato oltre l'80% ben %d volte nell'ultimo mese. Cerca di limitarlo per ridurre il degrado.";
+        return message.replaceAll('%d', caricheEccessive.toString());
+      }
+      return t?.batteryAdviceNmcGood ?? "✅ Ottima gestione: stai preservando la chimica al nichel limitando i picchi di carica.";
+    }
+
+    return t?.batteryAdviceGeneric ?? "Mantieni la carica tra 20-80% per una longevità ottimale.";
+  }
 
   // --- GESTIONE PROFILO (ID + NOME) ---
-  // Da chiamare nella SettingsPage per salvare il nome
   Future<void> syncUserProfile(String nuovoNome) async {
     _globalUserName = nuovoNome;
     final prefs = await SharedPreferences.getInstance();
     
-    // 1. Salva il nome nel profilo locale sul MacBook associato all'ID/Profilo
     await prefs.setString('global_user_name', nuovoNome);
     
-    // 2. Se esiste un ID utente, associa il nome a quell'ID nel Cloud
     final String? userId = prefs.getString('user_sync_id');
     if (userId != null && userId.isNotEmpty) {
-      // Carica il nome come attributo del profilo utente (non del contratto)
       await SyncService().uploadData(
         userId, 
         chargeHistory, 
@@ -129,217 +134,218 @@ class HomeProvider extends ChangeNotifier {
   static const String KEY_SIM_END = 'simulation_end';
   static const String KEY_SIM_START_SOC = 'simulation_start_soc';
 
-  // --- COSTRUTTORE ---
- HomeProvider() {
-  // Inizializziamo a -1 per la protezione anti-race-condition
-  currentSoc = -1.0; 
-  _socAtStartOfSim = -1.0;
-  carsLoaded = false;
+  // --- COSTRUTTORE (CORRETTO) ---
+  HomeProvider() {
+    currentSoc = -1.0; 
+    _socAtStartOfSim = -1.0;
+    carsLoaded = false;
 
-  simService.startChecking(
-    onSocUpdate: (newSoc) {
-      // PROTEZIONE: Se l'init non è finito, ignoriamo i messaggi del service
-      if (currentSoc == -1.0) return; 
+    simService.startChecking(
+      onSocUpdate: (newSoc) {
+        if (currentSoc == -1.0) return;
+        currentSoc = double.parse(newSoc.toStringAsFixed(1));
+        _saveSimulationProgress();
+        notifyListeners();
+      },
+      onStatusChange: (status) {
+        if (currentSoc == -1.0) return;
+        isSimulating = status;
+        if (!status) _clearSimulationProgress();
+        notifyListeners();
+      },
+      onSimulationComplete: () {
+        // 🔥 FIX: Gestione asincrona del salvataggio
+        if (currentSoc == -1.0) return;
+        
+        // Eseguiamo il salvataggio in modo asincrono senza bloccare l'UI
+        WidgetsBinding.instance.addPostFrameCallback((_) {
+          _handleSimulationCompletion();
+        });
+      },
+    );
+  }
 
-      currentSoc = double.parse(newSoc.toStringAsFixed(1));
-      
-      // NOTA: Qui NON aggiorniamo _socAtStartOfSim perché quel valore deve 
-      // rappresentare il SoC di INIZIO ricarica per i calcoli statistici.
-      
-      _saveSimulationProgress();
-      notifyListeners();
-    },
-    onStatusChange: (status) {
-      if (currentSoc == -1.0) return; 
-      isSimulating = status;
-      if (!status) _clearSimulationProgress();
-      notifyListeners();
-    },
-    onSimulationComplete: () {
-      if (currentSoc == -1.0) return;
-      _saveCompletedCharge();
+  // 🔥 NUOVO METODO: Gestione completion simulazione
+  Future<void> _handleSimulationCompletion() async {
+    _isSavingCompletion = true;
+    notifyListeners();
+    
+    final saved = await _saveCompletedCharge();
+    
+    if (saved) {
       _showCompletionDialog = true;
-      _clearSimulationProgress();
-      notifyListeners();
-    },
-  );
-}
-
-String get taperingWarning {
-  if (targetSoc > 80) {
-    if (targetSoc <= 90) {
-      return "🔋 Oltre l'80% la ricarica rallenta (60% della potenza)";
     } else {
-      return "⚡ Oltre il 90% la ricarica è molto lenta (20% della potenza)";
+      _showErrorDialog = true;
     }
-  }
-  return "";
-}
-bool get showTaperingWarning => targetSoc > 80;
- Future<void> init() async {
-  try {
-    debugPrint("🚀 INIT: Inizio caricamento HomeProvider");
     
-    // 1. Carica SOLO i parametri essenziali
-    await _loadSimulationParameters(); 
-    
-    if (currentSoc == -1.0) {
-      currentSoc = 20.0;
-      _socAtStartOfSim = 20.0;
-    }
-
-    // 2. Carica i dati CRITICI (necessari subito)
-    await _loadCarsFromJson();  // Questo serve per currentBatteryCap e selectedCar
-    
-    // 3. Notifica SUBITO l'UI che i dati essenziali sono pronti
-    carsLoaded = true;
-    notifyListeners();
-    
-    debugPrint("🚀 INIT: UI sbloccata, carico dati secondari in background");
-    
-    // 4. Carica TUTTO il resto DOPO che l'UI è visibile
-    WidgetsBinding.instance.addPostFrameCallback((_) {
-      _loadSecondaryData();
-    });
-    
-    debugPrint("🚀 INIT: Completato con successo");
-  } catch (e, stackTrace) {
-    debugPrint("❌❌❌ ERRORE GRAVE IN INIT: $e");
-    debugPrint("❌❌❌ STACKTRACE: $stackTrace");
-    
-    // In caso di errore, carica comunque valori di default
-    if (currentSoc == -1.0) currentSoc = 20.0;
-    if (allCars.isEmpty) {
-      selectedCar = CarModel(brand: "Default", model: "EV", batteryCapacity: 50.0);
-    }
-    carsLoaded = true;
+    _isSavingCompletion = false;
+    _clearSimulationProgress();
     notifyListeners();
   }
-}
 
-// 🔥 NUOVO METODO: carica i dati secondari in background
-Future<void> _loadSecondaryData() async {
-  try {
-    debugPrint("🔄 Caricamento dati secondari in background...");
-    
-    await loadBatteryConfig();
-    await _loadContract(); 
-    await _loadHistory(); 
-    await _loadSimulationProgress();  // Ora con timeout
-    _startBackgroundSync();
-    
-    debugPrint("✅ Dati secondari caricati");
-  } catch (e) {
-    debugPrint("❌ Errore caricamento dati secondari: $e");
+  String get taperingWarning {
+    if (targetSoc > 80) {
+      if (targetSoc <= 90) {
+        return "🔋 Oltre l'80% la ricarica rallenta (60% della potenza)";
+      } else {
+        return "⚡ Oltre il 90% la ricarica è molto lenta (20% della potenza)";
+      }
+    }
+    return "";
   }
-}
-
-void _recuperaRicaricaTerminataOffline(DateTime inizioReale, DateTime end) {
-  debugPrint("🔄 Eseguo recupero offline in post-init...");
   
-  try {
-    // Verifica che i dati necessari siano disponibili
-    if (selectedCar.batteryCapacity <= 0) {
-      debugPrint("⚠️ Dati auto non ancora caricati, impossibile recuperare - riprovo tra 1 secondo");
-      Future.delayed(const Duration(seconds: 1), () {
-        _recuperaRicaricaTerminataOffline(inizioReale, end);
+  bool get showTaperingWarning => targetSoc > 80;
+  
+  Future<void> init() async {
+    try {
+      debugPrint("🚀 INIT: Inizio caricamento HomeProvider");
+      
+      await _loadSimulationParameters(); 
+      
+      if (currentSoc == -1.0) {
+        currentSoc = 20.0;
+        _socAtStartOfSim = 20.0;
+      }
+
+      await _loadCarsFromJson();  
+      
+      carsLoaded = true;
+      notifyListeners();
+      
+      debugPrint("🚀 INIT: UI sbloccata, carico dati secondari in background");
+      
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        _loadSecondaryData();
       });
-      return;
+      
+      debugPrint("🚀 INIT: Completato con successo");
+    } catch (e, stackTrace) {
+      debugPrint("❌❌❌ ERRORE GRAVE IN INIT: $e");
+      debugPrint("❌❌❌ STACKTRACE: $stackTrace");
+      
+      if (currentSoc == -1.0) currentSoc = 20.0;
+      if (allCars.isEmpty) {
+        selectedCar = CarModel(brand: "Default", model: "EV", batteryCapacity: 50.0);
+      }
+      carsLoaded = true;
+      notifyListeners();
     }
-    
-    debugPrint("🔄 Calcolo kWh con: socIniziale=$_socAtStartOfSim, target=$targetSoc, capacita=$currentBatteryCap");
-    
-    final double kwhEffettivi = ChargeEngine.calculateEnergy(
-      _socAtStartOfSim, 
-      targetSoc, 
-      currentBatteryCap
-    );
-    
-    debugPrint("🔄 kWh calcolati: $kwhEffettivi");
-    
-    final double costoCalcolato = CostCalculator.calculate(
-      totalKwh: kwhEffettivi,
-      wallboxPower: wallboxPwr,
-      startTime: TimeOfDay.fromDateTime(inizioReale),
-      date: DateTime.now(),
-      contract: myContract,
-    );
+  }
 
-    debugPrint("🔄 Costo calcolato: $costoCalcolato");
+  Future<void> _loadSecondaryData() async {
+    try {
+      debugPrint("🔄 Caricamento dati secondari in background...");
+      
+      await loadBatteryConfig();
+      await _loadContract(); 
+      await _loadHistory(); 
+      await _loadSimulationProgress();
+      _startBackgroundSync();
+      
+      debugPrint("✅ Dati secondari caricati");
+    } catch (e) {
+      debugPrint("❌ Errore caricamento dati secondari: $e");
+    }
+  }
 
-    final session = ChargeSession(
-      id: "CHG_${DateTime.now().millisecondsSinceEpoch}", 
-      date: DateTime.now(),
-      startDateTime: inizioReale,
-      endDateTime: DateTime.now(),
-      startSoc: _socAtStartOfSim,
-      endSoc: targetSoc,
-      kwh: kwhEffettivi,
-      cost: costoCalcolato,
-      location: "Home",
-      carBrand: selectedCar.brand,
-      carModel: selectedCar.model,
-      contractId: activeContractId,
-      wallboxPower: wallboxPwr,
-      fascia: CostCalculator.getFasciaLabel(
+  void _recuperaRicaricaTerminataOffline(DateTime inizioReale, DateTime end) {
+    debugPrint("🔄 Eseguo recupero offline in post-init...");
+    
+    try {
+      if (selectedCar.batteryCapacity <= 0) {
+        debugPrint("⚠️ Dati auto non ancora caricati, impossibile recuperare - riprovo tra 1 secondo");
+        Future.delayed(const Duration(seconds: 1), () {
+          _recuperaRicaricaTerminataOffline(inizioReale, end);
+        });
+        return;
+      }
+      
+      debugPrint("🔄 Calcolo kWh con: socIniziale=$_socAtStartOfSim, target=$targetSoc, capacita=$currentBatteryCap");
+      
+      final double kwhEffettivi = ChargeEngine.calculateEnergy(
+        _socAtStartOfSim, 
+        targetSoc, 
+        currentBatteryCap
+      );
+      
+      debugPrint("🔄 kWh calcolati: $kwhEffettivi");
+      
+      final double costoCalcolato = CostCalculator.calculate(
         totalKwh: kwhEffettivi,
         wallboxPower: wallboxPwr,
         startTime: TimeOfDay.fromDateTime(inizioReale),
         date: DateTime.now(),
-        isMonorario: myContract.isMonorario,
-      ),
-      f1PriceAtTime: myContract.f1Price,
-      f2PriceAtTime: myContract.f2Price,
-      f3PriceAtTime: myContract.f3Price,
-    );
-    
-    // Aggiorna UI
-    chargeHistory.add(session);
-    saveHistory(); // Fire and forget - non bloccare
-    
-    currentSoc = targetSoc;
-    lastSavedEnergy = kwhEffettivi;
-    lastSavedCost = costoCalcolato;
-    _showCompletionDialog = true;
-    
-    // Mostra notifica
-    NotificationService().showChargingCompleteNotification(
-      socFinale: targetSoc,
-      energia: kwhEffettivi,
-      durata: end.difference(inizioReale),
-    );
-    
-    notifyListeners();
-    
-    debugPrint("✅ Recupero offline completato con successo");
-  } catch (e, stackTrace) {
-    debugPrint("❌❌❌ Errore nel recupero offline: $e");
-    debugPrint("❌❌❌ STACKTRACE: $stackTrace");
+        contract: myContract,
+      );
+
+      debugPrint("🔄 Costo calcolato: $costoCalcolato");
+
+      final session = ChargeSession(
+        id: "CHG_${DateTime.now().millisecondsSinceEpoch}", 
+        date: DateTime.now(),
+        startDateTime: inizioReale,
+        endDateTime: DateTime.now(),
+        startSoc: _socAtStartOfSim,
+        endSoc: targetSoc,
+        kwh: kwhEffettivi,
+        cost: costoCalcolato,
+        location: "Home",
+        carBrand: selectedCar.brand,
+        carModel: selectedCar.model,
+        contractId: activeContractId,
+        wallboxPower: wallboxPwr,
+        fascia: CostCalculator.getFasciaLabel(
+          totalKwh: kwhEffettivi,
+          wallboxPower: wallboxPwr,
+          startTime: TimeOfDay.fromDateTime(inizioReale),
+          date: DateTime.now(),
+          isMonorario: myContract.isMonorario,
+        ),
+        f1PriceAtTime: myContract.f1Price,
+        f2PriceAtTime: myContract.f2Price,
+        f3PriceAtTime: myContract.f3Price,
+      );
+      
+      chargeHistory.add(session);
+      saveHistory();
+      
+      currentSoc = targetSoc;
+      lastSavedEnergy = kwhEffettivi;
+      lastSavedCost = costoCalcolato;
+      _showCompletionDialog = true;
+      
+      NotificationService().showChargingCompleteNotification(
+        socFinale: targetSoc,
+        energia: kwhEffettivi,
+        durata: end.difference(inizioReale),
+      );
+      
+      notifyListeners();
+      
+      debugPrint("✅ Recupero offline completato con successo");
+    } catch (e, stackTrace) {
+      debugPrint("❌❌❌ Errore nel recupero offline: $e");
+      debugPrint("❌❌❌ STACKTRACE: $stackTrace");
+    }
   }
-}
 
-// Modifica questa funzione così per essere più sicuri
-void _startBackgroundSync() {
-  debugPrint("☁️ Sync Cloud in corso... controllo se sovrascrive il SoC");
-  // Il delay assicura che il database locale (SharedPreferences) 
-  // sia libero e non in conflitto con il cloud
-  Future.delayed(const Duration(seconds: 2), () async {
-    await _syncFromCloudBackground();
-  });
-}
+  void _startBackgroundSync() {
+    debugPrint("☁️ Sync Cloud in corso...");
+    Future.delayed(const Duration(seconds: 2), () async {
+      await _syncFromCloudBackground();
+    });
+  }
 
-  // Aggiungi questa funzione subito sotto l'init
   Future<void> _syncFromCloudBackground() async {
     final prefs = await SharedPreferences.getInstance();
     final userId = prefs.getString('user_sync_id');
     
     if (userId != null && userId.isNotEmpty) {
       try {
-        // Scarichiamo i dati, ma l'utente sta già usando l'app
         final cloudData = await SyncService().downloadAllData(userId);
         if (cloudData != null) {
           _updateFromDownload(cloudData);
-          notifyListeners(); // Aggiorna i dati solo quando arrivano
+          notifyListeners();
         }
       } catch (e) {
         debugPrint("☁️ Errore download in background: $e");
@@ -347,7 +353,6 @@ void _startBackgroundSync() {
     }
   }
 
-  
   void updateActiveContractDetails({
     required String provider,
     required bool isMonorario,
@@ -355,7 +360,6 @@ void _startBackgroundSync() {
     double? f2,
     double? f3,
   }) {
-    // Cerchiamo il contratto attivo nella lista
     final index = allContracts.indexWhere((c) => c.id == activeContractId);
     
     if (index != -1) {
@@ -365,7 +369,6 @@ void _startBackgroundSync() {
       allContracts[index].f2Price = isMonorario ? f1 : (f2 ?? f1);
       allContracts[index].f3Price = isMonorario ? f1 : (f3 ?? f1);
 
-      // Salva la lista aggiornata (prezzi, spread, etc.)
       saveAllContracts(); 
     }
   }
@@ -399,50 +402,45 @@ void _startBackgroundSync() {
 
   // --- AZIONI SIMULAZIONE ---
   void startSimulation() {
-  // 🔥 CRUCIALE: Sincronizziamo il punto di partenza con il valore attuale dello slider
-  _socAtStartOfSim = currentSoc; 
+    _socAtStartOfSim = currentSoc; 
 
-  _clearSimulationProgress().then((_) async {
-    DateTime startTime = calculatedStartDateTime;
-    final now = DateTime.now();
-    if (startTime.isBefore(now)) startTime = now;
+    _clearSimulationProgress().then((_) async {
+      DateTime startTime = calculatedStartDateTime;
+      final now = DateTime.now();
+      if (startTime.isBefore(now)) startTime = now;
 
-    // 1. Avvia la simulazione logica usando il SoC aggiornato
-    simService.initSimulation(
-      startDateTime: startTime,
-      currentSoc: _socAtStartOfSim,
-      targetSoc: targetSoc,
-      pwr: wallboxPwr,
-      cap: currentBatteryCap,
-    );
+      simService.initSimulation(
+        startDateTime: startTime,
+        currentSoc: _socAtStartOfSim,
+        targetSoc: targetSoc,
+        pwr: wallboxPwr,
+        cap: currentBatteryCap,
+      );
 
-    // 2. NOTIFICHE REALI
-    NotificationService().showChargingStartedNotification(
-      socIniziale: _socAtStartOfSim,
-      socTarget: targetSoc,
-      startTime: startTime,
-    );
+      NotificationService().showChargingStartedNotification(
+        socIniziale: _socAtStartOfSim,
+        socTarget: targetSoc,
+        startTime: startTime,
+      );
 
-    NotificationService().scheduleChargingComplete(
-      id: 999,
-      completionTime: simService.endTime ?? now.add(duration),
-      socFinale: targetSoc,
-      energia: energyNeeded,
-      durata: duration,
-    );
+      NotificationService().scheduleChargingComplete(
+        id: 999,
+        completionTime: simService.endTime ?? now.add(duration),
+        socFinale: targetSoc,
+        energia: energyNeeded,
+        durata: duration,
+      );
 
-    isSimulating = true;
-    
-    // 🔥 3. SALVA I DATI CONGELATI SU DISCO
-    final prefs = await SharedPreferences.getInstance();
-    await prefs.setDouble(KEY_SOC_INIZIALE_CONGELATO, _socAtStartOfSim);
-    await prefs.setInt(KEY_TIMESTAMP_INIZIO_CONGELATO, startTime.millisecondsSinceEpoch);
-    
-    // 4. Salviamo subito il progresso
-    _saveSimulationProgress();
-    notifyListeners();
-  });
-}
+      isSimulating = true;
+      
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.setDouble(KEY_SOC_INIZIALE_CONGELATO, _socAtStartOfSim);
+      await prefs.setInt(KEY_TIMESTAMP_INIZIO_CONGELATO, startTime.millisecondsSinceEpoch);
+      
+      _saveSimulationProgress();
+      notifyListeners();
+    });
+  }
 
   Future<void> loadBatteryConfig() async {
     final prefs = await SharedPreferences.getInstance();
@@ -451,16 +449,15 @@ void _startBackgroundSync() {
   }
 
   void stopSimulation() {
-  simService.stopSimulation();
-  
-  // 🔥 Cancella la notifica programmata se l'utente interrompe la carica
-  NotificationService().cancelAllNotifications(); 
-  
-  isSimulating = false;
-  _clearSimulationProgress();
-  _saveSimulationParameters();
-  notifyListeners();
-}
+    simService.stopSimulation();
+    
+    NotificationService().cancelAllNotifications(); 
+    
+    isSimulating = false;
+    _clearSimulationProgress();
+    _saveSimulationParameters();
+    notifyListeners();
+  }
 
   void addChargeSession(ChargeSession session) {
     chargeHistory.add(session);
@@ -475,91 +472,152 @@ void _startBackgroundSync() {
     }
   }
 
-  void _saveCompletedCharge() {
-    final now = DateTime.now();
-    final double socIniziale = _socAtStartOfSim;
-    final double socFinale = currentSoc;
-    final double capacita = currentBatteryCap;
-    final kwhEfettivi = ChargeEngine.calculateEnergy(socIniziale, socFinale, capacita);
-    
-    // Protezione per ricariche nulle o micro-incrementi
-    if (kwhEfettivi <= 0.05) return;
-
-    // Lucchetto Anti-Doppio (per evitare salvataggi multipli all'avvio)
-    if (chargeHistory.isNotEmpty) {
-      final last = chargeHistory.last;
-      bool stessaOra = now.difference(last.date).inSeconds.abs() < 30;
-      bool stessoSoc = (last.endSoc - socFinale).abs() < 0.1;
-      if (stessaOra && stessoSoc) {
-        debugPrint("🚫 Salvataggio ignorato: sessione già registrata.");
-        return; 
+  // 🔥 METODO CORRETTO: _saveCompletedCharge con gestione errori e await
+  Future<bool> _saveCompletedCharge() async {
+    try {
+      final now = DateTime.now();
+      final double socIniziale = _socAtStartOfSim;
+      final double socFinale = currentSoc;
+      final double capacita = currentBatteryCap;
+      
+      // Validazione dati
+      if (socIniziale < 0 || socFinale < 0 || capacita <= 0) {
+        debugPrint("❌ Dati non validi per salvataggio");
+        return false;
       }
-    }
+      
+      final kwhEffettivi = ChargeEngine.calculateEnergy(socIniziale, socFinale, capacita);
+      
+      if (kwhEffettivi <= 0.05) {
+        debugPrint("⚠️ Energia troppo bassa, salvataggio ignorato");
+        return false;
+      }
 
-    final contrattoAttivo = myContract;
-    final costoCalcolato = CostCalculator.calculate(
-      totalKwh: kwhEfettivi,
-      wallboxPower: wallboxPwr,
-      startTime: TimeOfDay.fromDateTime(simService.scheduledStart ?? now),
-      date: now,
-      contract: contrattoAttivo,
-    );
+      // Lucchetto Anti-Doppio
+      if (chargeHistory.isNotEmpty) {
+        final last = chargeHistory.last;
+        bool stessaOra = now.difference(last.date).inSeconds.abs() < 30;
+        bool stessoSoc = (last.endSoc - socFinale).abs() < 0.1;
+        bool stessoKwh = (last.kwh - kwhEffettivi).abs() < 0.1;
+        
+        if (stessaOra && stessoSoc && stessoKwh) {
+          debugPrint("🚫 Salvataggio ignorato: sessione già registrata.");
+          return false;
+        }
+      }
 
-    final session = ChargeSession(
-      id: "CHG_${now.millisecondsSinceEpoch}", 
-      date: now,
-      startDateTime: simService.scheduledStart ?? now,
-      endDateTime: now,
-      startSoc: socIniziale,
-      endSoc: socFinale,
-      kwh: kwhEfettivi,
-      cost: costoCalcolato,
-      location: "Home",
-      carBrand: selectedCar.brand,
-      carModel: selectedCar.model,
-      contractId: activeContractId,
-      wallboxPower: wallboxPwr,
-      fascia: CostCalculator.getFasciaLabel(
-        totalKwh: kwhEfettivi,
+      final contrattoAttivo = myContract;
+      final costoCalcolato = CostCalculator.calculate(
+        totalKwh: kwhEffettivi,
         wallboxPower: wallboxPwr,
         startTime: TimeOfDay.fromDateTime(simService.scheduledStart ?? now),
         date: now,
-        isMonorario: contrattoAttivo.isMonorario,
-      ),
-      f1PriceAtTime: contrattoAttivo.f1Price,
-      f2PriceAtTime: contrattoAttivo.f2Price,
-      f3PriceAtTime: contrattoAttivo.f3Price,
-    );
-    
-    // Aggiunta e persistenza locale
-    chargeHistory.add(session);
-    saveHistory(); // Metodo asincrono chiamato senza await per non bloccare
+        contract: contrattoAttivo,
+      );
 
-    // Sincronizzazione Cloud in background (Fire and Forget)
-    _syncHistoryIfPossible().catchError((e) => debugPrint("☁️ Errore sync: $e"));
+      final session = ChargeSession(
+        id: "CHG_${now.millisecondsSinceEpoch}_${DateTime.now().microsecond}", 
+        date: now,
+        startDateTime: simService.scheduledStart ?? now,
+        endDateTime: now,
+        startSoc: socIniziale,
+        endSoc: socFinale,
+        kwh: kwhEffettivi,
+        cost: costoCalcolato,
+        location: "Home",
+        carBrand: selectedCar.brand,
+        carModel: selectedCar.model,
+        contractId: activeContractId,
+        wallboxPower: wallboxPwr,
+        fascia: CostCalculator.getFasciaLabel(
+          totalKwh: kwhEffettivi,
+          wallboxPower: wallboxPwr,
+          startTime: TimeOfDay.fromDateTime(simService.scheduledStart ?? now),
+          date: now,
+          isMonorario: contrattoAttivo.isMonorario,
+        ),
+        f1PriceAtTime: contrattoAttivo.f1Price,
+        f2PriceAtTime: contrattoAttivo.f2Price,
+        f3PriceAtTime: contrattoAttivo.f3Price,
+      );
+      
+      chargeHistory.add(session);
+      
+      // ATTENDI il salvataggio!
+      final saved = await saveHistory();
+      
+      if (!saved) {
+        // Se il salvataggio principale fallisce, prova backup
+        await _createBackup(session);
+      }
+      
+      // Sincronizzazione Cloud (non bloccare)
+      _syncHistoryIfPossible().catchError((e) => 
+        debugPrint("☁️ Errore sync (non critico): $e")
+      );
 
-    lastSavedEnergy = kwhEfettivi;
-    lastSavedCost = costoCalcolato;
-    _socAtStartOfSim = currentSoc; 
-    
-    notifyListeners();
+      lastSavedEnergy = kwhEffettivi;
+      lastSavedCost = costoCalcolato;
+      _socAtStartOfSim = currentSoc;
+      
+      debugPrint("✅ Ricarica salvata: ${kwhEffettivi.toStringAsFixed(2)} kWh, ${costoCalcolato.toStringAsFixed(2)} €");
+      notifyListeners();
+      return true;
+      
+    } catch (e, stackTrace) {
+      debugPrint("❌ ERRORE GRAVE salvataggio: $e");
+      debugPrint("❌ STACKTRACE: $stackTrace");
+      return false;
+    }
   }
+
+  // 🔥 NUOVO METODO: Backup di emergenza
+  Future<void> _createBackup(ChargeSession session) async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      final backupKey = 'charge_history_backup_${DateFormat('yyyyMMdd_HHmmss').format(DateTime.now())}';
+      final allSessions = [...chargeHistory, session];
+      final jsonData = jsonEncode(allSessions.map((s) => s.toJson()).toList());
+      
+      await prefs.setString(backupKey, jsonData);
+      debugPrint("✅ Backup creato: $backupKey");
+    } catch (e) {
+      debugPrint("❌ Backup fallito: $e");
+    }
+  }
+
   // --- PERSISTENZA E SYNC ---
-  Future<void> saveHistory() async {
-    final prefs = await SharedPreferences.getInstance();
-    await prefs.setString('charge_history', jsonEncode(chargeHistory.map((s) => s.toJson()).toList()));
-    await prefs.setInt('last_local_update', DateTime.now().millisecondsSinceEpoch);
-  }
-
-  void deleteChargeSession(String id) async {
-    // 1. Toglie dalla lista
-    chargeHistory.removeWhere((s) => s.id == id);
-    // 2. Aggiorna il file locale subito
-    await saveHistory();
-    // 3. Aggiorna il Cloud subito (sovrascrive con la lista pulita)
-    await _syncHistoryIfPossible();
-    
-    notifyListeners();
+  // 🔥 METODO CORRETTO: saveHistory con verifica
+  Future<bool> saveHistory() async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      final String jsonData = jsonEncode(chargeHistory.map((s) => s.toJson()).toList());
+      
+      if (jsonData.isEmpty || jsonData == '[]') {
+        debugPrint("⚠️ Tentativo di salvare history vuota, ignorato");
+        return false;
+      }
+      
+      bool success = await prefs.setString('charge_history', jsonData);
+      
+      if (success) {
+        final savedData = prefs.getString('charge_history');
+        if (savedData == jsonData) {
+          await prefs.setInt('last_local_update', DateTime.now().millisecondsSinceEpoch);
+          debugPrint("💾 History salvata e VERIFICATA: ${chargeHistory.length} sessioni");
+          return true;
+        } else {
+          debugPrint("⚠️ Verifica fallita: dato salvato non corrisponde");
+          return false;
+        }
+      } else {
+        debugPrint("⚠️ SharedPreferences ha restituito 'false'");
+        return false;
+      }
+    } catch (e) {
+      debugPrint("❌ Errore durante il salvataggio: $e");
+      return false;
+    }
   }
 
   Future<void> _syncHistoryIfPossible() async {
@@ -579,7 +637,6 @@ void _startBackgroundSync() {
   Future<void> saveAllContracts() async {
     final prefs = await SharedPreferences.getInstance();
     
-    // Salva il nome utente globale (Profilo) indipendentemente dai contratti
     await prefs.setString('global_user_name', _globalUserName);
     
     final String jsonData = jsonEncode(allContracts.map((c) => c.toJson()).toList());
@@ -626,34 +683,31 @@ void _startBackgroundSync() {
   }
 
   void refreshBatteryChemistry(String newChemistry) {
-  _batteryChemistry = newChemistry; // Aggiorna la variabile privata
-  notifyListeners(); // 🔥 Fondamentale: scatena il rebuild del "Battery Coach" nella Home
-}
+    _batteryChemistry = newChemistry;
+    notifyListeners();
+  }
 
   // --- PARAMETRI SIMULAZIONE ---
   Future<void> salvaTuttiParametri() async { await _saveSimulationParameters(); }
 
   Future<void> _loadSimulationParameters() async {
-  final prefs = await SharedPreferences.getInstance();
-  
-  // 1. Carica il SoC attuale
-  currentSoc = prefs.getDouble(KEY_SOC_INIZIALE) ?? 20.0;
-  
-  // 🔥 2. SINCRONIZZA IL PUNTO DI PARTENZA (Fondamentale!)
-  // Se non fai questo, la simulazione riparte da 20.0 invece che da currentSoc
-  _socAtStartOfSim = currentSoc; 
-  
-  targetSoc = prefs.getDouble(KEY_SOC_TARGET) ?? 80.0;
-  wallboxPwr = prefs.getDouble(KEY_WALLBOX_PWR) ?? 3.7;
-  
-  final h = prefs.getInt(KEY_READY_TIME_HOUR);
-  final m = prefs.getInt(KEY_READY_TIME_MINUTE);
-  if (h != null && m != null) {
-    readyTime = TimeOfDay(hour: h, minute: m);
+    final prefs = await SharedPreferences.getInstance();
+    
+    currentSoc = prefs.getDouble(KEY_SOC_INIZIALE) ?? 20.0;
+    _socAtStartOfSim = currentSoc; 
+    
+    targetSoc = prefs.getDouble(KEY_SOC_TARGET) ?? 80.0;
+    wallboxPwr = prefs.getDouble(KEY_WALLBOX_PWR) ?? 3.7;
+    
+    final h = prefs.getInt(KEY_READY_TIME_HOUR);
+    final m = prefs.getInt(KEY_READY_TIME_MINUTE);
+    if (h != null && m != null) {
+      readyTime = TimeOfDay(hour: h, minute: m);
+    }
+    
+    debugPrint("📥 Parametri caricati: SoC attuale $currentSoc%, StartSim: $_socAtStartOfSim%");
   }
   
-  debugPrint("📥 Parametri caricati: SoC attuale $currentSoc%, StartSim: $_socAtStartOfSim%");
-}
   Future<void> _saveSimulationParameters() async {
     final prefs = await SharedPreferences.getInstance();
     await prefs.setDouble(KEY_SOC_INIZIALE, currentSoc);
@@ -673,147 +727,131 @@ void _startBackgroundSync() {
   }
 
   Future<void> _loadSimulationProgress() async {
-  try {
-    debugPrint("📂 _loadSimulationProgress: INIZIO");
-    
-    // 🔥 TIMEOUT: se dopo 3 secondi non completa, forza l'uscita
-    await Future.any([
-      _loadSimulationProgressInternal(),
-      Future.delayed(const Duration(seconds: 3), () {
-        debugPrint("⏱️ TIMEOUT _loadSimulationProgress, forzo uscita");
-        return null;
-      })
-    ]);
-  } catch (e) {
-    debugPrint("❌ ERRORE TIMEOUT: $e");
-    // In caso di timeout o errore, pulisci tutto
-    await _clearSimulationProgress();
-    isSimulating = false;
-    notifyListeners();
-  }
-}
-
-// 🔥 NUOVO METODO: contiene la logica originale
-Future<void> _loadSimulationProgressInternal() async {
-  // 🔥 CONTROLLO: se l'auto non è ancora caricata, rimanda
-  if (!carsLoaded || selectedCar.batteryCapacity <= 0) {
-    debugPrint("⚠️ Dati auto non pronti, rimando _loadSimulationProgress");
-    await Future.delayed(const Duration(milliseconds: 300));
-    _loadSimulationProgressInternal();  // Riprova
-    return;
-  }
-  
-  final prefs = await SharedPreferences.getInstance();
-  
-  // 1. Controllo se c'è una simulazione attiva
-  if (!(prefs.getBool(KEY_SIM_ACTIVE) ?? false)) {
-    debugPrint("ℹ️ Nessun progresso da ripristinare.");
-    return;
+    try {
+      debugPrint("📂 _loadSimulationProgress: INIZIO");
+      
+      await Future.any([
+        _loadSimulationProgressInternal(),
+        Future.delayed(const Duration(seconds: 3), () {
+          debugPrint("⏱️ TIMEOUT _loadSimulationProgress, forzo uscita");
+          return null;
+        })
+      ]);
+    } catch (e) {
+      debugPrint("❌ ERRORE TIMEOUT: $e");
+      await _clearSimulationProgress();
+      isSimulating = false;
+      notifyListeners();
+    }
   }
 
-  debugPrint("📂 Trovata simulazione attiva in SharedPreferences");
-  
-  final String? startStr = prefs.getString(KEY_SIM_START);
-  final String? endStr = prefs.getString(KEY_SIM_END);
-  final double? savedStartSoc = prefs.getDouble(KEY_SIM_START_SOC);
-  
-  debugPrint("📂 startStr: $startStr, endStr: $endStr, savedStartSoc: $savedStartSoc");
-  
-  if (startStr == null || endStr == null || savedStartSoc == null) {
-    debugPrint("⚠️ Dati simulazione incompleti, pulisco...");
-    await _clearSimulationProgress();
-    return;
-  }
-
-  final start = DateTime.parse(startStr);
-  final end = DateTime.parse(endStr);
-  final now = DateTime.now();
-  
-  // 🔥 RECUPERA I DATI CONGELATI
-  final double? socInizialeCongelato = prefs.getDouble(KEY_SOC_INIZIALE_CONGELATO);
-  final int? timestampInizioCongelato = prefs.getInt(KEY_TIMESTAMP_INIZIO_CONGELATO);
-  
-  debugPrint("📂 socInizialeCongelato: $socInizialeCongelato, timestampInizioCongelato: $timestampInizioCongelato");
-  
-  // 🔥 USA I DATI CONGELATI SE DISPONIBILI, ALTRIMENTI QUELLI NORMALI
-  _socAtStartOfSim = socInizialeCongelato ?? savedStartSoc;
-  final DateTime inizioReale = timestampInizioCongelato != null 
-      ? DateTime.fromMillisecondsSinceEpoch(timestampInizioCongelato)
-      : start;
-  
-  debugPrint("📂 _socAtStartOfSim: $_socAtStartOfSim, inizioReale: $inizioReale");
-
-  // CASO A: La ricarica è finita mentre l'app era chiusa
-  if (now.isAfter(end)) {
-    debugPrint("🏁 Carica terminata offline. Pianifico salvataggio post-init...");
-    
-    // Verifica che i dati necessari siano disponibili
-    if (selectedCar.batteryCapacity <= 0) {
-      debugPrint("⚠️ Dati auto non ancora caricati, rimando recupero...");
-      // Rimanda ancora più tardi
-      Future.delayed(const Duration(milliseconds: 500), () {
-        _recuperaRicaricaTerminataOffline(inizioReale, end);
-      });
-    } else {
-      // Pianifichiamo il salvataggio per DOPO che l'init è completo
-      WidgetsBinding.instance.addPostFrameCallback((_) {
-        _recuperaRicaricaTerminataOffline(inizioReale, end);
-      });
+  Future<void> _loadSimulationProgressInternal() async {
+    if (!carsLoaded || selectedCar.batteryCapacity <= 0) {
+      debugPrint("⚠️ Dati auto non pronti, rimando _loadSimulationProgress");
+      await Future.delayed(const Duration(milliseconds: 300));
+      _loadSimulationProgressInternal();
+      return;
     }
     
-    // Nel frattempo, resetta lo stato per evitare blocchi
-    isSimulating = false;
-    await _clearSimulationProgress();
-    notifyListeners();
-  } 
-  // CASO B: La ricarica è ancora in corso
-  else {
-    debugPrint("⚡ Ripristino simulazione attiva...");
+    final prefs = await SharedPreferences.getInstance();
     
-    // Assicuriamoci che i dati necessari siano pronti
-    if (selectedCar.batteryCapacity > 0) {
-      simService.restoreSimulation(
-        startDateTime: inizioReale,
-        endDateTime: end, 
-        currentSoc: _socAtStartOfSim,
-        targetSoc: targetSoc, 
-        pwr: wallboxPwr, 
-        cap: currentBatteryCap
-      );
-      isSimulating = true;
-    } else {
-      debugPrint("⚠️ Dati auto non ancora caricati, rimando ripristino...");
-      WidgetsBinding.instance.addPostFrameCallback((_) {
-        if (selectedCar.batteryCapacity > 0) {
-          simService.restoreSimulation(
-            startDateTime: inizioReale,
-            endDateTime: end, 
-            currentSoc: _socAtStartOfSim,
-            targetSoc: targetSoc, 
-            pwr: wallboxPwr, 
-            cap: currentBatteryCap
-          );
-          isSimulating = true;
-          notifyListeners();
-        }
-      });
+    if (!(prefs.getBool(KEY_SIM_ACTIVE) ?? false)) {
+      debugPrint("ℹ️ Nessun progresso da ripristinare.");
+      return;
     }
-    notifyListeners();
+
+    debugPrint("📂 Trovata simulazione attiva in SharedPreferences");
+    
+    final String? startStr = prefs.getString(KEY_SIM_START);
+    final String? endStr = prefs.getString(KEY_SIM_END);
+    final double? savedStartSoc = prefs.getDouble(KEY_SIM_START_SOC);
+    
+    debugPrint("📂 startStr: $startStr, endStr: $endStr, savedStartSoc: $savedStartSoc");
+    
+    if (startStr == null || endStr == null || savedStartSoc == null) {
+      debugPrint("⚠️ Dati simulazione incompleti, pulisco...");
+      await _clearSimulationProgress();
+      return;
+    }
+
+    final start = DateTime.parse(startStr);
+    final end = DateTime.parse(endStr);
+    final now = DateTime.now();
+    
+    final double? socInizialeCongelato = prefs.getDouble(KEY_SOC_INIZIALE_CONGELATO);
+    final int? timestampInizioCongelato = prefs.getInt(KEY_TIMESTAMP_INIZIO_CONGELATO);
+    
+    debugPrint("📂 socInizialeCongelato: $socInizialeCongelato, timestampInizioCongelato: $timestampInizioCongelato");
+    
+    _socAtStartOfSim = socInizialeCongelato ?? savedStartSoc;
+    final DateTime inizioReale = timestampInizioCongelato != null 
+        ? DateTime.fromMillisecondsSinceEpoch(timestampInizioCongelato)
+        : start;
+    
+    debugPrint("📂 _socAtStartOfSim: $_socAtStartOfSim, inizioReale: $inizioReale");
+
+    if (now.isAfter(end)) {
+      debugPrint("🏁 Carica terminata offline. Pianifico salvataggio post-init...");
+      
+      if (selectedCar.batteryCapacity <= 0) {
+        debugPrint("⚠️ Dati auto non ancora caricati, rimando recupero...");
+        Future.delayed(const Duration(milliseconds: 500), () {
+          _recuperaRicaricaTerminataOffline(inizioReale, end);
+        });
+      } else {
+        WidgetsBinding.instance.addPostFrameCallback((_) {
+          _recuperaRicaricaTerminataOffline(inizioReale, end);
+        });
+      }
+      
+      isSimulating = false;
+      await _clearSimulationProgress();
+      notifyListeners();
+    } else {
+      debugPrint("⚡ Ripristino simulazione attiva...");
+      
+      if (selectedCar.batteryCapacity > 0) {
+        simService.restoreSimulation(
+          startDateTime: inizioReale,
+          endDateTime: end, 
+          currentSoc: _socAtStartOfSim,
+          targetSoc: targetSoc, 
+          pwr: wallboxPwr, 
+          cap: currentBatteryCap
+        );
+        isSimulating = true;
+      } else {
+        debugPrint("⚠️ Dati auto non ancora caricati, rimando ripristino...");
+        WidgetsBinding.instance.addPostFrameCallback((_) {
+          if (selectedCar.batteryCapacity > 0) {
+            simService.restoreSimulation(
+              startDateTime: inizioReale,
+              endDateTime: end, 
+              currentSoc: _socAtStartOfSim,
+              targetSoc: targetSoc, 
+              pwr: wallboxPwr, 
+              cap: currentBatteryCap
+            );
+            isSimulating = true;
+            notifyListeners();
+          }
+        });
+      }
+      notifyListeners();
+    }
+    
+    debugPrint("📂 _loadSimulationProgress: FINE");
   }
-  
-  debugPrint("📂 _loadSimulationProgress: FINE");
-}
 
   Future<void> _clearSimulationProgress() async {
-  final prefs = await SharedPreferences.getInstance();
-  await prefs.remove(KEY_SIM_ACTIVE);
-  await prefs.remove(KEY_SIM_START);
-  await prefs.remove(KEY_SIM_END);
-  await prefs.remove(KEY_SIM_START_SOC);
-  // 🔥 Pulisci anche i dati congelati
-  await prefs.remove(KEY_SOC_INIZIALE_CONGELATO);
-  await prefs.remove(KEY_TIMESTAMP_INIZIO_CONGELATO);
-}
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.remove(KEY_SIM_ACTIVE);
+    await prefs.remove(KEY_SIM_START);
+    await prefs.remove(KEY_SIM_END);
+    await prefs.remove(KEY_SIM_START_SOC);
+    await prefs.remove(KEY_SOC_INIZIALE_CONGELATO);
+    await prefs.remove(KEY_TIMESTAMP_INIZIO_CONGELATO);
+  }
 
   // --- CARICAMENTO DATI ---
   Future<void> _loadCarsFromJson() async {
@@ -831,7 +869,6 @@ Future<void> _loadSimulationProgressInternal() async {
   Future<void> _loadContract() async {
     final prefs = await SharedPreferences.getInstance();
     
-    // 🔥 CARICAMENTO NOME UTENTE GLOBALE (Indipendente dai contratti)
     _globalUserName = prefs.getString('global_user_name') ?? "Utente";
 
     final String? listData = prefs.getString(KEY_CONTRACTS_LIST);
@@ -851,80 +888,107 @@ Future<void> _loadSimulationProgressInternal() async {
   }
 
   Future<void> _loadHistory() async {
-    final prefs = await SharedPreferences.getInstance();
-    final data = prefs.getString('charge_history');
-    if (data != null) {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      final data = prefs.getString('charge_history');
+      
+      if (data == null || data.isEmpty) {
+        debugPrint("📂 Cronologia vuota o inesistente.");
+        chargeHistory = [];
+        return;
+      }
+
       final List<dynamic> list = jsonDecode(data);
       chargeHistory = list.map((e) => ChargeSession.fromJson(e)).toList();
+      debugPrint("✅ Cronologia caricata: ${chargeHistory.length} sessioni.");
+      
+    } catch (e) {
+      debugPrint("❌ ERRORE FATALE CARICAMENTO HISTORY (File corrotto?): $e");
+      chargeHistory = [];
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.remove('charge_history');
     }
   }
   
   // --- SYNC DOWNLOAD ---
   void _updateFromDownload(Map<String, dynamic> data) async {
-  final prefs = await SharedPreferences.getInstance();
+    final prefs = await SharedPreferences.getInstance();
+    
+    int localTS = prefs.getInt('last_local_update') ?? 0;
+    
+    int cloudTS = 0;
+    var cloudRaw = data['lastUpdate'];
+    if (cloudRaw is int) cloudTS = cloudRaw;
+    else if (cloudRaw != null && cloudRaw.runtimeType.toString().contains('Timestamp')) {
+      cloudTS = cloudRaw.millisecondsSinceEpoch;
+    }
+
+    if (localTS > cloudTS) {
+      debugPrint("⏳ MacBook più recente ($localTS) del Cloud ($cloudTS). Salto download history.");
+      if (data['globalUserName'] != null) _globalUserName = data['globalUserName'];
+      notifyListeners();
+      return; 
+    }
+
+    bool hasChanged = false;
+
+    if (data['globalUserName'] != null) {
+      _globalUserName = data['globalUserName'];
+      hasChanged = true;
+    }
+
+    if (data['history'] != null) {
+      List<dynamic> cloudList = data['history'];
+      chargeHistory = cloudList.map((e) => ChargeSession.fromJson(e)).toList();
+      chargeHistory.sort((a, b) => b.date.compareTo(a.date));
+      hasChanged = true;
+    }
+
+    if (hasChanged) {
+      await prefs.setString('charge_history', jsonEncode(chargeHistory.map((s) => s.toJson()).toList()));
+      notifyListeners();
+    }
+  }
+
+  void selectCar(CarModel c) { 
+    selectedCar = c; 
+    capacityController.text = c.batteryCapacity.toString(); 
+    _saveSimulationParameters(); 
+    notifyListeners(); 
+  }
   
-  // 1. Prendi il timestamp dell'ultima modifica fatta su questo MacBook
-  int localTS = prefs.getInt('last_local_update') ?? 0;
+  void updateReadyTime(TimeOfDay t) { 
+    readyTime = t; 
+    _saveSimulationParameters(); 
+    notifyListeners(); 
+  }
   
-  // 2. Prendi il timestamp dal Cloud (Firestore lo manda in 'lastUpdate')
-  int cloudTS = 0;
-  var cloudRaw = data['lastUpdate'];
-  if (cloudRaw is int) cloudTS = cloudRaw;
-  // Se è un Timestamp di Firebase (comune in v2)
-  else if (cloudRaw != null && cloudRaw.runtimeType.toString().contains('Timestamp')) {
-    cloudTS = cloudRaw.millisecondsSinceEpoch;
+  void updateWallboxPwr(double v) { 
+    wallboxPwr = v; 
+    _saveSimulationParameters(); 
+    notifyListeners(); 
   }
-
-  // 🔥 LOGICA DI FERRO:
-  // Se il MacBook è più "giovane" (TS più alto) del Cloud, il Cloud è vecchio.
-  // NON scarichiamo la history, altrimenti perdiamo le ricariche nuove o riprendiamo quelle cancellate.
-  if (localTS > cloudTS) {
-    debugPrint("⏳ MacBook più recente ($localTS) del Cloud ($cloudTS). Salto download history.");
-    // Aggiorniamo solo il nome se presente, ma non tocchiamo i dati sensibili
-    if (data['globalUserName'] != null) _globalUserName = data['globalUserName'];
-    notifyListeners();
-    return; 
-  }
-
-  // SE ARRIVIAMO QUI: Il Cloud è più recente o uguale. Possiamo aggiornare.
-  bool hasChanged = false;
-
-  if (data['globalUserName'] != null) {
-    _globalUserName = data['globalUserName'];
-    hasChanged = true;
-  }
-
-  if (data['history'] != null) {
-    List<dynamic> cloudList = data['history'];
-    chargeHistory = cloudList.map((e) => ChargeSession.fromJson(e)).toList();
-    chargeHistory.sort((a, b) => b.date.compareTo(a.date));
-    hasChanged = true;
-  }
-
-  if (hasChanged) {
-    // Salviamo in locale, ma SENZA aggiornare il timestamp (perché è un dato che arriva da fuori)
-    await prefs.setString('charge_history', jsonEncode(chargeHistory.map((s) => s.toJson()).toList()));
-    notifyListeners();
-  }
-}
-
-  void selectCar(CarModel c) { selectedCar = c; capacityController.text = c.batteryCapacity.toString(); _saveSimulationParameters(); notifyListeners(); }
-  void updateReadyTime(TimeOfDay t) { readyTime = t; _saveSimulationParameters(); notifyListeners(); }
-  void updateWallboxPwr(double v) { wallboxPwr = v; _saveSimulationParameters(); notifyListeners(); }
   
   void updateCurrentSoc(double v) { 
-  currentSoc = double.parse(v.toStringAsFixed(1)); 
-  _socAtStartOfSim = currentSoc; // Prepara il punto di partenza
-  _saveSimulationParameters(); 
-  notifyListeners(); 
-}
+    currentSoc = double.parse(v.toStringAsFixed(1)); 
+    _socAtStartOfSim = currentSoc;
+    _saveSimulationParameters(); 
+    notifyListeners(); 
+  }
 
-  void updateTargetSoc(double v) { targetSoc = v; _saveSimulationParameters(); notifyListeners(); }
+  void updateTargetSoc(double v) { 
+    targetSoc = v; 
+    _saveSimulationParameters(); 
+    notifyListeners(); 
+  }
+  
   bool get shouldShowCompletionDialog => _showCompletionDialog;
   void resetCompletionDialog() => _showCompletionDialog = false;
+  
   Future<void> refreshAfterSettings() async { 
     await _loadHistory(); 
-    await _loadContract(); notifyListeners(); 
+    await _loadContract(); 
+    notifyListeners(); 
     await loadBatteryConfig();
-    }
+  }
 }
