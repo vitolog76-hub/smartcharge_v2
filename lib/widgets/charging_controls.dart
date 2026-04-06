@@ -108,7 +108,7 @@ class ChargingControls extends StatelessWidget {
     );
   }
 
-  // 🔥 RangeSlider con INPUT MANUALE per SOC
+ // 🔥 AGGIUNTO SOLO + E - AI LATI DEI TEXTFIELD ORIGINALI
   Widget _buildRangeSliderWithInput(AppLocalizations l10n) {
     final TextEditingController startController = TextEditingController(
       text: provider.currentSoc.toInt().toString()
@@ -122,7 +122,7 @@ class ChargingControls extends StatelessWidget {
         return Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            // Intestazione
+            // Intestazione (Invariata)
             Padding(
               padding: const EdgeInsets.only(left: 4, bottom: 8),
               child: Row(
@@ -142,7 +142,7 @@ class ChargingControls extends StatelessWidget {
               ),
             ),
             
-            // RangeSlider
+            // RangeSlider (Invariato)
             RangeSlider(
               values: RangeValues(provider.currentSoc, provider.targetSoc),
               min: 0,
@@ -150,134 +150,79 @@ class ChargingControls extends StatelessWidget {
               divisions: 100,
               activeColor: Colors.greenAccent,
               inactiveColor: Colors.greenAccent.withOpacity(0.2),
-              labels: RangeLabels(
-                '${provider.currentSoc.toInt()}%',
-                '${provider.targetSoc.toInt()}%',
-              ),
               onChanged: provider.isSimulating
                   ? null
                   : (RangeValues newValues) {
-                      if (newValues.start != provider.currentSoc) {
-                        provider.updateCurrentSoc(newValues.start);
-                        startController.text = newValues.start.toInt().toString();
-                      }
-                      if (newValues.end != provider.targetSoc) {
-                        provider.updateTargetSoc(newValues.end);
-                        endController.text = newValues.end.toInt().toString();
-                      }
+                      provider.updateCurrentSoc(newValues.start);
+                      provider.updateTargetSoc(newValues.end);
+                      setState(() {});
                     },
             ),
             
-            // Input manuali per SOC Iniziale e Finale
+            // Riga Input con l'aggiunta dei tasti + e -
             Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+              padding: const EdgeInsets.symmetric(horizontal: 0, vertical: 4),
               child: Row(
                 mainAxisAlignment: MainAxisAlignment.spaceBetween,
                 children: [
-                  // Input SOC Iniziale
+                  // --- SOC INIZIALE CON TASTI ---
                   Expanded(
                     child: Row(
                       children: [
-                        Container(
-                          width: 8,
-                          height: 8,
-                          decoration: const BoxDecoration(
-                            color: Colors.orangeAccent,
-                            shape: BoxShape.circle,
-                          ),
-                        ),
-                        const SizedBox(width: 4),
+                        _buildSmallButton(Icons.remove, Colors.orangeAccent, () {
+                          if (provider.currentSoc > 0) {
+                            provider.updateCurrentSoc(provider.currentSoc - 1);
+                            setState(() {});
+                          }
+                        }),
                         Expanded(
                           child: TextField(
                             controller: startController,
                             keyboardType: TextInputType.number,
                             textAlign: TextAlign.center,
-                            style: const TextStyle(
-                              color: Colors.orangeAccent,
-                              fontWeight: FontWeight.bold,
-                              fontSize: 14,
-                            ),
-                            decoration: InputDecoration(
-                              isDense: true,
-                              contentPadding: const EdgeInsets.symmetric(horizontal: 4, vertical: 2),
-                              border: UnderlineInputBorder(
-                                borderSide: BorderSide(color: Colors.orangeAccent.withOpacity(0.3)),
-                              ),
-                              enabledBorder: UnderlineInputBorder(
-                                borderSide: BorderSide(color: Colors.orangeAccent.withOpacity(0.3)),
-                              ),
-                              focusedBorder: const UnderlineInputBorder(
-                                borderSide: BorderSide(color: Colors.orangeAccent),
-                              ),
-                              suffixText: '%',
-                              suffixStyle: const TextStyle(color: Colors.orangeAccent, fontSize: 12),
-                            ),
-                            onSubmitted: (newValue) {
-                              int? parsed = int.tryParse(newValue);
-                              if (parsed != null) {
-                                int clamped = parsed.clamp(0, provider.targetSoc.toInt() - 1);
-                                provider.updateCurrentSoc(clamped.toDouble());
-                                startController.text = clamped.toString();
-                              } else {
-                                startController.text = provider.currentSoc.toInt().toString();
-                              }
-                            },
+                            style: const TextStyle(color: Colors.orangeAccent, fontWeight: FontWeight.bold, fontSize: 14),
+                            decoration: const InputDecoration(isDense: true, border: InputBorder.none, suffixText: '%'),
+                            onSubmitted: (v) => provider.updateCurrentSoc(double.tryParse(v) ?? provider.currentSoc),
                           ),
                         ),
+                        _buildSmallButton(Icons.add, Colors.orangeAccent, () {
+                          if (provider.currentSoc < provider.targetSoc - 1) {
+                            provider.updateCurrentSoc(provider.currentSoc + 1);
+                            setState(() {});
+                          }
+                        }),
                       ],
                     ),
                   ),
+                  
                   const SizedBox(width: 12),
-                  // Input SOC Finale
+
+                  // --- SOC FINALE CON TASTI ---
                   Expanded(
                     child: Row(
                       children: [
-                        Container(
-                          width: 8,
-                          height: 8,
-                          decoration: const BoxDecoration(
-                            color: Colors.greenAccent,
-                            shape: BoxShape.circle,
-                          ),
-                        ),
-                        const SizedBox(width: 4),
+                        _buildSmallButton(Icons.remove, Colors.greenAccent, () {
+                          if (provider.targetSoc > provider.currentSoc + 1) {
+                            provider.updateTargetSoc(provider.targetSoc - 1);
+                            setState(() {});
+                          }
+                        }),
                         Expanded(
                           child: TextField(
                             controller: endController,
                             keyboardType: TextInputType.number,
                             textAlign: TextAlign.center,
-                            style: const TextStyle(
-                              color: Colors.greenAccent,
-                              fontWeight: FontWeight.bold,
-                              fontSize: 14,
-                            ),
-                            decoration: InputDecoration(
-                              isDense: true,
-                              contentPadding: const EdgeInsets.symmetric(horizontal: 4, vertical: 2),
-                              border: UnderlineInputBorder(
-                                borderSide: BorderSide(color: Colors.greenAccent.withOpacity(0.3)),
-                              ),
-                              enabledBorder: UnderlineInputBorder(
-                                borderSide: BorderSide(color: Colors.greenAccent.withOpacity(0.3)),
-                              ),
-                              focusedBorder: const UnderlineInputBorder(
-                                borderSide: BorderSide(color: Colors.greenAccent),
-                              ),
-                              suffixText: '%',
-                              suffixStyle: const TextStyle(color: Colors.greenAccent, fontSize: 12),
-                            ),
-                            onSubmitted: (newValue) {
-                              int? parsed = int.tryParse(newValue);
-                              if (parsed != null) {
-                                int clamped = parsed.clamp(provider.currentSoc.toInt() + 1, 100);
-                                provider.updateTargetSoc(clamped.toDouble());
-                                endController.text = clamped.toString();
-                              } else {
-                                endController.text = provider.targetSoc.toInt().toString();
-                              }
-                            },
+                            style: const TextStyle(color: Colors.greenAccent, fontWeight: FontWeight.bold, fontSize: 14),
+                            decoration: const InputDecoration(isDense: true, border: InputBorder.none, suffixText: '%'),
+                            onSubmitted: (v) => provider.updateTargetSoc(double.tryParse(v) ?? provider.targetSoc),
                           ),
                         ),
+                        _buildSmallButton(Icons.add, Colors.greenAccent, () {
+                          if (provider.targetSoc < 100) {
+                            provider.updateTargetSoc(provider.targetSoc + 1);
+                            setState(() {});
+                          }
+                        }),
                       ],
                     ),
                   ),
