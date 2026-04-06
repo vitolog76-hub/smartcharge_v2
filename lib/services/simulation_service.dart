@@ -39,23 +39,23 @@ class SimulationService {
     debugPrint('✅ SimulationService: timer avviato');
   }
   
-  // 🔥 STEP 1: Calcola la potenza in base al SOC con 3 step
+  // 🔥 STEP 1: Calcola la potenza in base al SOC (CORRETTO)
   double _getCurrentPower(double currentSoc) {
-    // Step 1: 20% - 80% -> potenza piena
+    // Step 1: < 80% -> potenza piena
     if (currentSoc < 80) {
       return _nominalPower;
     }
-    // Step 2: 80% - 90% -> potenza ridotta al 60%
+    // Step 2: 80% - 90% -> potenza al 75% (più realistico in AC)
     else if (currentSoc >= 80 && currentSoc < 90) {
-      return _nominalPower * 0.6;
+      return _nominalPower * 0.75;
     }
-    // Step 3: 90% - 100% -> potenza ridotta al 20%
+    // Step 3: 90% - 100% -> potenza al 50% (minimo tecnico AC)
     else {
-      return _nominalPower * 0.2;
+      return _nominalPower * 0.5;
     }
   }
   
-  // 🔥 STEP 2: Calcola il tempo totale considerando i 3 step
+  // 🔥 STEP 2: Calcola il tempo totale considerando i 3 step (CORRETTO)
   Duration _calculateTotalDuration() {
     double totalSeconds = 0;
     double currentSoc = _currentSoc;
@@ -63,10 +63,7 @@ class SimulationService {
     
     if (remainingSoc <= 0) return Duration.zero;
     
-    // Calcola quanta energia serve in ogni step
-    double energyNeeded = 0;
-    
-    // Step 1: 20-80% (se applicabile)
+    // Step 1: 0-80%
     if (currentSoc < 80) {
       double step1End = _targetSoc < 80 ? _targetSoc : 80;
       double step1Delta = step1End - currentSoc;
@@ -78,24 +75,26 @@ class SimulationService {
       }
     }
     
-    // Step 2: 80-90% (se applicabile)
+    // Step 2: 80-90% (Usiamo 0.75 invece di 0.6)
     if (currentSoc >= 80 && currentSoc < 90 && _targetSoc > 80) {
       double step2End = _targetSoc < 90 ? _targetSoc : 90;
       double step2Delta = step2End - currentSoc;
       if (step2Delta > 0) {
         double step2Energy = (step2Delta / 100) * _capacity;
-        double step2Hours = step2Energy / (_nominalPower * 0.6);
+        double step2Power = _nominalPower * 0.75;
+        double step2Hours = step2Energy / step2Power;
         totalSeconds += step2Hours * 3600;
         currentSoc = step2End;
       }
     }
     
-    // Step 3: 90-100% (se applicabile)
+    // Step 3: 90-100% (Usiamo 0.5 invece di 0.2)
     if (currentSoc >= 90 && _targetSoc > 90) {
       double step3Delta = _targetSoc - currentSoc;
       if (step3Delta > 0) {
         double step3Energy = (step3Delta / 100) * _capacity;
-        double step3Hours = step3Energy / (_nominalPower * 0.2);
+        double step3Power = _nominalPower * 0.5;
+        double step3Hours = step3Energy / step3Power;
         totalSeconds += step3Hours * 3600;
       }
     }
@@ -190,28 +189,29 @@ class SimulationService {
     );
   }
   
-  void _checkSimulation(Timer timer) {
+ void _checkSimulation(Timer timer) {
     final now = DateTime.now();
     
     if (_isSimulating && _endTime != null && scheduledStart != null) {
-      if (now.isBefore(_endTime!)) {
-        // 🔥 Calcola il SOC attuale considerando i 3 step
+      // Se abbiamo superato l'orario di fine, forziamo il completamento
+      if (now.isAfter(_endTime!) && !_hasNotifiedCompletion) {
+        _hasNotifiedCompletion = true;
+        _completeSimulation();
+      } else if (now.isBefore(_endTime!)) {
+        // Altrimenti calcoliamo il progresso
         double newSoc = _calculateCurrentSoc(now);
         onSocUpdate?.call(newSoc);
         
         if (now.second % 10 == 0) {
           debugPrint('⏳ Simulazione: SOC Attuale: ${newSoc.toStringAsFixed(1)}%');
         }
-      } else if (!_hasNotifiedCompletion) {
-        _hasNotifiedCompletion = true;
-        _completeSimulation();
       }
     }
   }
   
-  // 🔥 STEP 3: Calcola il SOC attuale basato sui 3 step di potenza
   double _calculateCurrentSoc(DateTime now) {
-    if (now.isBefore(scheduledStart!)) return _currentSoc;
+    if (scheduledStart == null || now.isBefore(scheduledStart!)) return _currentSoc;
+    if (_endTime != null && now.isAfter(_endTime!)) return _targetSoc;
     
     double elapsedSeconds = now.difference(scheduledStart!).inSeconds.toDouble();
     if (elapsedSeconds <= 0) return _currentSoc;
@@ -219,7 +219,8 @@ class SimulationService {
     double soc = _currentSoc;
     double secondsRemaining = elapsedSeconds;
     
-    // Step 1: 20-80% (potenza piena)
+    // --- Step 1: 0-80% (Potenza Piena) ---
+    // Rimane identico perché la simulazione qui è perfetta
     if (soc < 80) {
       double step1End = _targetSoc < 80 ? _targetSoc : 80;
       double step1Delta = step1End - soc;
@@ -228,59 +229,52 @@ class SimulationService {
         double step1Seconds = (step1Energy / _nominalPower) * 3600;
         
         if (secondsRemaining >= step1Seconds) {
-          // Completato step 1
           soc = step1End;
           secondsRemaining -= step1Seconds;
         } else {
-          // Ancora nello step 1
           double energyDone = (secondsRemaining / 3600) * _nominalPower;
           double socDone = (energyDone / _capacity) * 100;
-          soc = _currentSoc + socDone;
-          return soc.clamp(_currentSoc, _targetSoc);
+          return (soc + socDone).clamp(_currentSoc, _targetSoc);
         }
       }
     }
     
-    // Step 2: 80-90% (potenza 60%)
+    // --- Step 2: 80-90% (Potenza 80%) ---
+    // Alzata da 0.6 a 0.8: in AC il rallentamento è minimo
     if (soc >= 80 && soc < 90 && _targetSoc > 80) {
       double step2End = _targetSoc < 90 ? _targetSoc : 90;
       double step2Delta = step2End - soc;
       if (step2Delta > 0) {
+        double step2Power = _nominalPower * 0.8; 
         double step2Energy = (step2Delta / 100) * _capacity;
-        double step2Seconds = (step2Energy / (_nominalPower * 0.6)) * 3600;
+        double step2Seconds = (step2Energy / step2Power) * 3600;
         
         if (secondsRemaining >= step2Seconds) {
-          // Completato step 2
           soc = step2End;
           secondsRemaining -= step2Seconds;
         } else {
-          // Ancora nello step 2
-          double power = _nominalPower * 0.6;
-          double energyDone = (secondsRemaining / 3600) * power;
+          double energyDone = (secondsRemaining / 3600) * step2Power;
           double socDone = (energyDone / _capacity) * 100;
-          soc = soc + socDone;
-          return soc.clamp(_currentSoc, _targetSoc);
+          return (soc + socDone).clamp(_currentSoc, _targetSoc);
         }
       }
     }
     
-    // Step 3: 90-100% (potenza 20%)
+    // --- Step 3: 90-100% (Potenza 60%) ---
+    // Alzata da 0.2 a 0.6: evita lo sforamento di 3 ore
     if (soc >= 90 && _targetSoc > 90) {
       double step3Delta = _targetSoc - soc;
       if (step3Delta > 0) {
+        double step3Power = _nominalPower * 0.6; 
         double step3Energy = (step3Delta / 100) * _capacity;
-        double step3Seconds = (step3Energy / (_nominalPower * 0.2)) * 3600;
+        double step3Seconds = (step3Energy / step3Power) * 3600;
         
         if (secondsRemaining >= step3Seconds) {
-          // Completato step 3
           soc = _targetSoc;
         } else {
-          // Ancora nello step 3
-          double power = _nominalPower * 0.2;
-          double energyDone = (secondsRemaining / 3600) * power;
+          double energyDone = (secondsRemaining / 3600) * step3Power;
           double socDone = (energyDone / _capacity) * 100;
           soc = soc + socDone;
-          return soc.clamp(_currentSoc, _targetSoc);
         }
       }
     }
