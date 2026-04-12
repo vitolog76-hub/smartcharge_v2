@@ -39,64 +39,33 @@ class SimulationService {
     debugPrint('✅ SimulationService: timer avviato');
   }
   
-  // 🔥 STEP 1: Calcola la potenza in base al SOC (CORRETTO)
+  // 🔥 UNICA FONTE DI VERITÀ PER IL RALLENTAMENTO
+  double _getStepPowerFactor(double soc) {
+    if (soc < 80) return 1.0;
+    if (soc < 90) return 0.75;
+    return 0.50;
+  }
+
   double _getCurrentPower(double currentSoc) {
-    // Step 1: < 80% -> potenza piena
-    if (currentSoc < 80) {
-      return _nominalPower;
-    }
-    // Step 2: 80% - 90% -> potenza al 75% (più realistico in AC)
-    else if (currentSoc >= 80 && currentSoc < 90) {
-      return _nominalPower * 0.75;
-    }
-    // Step 3: 90% - 100% -> potenza al 50% (minimo tecnico AC)
-    else {
-      return _nominalPower * 0.5;
-    }
+    return _nominalPower * _getStepPowerFactor(currentSoc);
   }
   
-  // 🔥 STEP 2: Calcola il tempo totale considerando i 3 step (CORRETTO)
   Duration _calculateTotalDuration() {
     double totalSeconds = 0;
-    double currentSoc = _currentSoc;
-    double remainingSoc = _targetSoc - currentSoc;
+    double tempSoc = _currentSoc;
     
-    if (remainingSoc <= 0) return Duration.zero;
+    if (_targetSoc - tempSoc <= 0) return Duration.zero;
     
-    // Step 1: 0-80%
-    if (currentSoc < 80) {
-      double step1End = _targetSoc < 80 ? _targetSoc : 80;
-      double step1Delta = step1End - currentSoc;
-      if (step1Delta > 0) {
-        double step1Energy = (step1Delta / 100) * _capacity;
-        double step1Hours = step1Energy / _nominalPower;
-        totalSeconds += step1Hours * 3600;
-        currentSoc = step1End;
-      }
-    }
-    
-    // Step 2: 80-90% (Usiamo 0.75 invece di 0.6)
-    if (currentSoc >= 80 && currentSoc < 90 && _targetSoc > 80) {
-      double step2End = _targetSoc < 90 ? _targetSoc : 90;
-      double step2Delta = step2End - currentSoc;
-      if (step2Delta > 0) {
-        double step2Energy = (step2Delta / 100) * _capacity;
-        double step2Power = _nominalPower * 0.75;
-        double step2Hours = step2Energy / step2Power;
-        totalSeconds += step2Hours * 3600;
-        currentSoc = step2End;
-      }
-    }
-    
-    // Step 3: 90-100% (Usiamo 0.5 invece di 0.2)
-    if (currentSoc >= 90 && _targetSoc > 90) {
-      double step3Delta = _targetSoc - currentSoc;
-      if (step3Delta > 0) {
-        double step3Energy = (step3Delta / 100) * _capacity;
-        double step3Power = _nominalPower * 0.5;
-        double step3Hours = step3Energy / step3Power;
-        totalSeconds += step3Hours * 3600;
-      }
+    while (tempSoc < _targetSoc) {
+      double nextThreshold = tempSoc < 80 ? 80 : (tempSoc < 90 ? 90 : 100);
+      double targetForStep = _targetSoc < nextThreshold ? _targetSoc : nextThreshold;
+      
+      double deltaSoc = targetForStep - tempSoc;
+      double energy = (deltaSoc / 100) * _capacity;
+      double power = _nominalPower * _getStepPowerFactor(tempSoc);
+      
+      totalSeconds += (energy / power) * 3600;
+      tempSoc = targetForStep;
     }
     
     return Duration(seconds: totalSeconds.round());
@@ -112,28 +81,23 @@ class SimulationService {
     debugPrint('🎯 initSimulation - currentSoc: $currentSoc, targetSoc: $targetSoc');
     debugPrint('🎯 initSimulation - startDateTime: $startDateTime');
     
-    // RESET TOTALE
     _hasNotifiedCompletion = false;
     scheduledStart = null;
     _endTime = null;
     
-    // Assegna i nuovi valori
     scheduledStart = startDateTime;
     _currentSoc = currentSoc;
     _targetSoc = targetSoc;
     _nominalPower = pwr;
     _capacity = cap;
     
-    // 🔥 Calcola il tempo totale considerando i 3 step
     Duration totalDuration = _calculateTotalDuration();
     _endTime = startDateTime.add(totalDuration);
     
     debugPrint('🎯 initSimulation - Potenza nominale: $_nominalPower kW');
     debugPrint('🎯 initSimulation - Durata totale: ${totalDuration.inMinutes} minuti');
     debugPrint('🎯 initSimulation - _endTime: $_endTime');
-    debugPrint('🎯 initSimulation - now: ${DateTime.now()}');
     
-    // Reset flag simulazione
     _isSimulating = false;
     
     if (startDateTime.isBefore(DateTime.now().add(const Duration(minutes: 1)))) {
@@ -166,7 +130,6 @@ class SimulationService {
       _isSimulating = true;
       onStatusChange?.call(true);
 
-      // 🔥 Calcola il progresso in modo più accurato considerando i 3 step
       double newSoc = _calculateCurrentSoc(now);
       
       Future.microtask(() {
@@ -189,104 +152,120 @@ class SimulationService {
     );
   }
   
- void _checkSimulation(Timer timer) {
+  void _checkSimulation(Timer timer) {
     final now = DateTime.now();
     
     if (_isSimulating && _endTime != null && scheduledStart != null) {
-      // Se abbiamo superato l'orario di fine, forziamo il completamento
-      if (now.isAfter(_endTime!) && !_hasNotifiedCompletion) {
-        _hasNotifiedCompletion = true;
-        _completeSimulation();
-      } else if (now.isBefore(_endTime!)) {
-        // Altrimenti calcoliamo il progresso
-        double newSoc = _calculateCurrentSoc(now);
-        onSocUpdate?.call(newSoc);
+      // 🔥 Calcola SOC attuale
+      double newSoc = _calculateCurrentSoc(now);
+      
+      // 🔥 Se abbiamo raggiunto o superato l'orario di fine
+      if (!now.isBefore(_endTime!)) {
+        debugPrint('⏰ Raggiunto orario fine: ${DateFormat("HH:mm:ss").format(now)}');
         
-        if (now.second % 10 == 0) {
-          debugPrint('⏳ Simulazione: SOC Attuale: ${newSoc.toStringAsFixed(1)}%');
+        if (!_hasNotifiedCompletion) {
+          _hasNotifiedCompletion = true;
+          _completeSimulation();
         }
+        return;
+      }
+      
+      // 🔥 Se siamo entro 2 secondi dalla fine e SOC è quasi al target
+      final twoSecondsBeforeEnd = _endTime!.subtract(const Duration(seconds: 2));
+      if (now.isAfter(twoSecondsBeforeEnd) && (newSoc >= _targetSoc - 0.5)) {
+        if (!_hasNotifiedCompletion) {
+          debugPrint('🎯 Quasi alla fine, forzo completamento');
+          _hasNotifiedCompletion = true;
+          _completeSimulation();
+        }
+        return;
+      }
+      
+      // Aggiornamento normale
+      onSocUpdate?.call(newSoc);
+      
+      if (now.second % 10 == 0) {
+        debugPrint('⏳ Simulazione: SOC Attuale: ${newSoc.toStringAsFixed(1)}%, Fine: ${DateFormat("HH:mm:ss").format(_endTime!)}');
       }
     }
   }
   
+  // 🔥 METODO RIVEDUTO E CORRETTO
   double _calculateCurrentSoc(DateTime now) {
-    if (scheduledStart == null || now.isBefore(scheduledStart!)) return _currentSoc;
-    if (_endTime != null && now.isAfter(_endTime!)) return _targetSoc;
+    // Se non c'è orario di inizio
+    if (scheduledStart == null) return _currentSoc;
     
+    // Se non è ancora iniziata
+    if (now.isBefore(scheduledStart!)) return _currentSoc;
+    
+    // Se abbiamo raggiunto o superato l'orario di fine
+    if (_endTime != null && !now.isBefore(_endTime!)) {
+      return _targetSoc;
+    }
+    
+    // Calcola il tempo trascorso in secondi
     double elapsedSeconds = now.difference(scheduledStart!).inSeconds.toDouble();
-    if (elapsedSeconds <= 0) return _currentSoc;
     
+    // Calcola la durata totale prevista
+    Duration totalDuration = _calculateTotalDuration();
+    double totalSeconds = totalDuration.inSeconds.toDouble();
+    
+    if (totalSeconds <= 0) return _currentSoc;
+    
+    // Calcola la percentuale di tempo trascorsa
+    double progress = elapsedSeconds / totalSeconds;
+    
+    // Limita progresso tra 0 e 1
+    progress = progress.clamp(0.0, 1.0);
+    
+    // 🔥 Usa la stessa logica ma inversa: dal tempo al SOC
     double soc = _currentSoc;
-    double secondsRemaining = elapsedSeconds;
+    double accumulatedProgress = 0;
     
-    // --- Step 1: 0-80% (Potenza Piena) ---
-    // Rimane identico perché la simulazione qui è perfetta
-    if (soc < 80) {
-      double step1End = _targetSoc < 80 ? _targetSoc : 80;
-      double step1Delta = step1End - soc;
-      if (step1Delta > 0) {
-        double step1Energy = (step1Delta / 100) * _capacity;
-        double step1Seconds = (step1Energy / _nominalPower) * 3600;
-        
-        if (secondsRemaining >= step1Seconds) {
-          soc = step1End;
-          secondsRemaining -= step1Seconds;
-        } else {
-          double energyDone = (secondsRemaining / 3600) * _nominalPower;
-          double socDone = (energyDone / _capacity) * 100;
-          return (soc + socDone).clamp(_currentSoc, _targetSoc);
-        }
+    while (soc < _targetSoc && accumulatedProgress < progress) {
+      // Determina il prossimo step
+      double nextThreshold = soc < 80 ? 80 : (soc < 90 ? 90 : 100);
+      double targetForStep = _targetSoc < nextThreshold ? _targetSoc : nextThreshold;
+      
+      double deltaSoc = targetForStep - soc;
+      double energyNeeded = (deltaSoc / 100) * _capacity;
+      double power = _nominalPower * _getStepPowerFactor(soc);
+      double stepSeconds = (energyNeeded / power) * 3600;
+      double stepProgress = stepSeconds / totalSeconds;
+      
+      if (accumulatedProgress + stepProgress <= progress) {
+        // Completato tutto lo step
+        soc = targetForStep;
+        accumulatedProgress += stepProgress;
+      } else {
+        // Step parziale
+        double remainingProgress = progress - accumulatedProgress;
+        double fractionOfStep = remainingProgress / stepProgress;
+        soc += deltaSoc * fractionOfStep;
+        break;
       }
     }
     
-    // --- Step 2: 80-90% (Potenza 80%) ---
-    // Alzata da 0.6 a 0.8: in AC il rallentamento è minimo
-    if (soc >= 80 && soc < 90 && _targetSoc > 80) {
-      double step2End = _targetSoc < 90 ? _targetSoc : 90;
-      double step2Delta = step2End - soc;
-      if (step2Delta > 0) {
-        double step2Power = _nominalPower * 0.8; 
-        double step2Energy = (step2Delta / 100) * _capacity;
-        double step2Seconds = (step2Energy / step2Power) * 3600;
-        
-        if (secondsRemaining >= step2Seconds) {
-          soc = step2End;
-          secondsRemaining -= step2Seconds;
-        } else {
-          double energyDone = (secondsRemaining / 3600) * step2Power;
-          double socDone = (energyDone / _capacity) * 100;
-          return (soc + socDone).clamp(_currentSoc, _targetSoc);
-        }
-      }
-    }
+    // 🔥 Assicurati che non superi il target per errori floating point
+    if (soc > _targetSoc) soc = _targetSoc;
+    if (soc < _currentSoc) soc = _currentSoc;
     
-    // --- Step 3: 90-100% (Potenza 60%) ---
-    // Alzata da 0.2 a 0.6: evita lo sforamento di 3 ore
-    if (soc >= 90 && _targetSoc > 90) {
-      double step3Delta = _targetSoc - soc;
-      if (step3Delta > 0) {
-        double step3Power = _nominalPower * 0.6; 
-        double step3Energy = (step3Delta / 100) * _capacity;
-        double step3Seconds = (step3Energy / step3Power) * 3600;
-        
-        if (secondsRemaining >= step3Seconds) {
-          soc = _targetSoc;
-        } else {
-          double energyDone = (secondsRemaining / 3600) * step3Power;
-          double socDone = (energyDone / _capacity) * 100;
-          soc = soc + socDone;
-        }
-      }
-    }
-    
-    return soc.clamp(_currentSoc, _targetSoc);
+    // 🔥 Arrotonda a 1 decimale per evitare oscillazioni
+    return double.parse(soc.toStringAsFixed(1));
   }
   
   void _completeSimulation() {
     debugPrint('✅ _completeSimulation - chiamato');
+    
+    // 🔥 Forza SOC al target esatto
     _isSimulating = false;
     onStatusChange?.call(false);
-    onSocUpdate?.call(_targetSoc);
+    
+    // Forza l'aggiornamento UI con SOC target esatto
+    Future.microtask(() {
+      onSocUpdate?.call(_targetSoc);
+      debugPrint('✅ Forzato aggiornamento SOC finale: $_targetSoc%');
+    });
     
     onSimulationComplete?.call();
     
@@ -299,7 +278,7 @@ class SimulationService {
       durata: duration,
     );
     
-    debugPrint('✅ Simulazione completata!');
+    debugPrint('✅ Simulazione completata! SOC finale: $_targetSoc%');
   }
   
   void stopSimulation() {
@@ -307,6 +286,7 @@ class SimulationService {
     _isSimulating = false;
     scheduledStart = null;
     _endTime = null;
+    _hasNotifiedCompletion = false;
     onStatusChange?.call(false);
     NotificationService().cancelAllNotifications();
   }
@@ -314,6 +294,12 @@ class SimulationService {
   void dispose() {
     debugPrint('🧹 SimulationService: dispose chiamato');
     _timer?.cancel();
+    _timer = null;
     NotificationService().cancelAllNotifications();
+    
+    // Pulisci i callback per evitare memory leak
+    onSocUpdate = null;
+    onStatusChange = null;
+    onSimulationComplete = null;
   }
 }

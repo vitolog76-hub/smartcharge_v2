@@ -3,48 +3,50 @@ description: "OriGo - EV Charging Scheduler"
 version: 1.0.0+1
 
 environment:
-  sdk: ^3.10.8
+  sdk: '>=3.10.8 <4.0.0'
 
 dependencies:
   flutter:
     sdk: flutter
-  flutter_localizations:  # 🔥 NUOVO
-    sdk: flutter           # 🔥 NUOVO
+  flutter_localizations:
+    sdk: flutter
   
-  flutter_local_notifications: ^17.0.0
-  timezone: ^0.9.4
+  # Mantieni queste versioni per non rompere il tuo codice attuale
+  flutter_local_notifications: ^17.2.4
+  timezone: any 
   
   # UI & Fonts
-  google_fonts: ^6.1.0
+  google_fonts: ^6.2.1
   cupertino_icons: ^1.0.8
-  flutter_dotenv: ^5.2.1
+  flutter_dotenv: ^5.1.0
   
   # State Management & Storage
   provider: ^6.1.1
-  shared_preferences: ^2.5.4
-  intl: ^0.20.2
+  shared_preferences: ^2.2.3
+  intl: ^0.20.2 # Obbligatorio per Flutter SDK
 
-  image_picker: ^1.0.4
+  image_picker: ^1.0.7
   
   # AI & FILE PICKER
   google_generative_ai: ^0.4.0
   file_picker: ^8.0.0
   
-  # ESTRAZIONE PDF
-  syncfusion_flutter_pdf: ^32.2.8
+  # ESTRAZIONE PDF - Aggiornato alla v33 per supportare intl 0.20.2
+  syncfusion_flutter_pdf: ^33.1.47
   
-  # Grafici e PDF
-  fl_chart: ^0.66.0
+  # Grafici e PDF (Versione 0.66 per compatibilità col tuo codice)
+  fl_chart: ^0.66.2
   pdf: ^3.10.8
   printing: ^5.11.1
   path_provider: ^2.1.2
-  share_plus: ^7.2.0
+  share_plus: ^12.0.2
   universal_html: ^2.3.0
   
   # Firebase
-  firebase_core: ^3.15.0
-  cloud_firestore: ^5.6.5
-  firebase_auth: ^5.5.2
+  firebase_core: ^3.0.0
+  cloud_firestore: ^5.0.0
+  firebase_auth: ^5.0.0
+  google_sign_in: ^6.2.1
   
   # Effetti Visivi
   fluid_background: ^1.0.5
@@ -53,10 +55,9 @@ dependencies:
   permission_handler: ^11.3.0
 
 dev_dependencies:
-  google_sign_in: ^6.1.5
   flutter_test:
     sdk: flutter
-  flutter_lints: ^6.0.0
+  flutter_lints: ^3.0.0
   flutter_launcher_icons: ^0.13.1
 
 flutter_launcher_icons:
@@ -68,7 +69,7 @@ flutter_launcher_icons:
   remove_alpha_ios: true
 
 flutter:
-  generate: true  # 🔥 NUOVO (fondamentale!)
+  generate: true
   uses-material-design: true
   
   fonts:
