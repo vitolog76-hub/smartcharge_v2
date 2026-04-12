@@ -29,7 +29,8 @@ class HomeProvider extends ChangeNotifier {
   final capacityController = TextEditingController();
   List<ChargeSession> chargeHistory = [];
   static const String KEY_SOC_INIZIALE_CONGELATO = 'soc_iniziale_congelato';
-  static const String KEY_TIMESTAMP_INIZIO_CONGELATO = 'timestamp_inizio_congelato'; 
+  static const String KEY_TIMESTAMP_INIZIO_CONGELATO = 'timestamp_inizio_congelato';
+  static const String KEY_FROZEN_START_TIME = 'frozen_start_time';
   
   final SimulationService simService = SimulationService();
   bool isSimulating = false;
@@ -53,6 +54,9 @@ class HomeProvider extends ChangeNotifier {
   double _initProgress = 0.0;
   String _initMessage = "Avvio applicazione...";
   String? _initSubMessage;
+
+  // 🔥 ORARIO INIZIO CONGELATO (NON CAMBIA MAI DURANTE LA SIMULAZIONE)
+  DateTime? _frozenStartTime;
 
   // Getter
   bool get isSaving => _isSaving;
@@ -192,34 +196,33 @@ class HomeProvider extends ChangeNotifier {
 
   // 🔥 Gestione completion simulazione
   Future<void> _handleSimulationCompletion() async {
-  _isSavingCompletion = true;
-  notifyListeners();
-  
-  // 🔥 Calcola subito i valori per il popup
-  final double socIniziale = _socAtStartOfSim;
-  final double socFinale = currentSoc;
-  final double capacita = currentBatteryCap;
-  
-  if (socIniziale < currentSoc) {
-    final kwhEffettivi = ChargeEngine.calculateEnergy(socIniziale, socFinale, capacita);
-    final costoCalcolato = CostCalculator.calculate(
-      totalKwh: kwhEffettivi,
-      wallboxPower: wallboxPwr,
-      startTime: TimeOfDay.fromDateTime(simService.scheduledStart ?? DateTime.now()),
-      date: DateTime.now(),
-      contract: myContract,
-    );
+    _isSavingCompletion = true;
+    notifyListeners();
     
-    lastSavedEnergy = kwhEffettivi;
-    lastSavedCost = costoCalcolato;
+    final double socIniziale = _socAtStartOfSim;
+    final double socFinale = currentSoc;
+    final double capacita = currentBatteryCap;
+    
+    if (socIniziale < currentSoc) {
+      final kwhEffettivi = ChargeEngine.calculateEnergy(socIniziale, socFinale, capacita);
+      final costoCalcolato = CostCalculator.calculate(
+        totalKwh: kwhEffettivi,
+        wallboxPower: wallboxPwr,
+        startTime: TimeOfDay.fromDateTime(simService.scheduledStart ?? DateTime.now()),
+        date: DateTime.now(),
+        contract: myContract,
+      );
+      
+      lastSavedEnergy = kwhEffettivi;
+      lastSavedCost = costoCalcolato;
+    }
+    
+    _showCompletionDialog = true;
+    _isSavingCompletion = false;
+    _clearSimulationProgress();
+    notifyListeners();
   }
   
-  _showCompletionDialog = true;
-  
-  _isSavingCompletion = false;
-  _clearSimulationProgress();
-  notifyListeners();
-}
   Future<void> init() async {
     try {
       debugPrint("🚀 INIT: Inizio caricamento HomeProvider");
@@ -438,7 +441,14 @@ class HomeProvider extends ChangeNotifier {
   }
 
   DateTime get calculatedStartDateTime => targetReadyDateTime.subtract(duration);
-  String get startTimeDisplay => DateFormat('HH:mm').format(calculatedStartDateTime);
+  
+  String get startTimeDisplay {
+    if (_frozenStartTime != null) {
+      return DateFormat('HH:mm').format(_frozenStartTime!);
+    }
+    return DateFormat('HH:mm').format(calculatedStartDateTime);
+  }
+  
   bool get isChargingReal => isSimulating && DateTime.now().isAfter(simService.scheduledStart ?? DateTime.now());
 
   double get estimatedCost {
@@ -454,10 +464,11 @@ class HomeProvider extends ChangeNotifier {
 
   // --- AZIONI SIMULAZIONE ---
   void startSimulation() {
-    _socAtStartOfSim = currentSoc; 
+    _socAtStartOfSim = currentSoc;
+    _frozenStartTime = calculatedStartDateTime;
 
     _clearSimulationProgress().then((_) async {
-      DateTime startTime = calculatedStartDateTime;
+      DateTime startTime = _frozenStartTime!;
       final now = DateTime.now();
       if (startTime.isBefore(now)) startTime = now;
 
@@ -501,6 +512,7 @@ class HomeProvider extends ChangeNotifier {
   }
 
   void stopSimulation() {
+    _frozenStartTime = null;
     simService.stopSimulation();
     NotificationService().cancelAllNotifications(); 
     isSimulating = false;
@@ -798,6 +810,9 @@ class HomeProvider extends ChangeNotifier {
     await prefs.setString(KEY_SIM_START, simService.scheduledStart?.toIso8601String() ?? '');
     await prefs.setString(KEY_SIM_END, simService.endTime?.toIso8601String() ?? '');
     await prefs.setDouble(KEY_SIM_START_SOC, _socAtStartOfSim);
+    if (_frozenStartTime != null) {
+      await prefs.setString(KEY_FROZEN_START_TIME, _frozenStartTime!.toIso8601String());
+    }
   }
 
   Future<void> _loadSimulationProgress() async {
@@ -839,6 +854,12 @@ class HomeProvider extends ChangeNotifier {
     final String? startStr = prefs.getString(KEY_SIM_START);
     final String? endStr = prefs.getString(KEY_SIM_END);
     final double? savedStartSoc = prefs.getDouble(KEY_SIM_START_SOC);
+    
+    final String? frozenStartStr = prefs.getString(KEY_FROZEN_START_TIME);
+    if (frozenStartStr != null) {
+      _frozenStartTime = DateTime.parse(frozenStartStr);
+      debugPrint("📂 frozenStartTime ripristinato: $_frozenStartTime");
+    }
     
     debugPrint("📂 startStr: $startStr, endStr: $endStr, savedStartSoc: $savedStartSoc");
     
@@ -925,6 +946,7 @@ class HomeProvider extends ChangeNotifier {
     await prefs.remove(KEY_SIM_START_SOC);
     await prefs.remove(KEY_SOC_INIZIALE_CONGELATO);
     await prefs.remove(KEY_TIMESTAMP_INIZIO_CONGELATO);
+    await prefs.remove(KEY_FROZEN_START_TIME);
   }
 
   // --- CARICAMENTO DATI ---
