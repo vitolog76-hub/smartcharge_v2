@@ -36,7 +36,7 @@ class HomeProvider extends ChangeNotifier {
   bool _showCompletionDialog = false;
   bool _isSavingCompletion = false;
   bool _showErrorDialog = false;
-  bool get showTaperingWarning => targetSoc > 80;
+  bool get showTaperingWarning => false;
   List<EnergyContract> allContracts = [];
 
   String activeContractId = "";
