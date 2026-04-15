@@ -949,6 +949,54 @@ abstract class AppLocalizations {
   /// In it, this message translates to:
   /// **'sarà disponibile nella prossima release'**
   String get comingSoon;
+
+  /// No description provided for @changePassword.
+  ///
+  /// In it, this message translates to:
+  /// **'Cambia password'**
+  String get changePassword;
+
+  /// No description provided for @currentPassword.
+  ///
+  /// In it, this message translates to:
+  /// **'Password attuale'**
+  String get currentPassword;
+
+  /// No description provided for @newPassword.
+  ///
+  /// In it, this message translates to:
+  /// **'Nuova password'**
+  String get newPassword;
+
+  /// No description provided for @confirmNewPassword.
+  ///
+  /// In it, this message translates to:
+  /// **'Conferma nuova password'**
+  String get confirmNewPassword;
+
+  /// No description provided for @passwordChanged.
+  ///
+  /// In it, this message translates to:
+  /// **'Password cambiata con successo'**
+  String get passwordChanged;
+
+  /// No description provided for @passwordMismatch.
+  ///
+  /// In it, this message translates to:
+  /// **'Le password non corrispondono'**
+  String get passwordMismatch;
+
+  /// No description provided for @passwordTooShort.
+  ///
+  /// In it, this message translates to:
+  /// **'La password deve avere almeno 6 caratteri'**
+  String get passwordTooShort;
+
+  /// No description provided for @wrongPassword.
+  ///
+  /// In it, this message translates to:
+  /// **'Password attuale non corretta'**
+  String get wrongPassword;
 }
 
 class _AppLocalizationsDelegate

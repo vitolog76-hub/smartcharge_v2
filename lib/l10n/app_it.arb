@@ -160,5 +160,13 @@
   "fasciaF3": "F3",
   "fasciaDistribution": "DISTRIBUZIONE FASCE ORARIE",
   
-  "comingSoon": "sarà disponibile nella prossima release"
+  "comingSoon": "sarà disponibile nella prossima release",
+  "changePassword": "Cambia password",
+  "currentPassword": "Password attuale",
+  "newPassword": "Nuova password",
+  "confirmNewPassword": "Conferma nuova password",
+  "passwordChanged": "Password cambiata con successo",
+  "passwordMismatch": "Le password non corrispondono",
+  "passwordTooShort": "La password deve avere almeno 6 caratteri",
+  "wrongPassword": "Password attuale non corretta"
 }

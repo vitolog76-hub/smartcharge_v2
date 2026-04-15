@@ -5,11 +5,16 @@ import 'package:origo/models/contract_model.dart';
 class SyncService {
   final FirebaseFirestore _db = FirebaseFirestore.instance;
 
-  // 1. Verifica esistenza ID
+  // 1. Verifica esistenza ID (controlla il documento v2 nella subcollection)
   Future<bool> checkIfUserExists(String userId) async {
     if (userId.isEmpty) return false;
     try {
-      DocumentSnapshot doc = await _db.collection("users").doc(userId).get();
+      DocumentSnapshot doc = await _db
+          .collection("users")
+          .doc(userId)
+          .collection("versions")
+          .doc("v2")
+          .get();
       return doc.exists;
     } catch (e) {
       print("!!! ERRORE VERIFICA ID: $e");
@@ -34,13 +39,12 @@ class SyncService {
 
       // 🔥 SALVATAGGIO STRUTTURATO: Il nome è al livello dell'ID, non del contratto
       await _db.collection("users").doc(userId).collection("versions").doc("v2").set({
-      // Usa i millisecondi del dispositivo per un confronto diretto con SharedPreferences
-      'lastUpdate': DateTime.now().millisecondsSinceEpoch, 
+      'lastUpdate': FieldValue.serverTimestamp(), 
       'globalUserName': userName,
       'history': historyMap,
       'allContracts': contractsMap,
       'activeContractId': activeContractId,
-    }); // Niente merge = Pulizia totale
+    }, SetOptions(merge: true));
 
       print("✅ SYNC OK: Utente [$userName] aggiornato su Cloud con ID: $userId");
     } catch (e) {

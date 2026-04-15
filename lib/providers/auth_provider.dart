@@ -192,9 +192,28 @@ class AuthProvider extends ChangeNotifier {
 
   Future<void> signOut() async {
     await _auth.signOut();
-    await GoogleSignIn().signOut(); // 🔥 AGGIUNTO ANCHE QUI
+    await GoogleSignIn().signOut();
     
+    // Cancella solo i dati utente, preserva impostazioni dispositivo
+    // (auto selezionata, chimica batteria, potenza wallbox, orari, ecc.)
     final prefs = await SharedPreferences.getInstance();
-    await prefs.clear();
+    final userKeys = [
+      'user_sync_id',
+      'global_user_name',
+      'charge_history',
+      'energy_contracts_list',
+      'active_contract_id',
+      'last_local_update',
+      'soc_iniziale_congelato',
+      'timestamp_inizio_congelato',
+      'frozen_start_time',
+      'simulation_active',
+      'simulation_start',
+      'simulation_end',
+      'simulation_start_soc',
+    ];
+    for (final key in userKeys) {
+      await prefs.remove(key);
+    }
   }
 }

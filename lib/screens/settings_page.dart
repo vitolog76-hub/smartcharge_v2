@@ -1,22 +1,13 @@
-import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:origo/models/contract_model.dart';
-import 'package:origo/models/charge_session.dart';
 import 'package:origo/models/car_model.dart';
-import 'package:origo/services/sync_service.dart';
 import 'package:origo/providers/auth_provider.dart';
 import 'package:origo/providers/home_provider.dart';
-import 'package:origo/screens/contract_summary_page.dart';
 import 'package:provider/provider.dart';
-import 'package:origo/pages/add_contract_page.dart';
-import 'package:origo/services/cost_calculator.dart';
-import 'package:flutter/services.dart';
-import 'package:origo/providers/locale_provider.dart';
 import 'package:origo/l10n/app_localizations.dart';
 
 // IMPORT DEI NUOVI WIDGET
-import 'package:origo/widgets/settings/expandable_section.dart';
 import 'package:origo/widgets/settings/account_section.dart';
 import 'package:origo/widgets/settings/user_vehicle_section.dart';
 import 'package:origo/widgets/settings/contracts_section.dart';
@@ -43,7 +34,6 @@ class SettingsPage extends StatefulWidget {
 }
 
 class _SettingsPageState extends State<SettingsPage> with TickerProviderStateMixin {
-  late TextEditingController _idController;
   late TextEditingController _nameController;
   late TextEditingController _providerController;
   late TextEditingController _f1Controller;
@@ -70,7 +60,6 @@ class _SettingsPageState extends State<SettingsPage> with TickerProviderStateMix
     _f1Controller = TextEditingController(text: widget.contract.f1Price.toString());
     _f2Controller = TextEditingController(text: widget.contract.f2Price.toString());
     _f3Controller = TextEditingController(text: widget.contract.f3Price.toString());
-    _idController = TextEditingController();
     
     _isMonorario = widget.contract.isMonorario;
     
@@ -105,7 +94,6 @@ class _SettingsPageState extends State<SettingsPage> with TickerProviderStateMix
 
   @override
   void dispose() {
-    _idController.dispose();
     _nameController.dispose();
     _batteryController.dispose();
     _providerController.dispose();
@@ -136,7 +124,6 @@ class _SettingsPageState extends State<SettingsPage> with TickerProviderStateMix
   Future<void> _loadSettingsData() async {
     final prefs = await SharedPreferences.getInstance();
     setState(() {
-      _idController.text = prefs.getString('user_sync_id') ?? "";
       _selectedBatteryType = prefs.getString('battery_chemistry') ?? "NMC / NCA";
       
       String? savedName = prefs.getString('global_user_name');
@@ -144,32 +131,6 @@ class _SettingsPageState extends State<SettingsPage> with TickerProviderStateMix
         _nameController.text = savedName;
       }
     });
-  }
-
-  Future<void> _importFromCloud(String userId) async {
-    if (userId.isEmpty) {
-      _showErrorDialog("Errore", "Inserisci un ID valido.");
-      return;
-    }
-    setState(() => _isSyncing = true);
-    try {
-      var data = await SyncService().downloadAllData(userId);
-      if (data != null) {
-        await context.read<HomeProvider>().refreshAfterSettings();
-        final homeProv = context.read<HomeProvider>();
-        final prefs = await SharedPreferences.getInstance();
-        setState(() {
-          _nameController.text = homeProv.globalUserName;
-          _selectedBatteryType = prefs.getString('battery_chemistry') ?? "NMC / NCA";
-          _providerController.text = homeProv.myContract.provider;
-          _f1Controller.text = homeProv.myContract.f1Price.toString();
-        });
-      }
-    } catch (e) {
-      _showErrorDialog("Errore", "Sincronizzazione fallita.");
-    } finally {
-      setState(() => _isSyncing = false);
-    }
   }
 
   void _saveAll() async {
@@ -184,7 +145,6 @@ class _SettingsPageState extends State<SettingsPage> with TickerProviderStateMix
       return;
     }
 
-    String userId = _idController.text.trim();
     String nuovoNomeProfilo = _nameController.text.trim(); 
     final homeProv = context.read<HomeProvider>();
 
@@ -197,10 +157,6 @@ class _SettingsPageState extends State<SettingsPage> with TickerProviderStateMix
 
     final prefs = await SharedPreferences.getInstance();
     await prefs.setString('battery_chemistry', _selectedBatteryType);
-    
-    if (userId.isNotEmpty) {
-      await prefs.setString('user_sync_id', userId);
-    }
 
     homeProv.updateActiveContractDetails(
       provider: _providerController.text,
@@ -217,7 +173,7 @@ class _SettingsPageState extends State<SettingsPage> with TickerProviderStateMix
     if (mounted) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
-          content: Text("✅ Impostazioni salvate!"),
+          content: Text("Impostazioni salvate!"),
           backgroundColor: Colors.green,
         )
       );
@@ -298,10 +254,8 @@ class _SettingsPageState extends State<SettingsPage> with TickerProviderStateMix
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    // 1. ACCOUNT (ID + Logout)
+                    // 1. ACCOUNT
                     AccountSection(
-                      idController: _idController,
-                      onImport: () => _importFromCloud(_idController.text.trim()),
                       onShowLogoutConfirm: _showLogoutConfirmDialog,
                       isExpanded: _expandedSections['account']!,
                       animation: _animations['account']!,
@@ -371,7 +325,7 @@ class _SettingsPageState extends State<SettingsPage> with TickerProviderStateMix
                         child: _isSyncing 
                           ? const CircularProgressIndicator(color: Colors.black)
                           : Text(
-                              l10n.saveAllChanges,  // <-- AGGIUNTA LA TRADUZIONE
+                              l10n.saveAllChanges,
                               style: const TextStyle(fontWeight: FontWeight.w900, letterSpacing: 1.5),
                             ),
                       ),

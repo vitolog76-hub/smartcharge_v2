@@ -155,5 +155,13 @@
   "fasciaF3": "F3",
   "fasciaDistribution": "ZEITFENSTERVERTEILUNG",
   
-  "comingSoon": "wird in der nächsten Version verfügbar sein"
+  "comingSoon": "wird in der nächsten Version verfügbar sein",
+  "changePassword": "Passwort ändern",
+  "currentPassword": "Aktuelles Passwort",
+  "newPassword": "Neues Passwort",
+  "confirmNewPassword": "Neues Passwort bestätigen",
+  "passwordChanged": "Passwort erfolgreich geändert",
+  "passwordMismatch": "Passwörter stimmen nicht überein",
+  "passwordTooShort": "Das Passwort muss mindestens 6 Zeichen lang sein",
+  "wrongPassword": "Aktuelles Passwort ist falsch"
 }

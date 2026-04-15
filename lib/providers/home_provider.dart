@@ -679,11 +679,6 @@ class HomeProvider extends ChangeNotifier {
       final prefs = await SharedPreferences.getInstance();
       final String jsonData = jsonEncode(chargeHistory.map((s) => s.toJson()).toList());
       
-      if (jsonData.isEmpty || jsonData == '[]') {
-        debugPrint("⚠️ Tentativo di salvare history vuota, ignorato");
-        return false;
-      }
-      
       bool success = await prefs.setString('charge_history', jsonData);
       
       if (success) {
@@ -1091,6 +1086,7 @@ class HomeProvider extends ChangeNotifier {
   void deleteChargeSession(String id) async {
     chargeHistory.removeWhere((s) => s.id == id);
     await saveHistory();
+    _syncHistoryIfPossible();
     notifyListeners();
   }
 }

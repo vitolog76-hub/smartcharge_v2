@@ -4,15 +4,14 @@ import 'package:firebase_core/firebase_core.dart';
 import 'package:intl/date_symbol_data_local.dart';
 import 'package:origo/providers/auth_provider.dart';
 import 'package:origo/providers/home_provider.dart';
-import 'package:origo/providers/locale_provider.dart'; // 🔥 NUOVO
+import 'package:origo/providers/locale_provider.dart';
 import 'package:origo/screens/login_page.dart';
 import 'package:origo/screens/home_page.dart';
 import 'package:origo/services/notification_service.dart';
 import 'package:flutter_dotenv/flutter_dotenv.dart';
 import 'package:flutter/foundation.dart' show kIsWeb;
-import 'package:flutter_localizations/flutter_localizations.dart'; // 🔥 NUOVO
+import 'package:flutter_localizations/flutter_localizations.dart';
 import 'package:origo/l10n/app_localizations.dart';
-import 'package:origo/providers/locale_provider.dart';
 
 void main() async {
   // 1. OBBLIGATORIO: Inizializza i legami con il sistema operativo

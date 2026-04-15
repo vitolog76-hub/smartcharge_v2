@@ -155,5 +155,13 @@
   "fasciaF3": "F3",
   "fasciaDistribution": "DISTRIBUCIÓN FRANJAS HORARIAS",
   
-  "comingSoon": "estará disponible en la próxima versión"
+  "comingSoon": "estará disponible en la próxima versión",
+  "changePassword": "Cambiar contraseña",
+  "currentPassword": "Contraseña actual",
+  "newPassword": "Nueva contraseña",
+  "confirmNewPassword": "Confirmar nueva contraseña",
+  "passwordChanged": "Contraseña cambiada con éxito",
+  "passwordMismatch": "Las contraseñas no coinciden",
+  "passwordTooShort": "La contraseña debe tener al menos 6 caracteres",
+  "wrongPassword": "La contraseña actual es incorrecta"
 }

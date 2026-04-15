@@ -450,4 +450,29 @@ class AppLocalizationsFr extends AppLocalizations {
 
   @override
   String get comingSoon => 'sera disponible dans la prochaine version';
+
+  @override
+  String get changePassword => 'Changer le mot de passe';
+
+  @override
+  String get currentPassword => 'Mot de passe actuel';
+
+  @override
+  String get newPassword => 'Nouveau mot de passe';
+
+  @override
+  String get confirmNewPassword => 'Confirmer le nouveau mot de passe';
+
+  @override
+  String get passwordChanged => 'Mot de passe modifié avec succès';
+
+  @override
+  String get passwordMismatch => 'Les mots de passe ne correspondent pas';
+
+  @override
+  String get passwordTooShort =>
+      'Le mot de passe doit contenir au moins 6 caractères';
+
+  @override
+  String get wrongPassword => 'Le mot de passe actuel est incorrect';
 }

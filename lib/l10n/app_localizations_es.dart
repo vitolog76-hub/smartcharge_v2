@@ -449,4 +449,29 @@ class AppLocalizationsEs extends AppLocalizations {
 
   @override
   String get comingSoon => 'estará disponible en la próxima versión';
+
+  @override
+  String get changePassword => 'Cambiar contraseña';
+
+  @override
+  String get currentPassword => 'Contraseña actual';
+
+  @override
+  String get newPassword => 'Nueva contraseña';
+
+  @override
+  String get confirmNewPassword => 'Confirmar nueva contraseña';
+
+  @override
+  String get passwordChanged => 'Contraseña cambiada con éxito';
+
+  @override
+  String get passwordMismatch => 'Las contraseñas no coinciden';
+
+  @override
+  String get passwordTooShort =>
+      'La contraseña debe tener al menos 6 caracteres';
+
+  @override
+  String get wrongPassword => 'La contraseña actual es incorrecta';
 }
