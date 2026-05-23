@@ -4,12 +4,20 @@ import 'package:shared_preferences/shared_preferences.dart';
 import 'dart:convert';
 import 'package:origo/services/sync_service.dart';
 import 'package:origo/models/contract_model.dart';
-import 'package:google_sign_in/google_sign_in.dart'; // 🔥 IMPORT AGGIUNTO
+import 'package:google_sign_in/google_sign_in.dart';
+import 'package:flutter/foundation.dart' show kIsWeb; // 🔥 AGGIUNTO
 
 class AuthProvider extends ChangeNotifier {
   final FirebaseAuth _auth = FirebaseAuth.instance;
   User? _user;
   bool _isLoading = false;
+
+  // 🔥 GOOGLE SIGN IN CON CLIENT ID PER WEB (AGGIUNTO)
+  final GoogleSignIn _googleSignIn = GoogleSignIn(
+    clientId: kIsWeb
+        ? const String.fromEnvironment('GOOGLE_CLIENT_ID')
+        : null, // Su mobile non serve, usa il default
+  );
 
   User? get user => _user;
   bool get isLoading => _isLoading;
@@ -55,13 +63,13 @@ class AuthProvider extends ChangeNotifier {
     }
   }
 
-  // 🔥 METODO PER LOGIN CON GOOGLE (AGGIUNTO)
+  // 🔥 METODO PER LOGIN CON GOOGLE (MODIFICATO - USA _googleSignIn)
   Future<String?> signInWithGoogle() async {
     _isLoading = true;
     notifyListeners();
 
     try {
-      final GoogleSignInAccount? googleUser = await GoogleSignIn().signIn();
+      final GoogleSignInAccount? googleUser = await _googleSignIn.signIn();
       if (googleUser == null) {
         _isLoading = false;
         notifyListeners();
@@ -131,7 +139,6 @@ class AuthProvider extends ChangeNotifier {
       id: "default_contract_${DateTime.now().millisecondsSinceEpoch}",
       contractName: "Contratto Base",
       provider: "Esempio",
-      // userName: displayName, // Possiamo anche smettere di passarlo qui se vuoi pulire il modello
       f1Price: 0.20,
       f2Price: 0.18,
       f3Price: 0.15,
@@ -140,10 +147,8 @@ class AuthProvider extends ChangeNotifier {
 
     final prefs = await SharedPreferences.getInstance();
 
-    // 1. Salviamo il nome globale nelle SharedPreferences (quello che userà HomeProvider)
     await prefs.setString('global_user_name', displayName);
 
-    // 2. Salvataggio locale MacBook
     await prefs.setString(
       'energy_contracts_list',
       jsonEncode([defaultContract.toJson()]),
@@ -151,13 +156,12 @@ class AuthProvider extends ChangeNotifier {
     await prefs.setString('active_contract_id', defaultContract.id);
     await prefs.setString('charge_history', jsonEncode([]));
 
-    // 🔥 FIX: Passiamo i 5 argomenti richiesti dal nuovo SyncService
     await SyncService().uploadData(
-      userId, // 1. ID Utente
-      [], // 2. History vuota
-      [defaultContract], // 3. Lista con il contratto di default
-      defaultContract.id, // 4. ID del contratto attivo
-      displayName, // 5. Nome Globale (Aggiunto!)
+      userId,
+      [],
+      [defaultContract],
+      defaultContract.id,
+      displayName,
     );
   }
 
@@ -173,7 +177,6 @@ class AuthProvider extends ChangeNotifier {
         if (data != null) {
           final prefs = await SharedPreferences.getInstance();
 
-          // --- RECUPERO NOME GLOBALE DAL CLOUD ---
           if (data['globalUserName'] != null) {
             await prefs.setString('global_user_name', data['globalUserName']);
             debugPrint("✅ Nome globale scaricato: ${data['globalUserName']}");
@@ -208,10 +211,8 @@ class AuthProvider extends ChangeNotifier {
 
   Future<void> signOut() async {
     await _auth.signOut();
-    await GoogleSignIn().signOut();
+    await _googleSignIn.signOut(); // 🔥 CAMBIATO: usa _googleSignIn
 
-    // Cancella solo i dati utente, preserva impostazioni dispositivo
-    // (auto selezionata, chimica batteria, potenza wallbox, orari, ecc.)
     final prefs = await SharedPreferences.getInstance();
     final userKeys = [
       'user_sync_id',
