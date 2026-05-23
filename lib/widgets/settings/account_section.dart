@@ -5,6 +5,7 @@ import 'expandable_section.dart';
 
 class AccountSection extends StatelessWidget {
   final Future<bool?> Function() onShowLogoutConfirm;
+  final Future<void> Function() onLogout;
   final bool isExpanded;
   final Animation<double> animation;
   final VoidCallback onToggle;
@@ -12,6 +13,7 @@ class AccountSection extends StatelessWidget {
   const AccountSection({
     super.key,
     required this.onShowLogoutConfirm,
+    required this.onLogout,
     required this.isExpanded,
     required this.animation,
     required this.onToggle,
@@ -21,7 +23,7 @@ class AccountSection extends StatelessWidget {
   Widget build(BuildContext context) {
     final l10n = AppLocalizations.of(context)!;
     final user = FirebaseAuth.instance.currentUser;
-    
+
     return ExpandableSection(
       title: "ACCOUNT",
       icon: Icons.account_circle,
@@ -50,12 +52,18 @@ class AccountSection extends StatelessWidget {
                     children: [
                       Text(
                         l10n.email.toUpperCase(),
-                        style: const TextStyle(color: Colors.cyanAccent, fontSize: 10),
+                        style: const TextStyle(
+                          color: Colors.cyanAccent,
+                          fontSize: 10,
+                        ),
                       ),
                       const SizedBox(height: 4),
                       Text(
                         user?.email ?? "-",
-                        style: const TextStyle(color: Colors.white, fontSize: 16),
+                        style: const TextStyle(
+                          color: Colors.white,
+                          fontSize: 16,
+                        ),
                       ),
                     ],
                   ),
@@ -99,7 +107,7 @@ class AccountSection extends StatelessWidget {
             onTap: () async {
               final confirm = await onShowLogoutConfirm();
               if (confirm == true) {
-                // Logout gestito dalla pagina principale
+                await onLogout();
               }
             },
           ),
@@ -138,7 +146,10 @@ class AccountSection extends StatelessWidget {
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(ctx),
-            child: Text(l10n.cancel, style: const TextStyle(color: Colors.white38)),
+            child: Text(
+              l10n.cancel,
+              style: const TextStyle(color: Colors.white38),
+            ),
           ),
           ElevatedButton(
             onPressed: () => _changePassword(
@@ -225,8 +236,8 @@ class AccountSection extends StatelessWidget {
 
   void _showSnackBar(BuildContext context, String message, Color color) {
     if (!context.mounted) return;
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(content: Text(message), backgroundColor: color),
-    );
+    ScaffoldMessenger.of(
+      context,
+    ).showSnackBar(SnackBar(content: Text(message), backgroundColor: color));
   }
 }

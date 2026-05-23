@@ -33,14 +33,15 @@ class SettingsPage extends StatefulWidget {
   State<SettingsPage> createState() => _SettingsPageState();
 }
 
-class _SettingsPageState extends State<SettingsPage> with TickerProviderStateMixin {
+class _SettingsPageState extends State<SettingsPage>
+    with TickerProviderStateMixin {
   late TextEditingController _nameController;
   late TextEditingController _providerController;
   late TextEditingController _f1Controller;
   late TextEditingController _f2Controller;
   late TextEditingController _f3Controller;
   late TextEditingController _batteryController;
-  
+
   bool _isSyncing = false;
   late bool _isMonorario;
   String _selectedBatteryType = "NMC / NCA";
@@ -53,27 +54,37 @@ class _SettingsPageState extends State<SettingsPage> with TickerProviderStateMix
   @override
   void initState() {
     super.initState();
-    
+
     _providerController = TextEditingController(text: widget.contract.provider);
-    _nameController = TextEditingController(text: widget.homeProvider.globalUserName);
-    _batteryController = TextEditingController(text: widget.homeProvider.capacityController.text);
-    _f1Controller = TextEditingController(text: widget.contract.f1Price.toString());
-    _f2Controller = TextEditingController(text: widget.contract.f2Price.toString());
-    _f3Controller = TextEditingController(text: widget.contract.f3Price.toString());
-    
+    _nameController = TextEditingController(
+      text: widget.homeProvider.globalUserName,
+    );
+    _batteryController = TextEditingController(
+      text: widget.homeProvider.capacityController.text,
+    );
+    _f1Controller = TextEditingController(
+      text: widget.contract.f1Price.toString(),
+    );
+    _f2Controller = TextEditingController(
+      text: widget.contract.f2Price.toString(),
+    );
+    _f3Controller = TextEditingController(
+      text: widget.contract.f3Price.toString(),
+    );
+
     _isMonorario = widget.contract.isMonorario;
-    
+
     // 4 sezioni: tutte chiuse tranne account aperto di default
     _expandedSections = {
-      'account': true,           // ACCOUNT (aperto di default)
-      'userVehicle': false,      // DATI UTENTE E VEICOLO
-      'contracts': false,        // GESTIONE CONTRATTI ENERGIA
-      'language': false,         // LINGUA
+      'account': true, // ACCOUNT (aperto di default)
+      'userVehicle': false, // DATI UTENTE E VEICOLO
+      'contracts': false, // GESTIONE CONTRATTI ENERGIA
+      'language': false, // LINGUA
     };
-    
+
     _animationControllers = {};
     _animations = {};
-    
+
     for (var key in _expandedSections.keys) {
       _animationControllers[key] = AnimationController(
         vsync: this,
@@ -83,12 +94,12 @@ class _SettingsPageState extends State<SettingsPage> with TickerProviderStateMix
         parent: _animationControllers[key]!,
         curve: Curves.easeInOut,
       );
-      
+
       if (_expandedSections[key] == true) {
         _animationControllers[key]!.forward();
       }
     }
-    
+
     _loadSettingsData();
   }
 
@@ -100,11 +111,11 @@ class _SettingsPageState extends State<SettingsPage> with TickerProviderStateMix
     _f1Controller.dispose();
     _f2Controller.dispose();
     _f3Controller.dispose();
-    
+
     for (var controller in _animationControllers.values) {
       controller.dispose();
     }
-    
+
     super.dispose();
   }
 
@@ -112,7 +123,7 @@ class _SettingsPageState extends State<SettingsPage> with TickerProviderStateMix
     setState(() {
       bool isExpanded = _expandedSections[sectionKey] ?? false;
       _expandedSections[sectionKey] = !isExpanded;
-      
+
       if (!isExpanded) {
         _animationControllers[sectionKey]?.forward();
       } else {
@@ -124,8 +135,9 @@ class _SettingsPageState extends State<SettingsPage> with TickerProviderStateMix
   Future<void> _loadSettingsData() async {
     final prefs = await SharedPreferences.getInstance();
     setState(() {
-      _selectedBatteryType = prefs.getString('battery_chemistry') ?? "NMC / NCA";
-      
+      _selectedBatteryType =
+          prefs.getString('battery_chemistry') ?? "NMC / NCA";
+
       String? savedName = prefs.getString('global_user_name');
       if (savedName != null && savedName.isNotEmpty) {
         _nameController.text = savedName;
@@ -139,19 +151,19 @@ class _SettingsPageState extends State<SettingsPage> with TickerProviderStateMix
 
     if (batteryValue == null || batteryValue <= 0) {
       _showErrorDialog(
-        "VALORE NON VALIDO", 
-        "Inserisci una capacità batteria maggiore di zero per permettere il calcolo dei costi."
+        "VALORE NON VALIDO",
+        "Inserisci una capacità batteria maggiore di zero per permettere il calcolo dei costi.",
       );
       return;
     }
 
-    String nuovoNomeProfilo = _nameController.text.trim(); 
+    String nuovoNomeProfilo = _nameController.text.trim();
     final homeProv = context.read<HomeProvider>();
 
     setState(() => _isSyncing = true);
-    
+
     homeProv.capacityController.text = batteryValue.toString();
-    homeProv.refreshBatteryChemistry(_selectedBatteryType); 
+    homeProv.refreshBatteryChemistry(_selectedBatteryType);
 
     await homeProv.syncUserProfile(nuovoNomeProfilo);
 
@@ -166,16 +178,16 @@ class _SettingsPageState extends State<SettingsPage> with TickerProviderStateMix
       f3: double.tryParse(_f3Controller.text),
     );
 
-    await homeProv.salvaTuttiParametri(); 
+    await homeProv.salvaTuttiParametri();
 
     setState(() => _isSyncing = false);
-    
+
     if (mounted) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
           content: Text("Impostazioni salvate!"),
           backgroundColor: Colors.green,
-        )
+        ),
       );
       Navigator.pop(context, true);
     }
@@ -188,9 +200,29 @@ class _SettingsPageState extends State<SettingsPage> with TickerProviderStateMix
         backgroundColor: const Color(0xFF0F172A),
         title: Text(title, style: const TextStyle(color: Colors.white)),
         content: Text(message, style: const TextStyle(color: Colors.white70)),
-        actions: [TextButton(onPressed: () => Navigator.pop(ctx), child: const Text("OK"))],
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx),
+            child: const Text("OK"),
+          ),
+        ],
       ),
     );
+  }
+
+  Future<void> _logout() async {
+    setState(() => _isSyncing = true);
+    try {
+      await widget.authProvider.signOut();
+    } catch (e) {
+      if (mounted) {
+        _showErrorDialog("Logout failed", e.toString());
+      }
+    } finally {
+      if (mounted) {
+        setState(() => _isSyncing = false);
+      }
+    }
   }
 
   Future<bool?> _showLogoutConfirmDialog() {
@@ -201,8 +233,17 @@ class _SettingsPageState extends State<SettingsPage> with TickerProviderStateMix
         title: const Text("Logout", style: TextStyle(color: Colors.white)),
         content: const Text("Sei sicuro di voler uscire?"),
         actions: [
-          TextButton(onPressed: () => Navigator.pop(ctx, false), child: const Text("ANNULLA")),
-          TextButton(onPressed: () => Navigator.pop(ctx, true), child: const Text("ESCI", style: TextStyle(color: Colors.redAccent))),
+          TextButton(
+            onPressed: () => Navigator.pop(ctx, false),
+            child: const Text("ANNULLA"),
+          ),
+          TextButton(
+            onPressed: () => Navigator.pop(ctx, true),
+            child: const Text(
+              "ESCI",
+              style: TextStyle(color: Colors.redAccent),
+            ),
+          ),
         ],
       ),
     );
@@ -211,7 +252,7 @@ class _SettingsPageState extends State<SettingsPage> with TickerProviderStateMix
   @override
   Widget build(BuildContext context) {
     final l10n = AppLocalizations.of(context)!;
-    
+
     return Scaffold(
       body: Container(
         width: double.infinity,
@@ -220,11 +261,7 @@ class _SettingsPageState extends State<SettingsPage> with TickerProviderStateMix
           gradient: LinearGradient(
             begin: Alignment.topLeft,
             end: Alignment.bottomRight,
-            colors: [
-              Color(0xFF0F172A),
-              Color(0xFF020617),
-              Colors.black,
-            ],
+            colors: [Color(0xFF0F172A), Color(0xFF020617), Colors.black],
           ),
         ),
         child: Column(
@@ -232,31 +269,44 @@ class _SettingsPageState extends State<SettingsPage> with TickerProviderStateMix
             AppBar(
               title: Text(
                 l10n.settingsSystem,
-                style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w900, letterSpacing: 2)
+                style: const TextStyle(
+                  fontSize: 14,
+                  fontWeight: FontWeight.w900,
+                  letterSpacing: 2,
+                ),
               ),
               centerTitle: true,
               backgroundColor: Colors.transparent,
               elevation: 0,
               leading: IconButton(
-                icon: const Icon(Icons.arrow_back_ios, color: Colors.cyanAccent, size: 20),
+                icon: const Icon(
+                  Icons.arrow_back_ios,
+                  color: Colors.cyanAccent,
+                  size: 20,
+                ),
                 onPressed: () => Navigator.pop(context),
               ),
               actions: [
-                if (!_isSyncing) IconButton(
-                  onPressed: _saveAll, 
-                  icon: const Icon(Icons.check, color: Colors.cyanAccent)
-                )
+                if (!_isSyncing)
+                  IconButton(
+                    onPressed: _saveAll,
+                    icon: const Icon(Icons.check, color: Colors.cyanAccent),
+                  ),
               ],
             ),
             Expanded(
               child: SingleChildScrollView(
-                padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 10),
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 20,
+                  vertical: 10,
+                ),
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     // 1. ACCOUNT
                     AccountSection(
                       onShowLogoutConfirm: _showLogoutConfirmDialog,
+                      onLogout: _logout,
                       isExpanded: _expandedSections['account']!,
                       animation: _animations['account']!,
                       onToggle: () => _toggleSection('account'),
@@ -270,7 +320,8 @@ class _SettingsPageState extends State<SettingsPage> with TickerProviderStateMix
                       selectedCar: widget.selectedCar,
                       batteryController: _batteryController,
                       selectedBatteryType: _selectedBatteryType,
-                      onBatteryTypeChanged: (val) => setState(() => _selectedBatteryType = val),
+                      onBatteryTypeChanged: (val) =>
+                          setState(() => _selectedBatteryType = val),
                       isExpanded: _expandedSections['userVehicle']!,
                       animation: _animations['userVehicle']!,
                       onToggle: () => _toggleSection('userVehicle'),
@@ -303,12 +354,15 @@ class _SettingsPageState extends State<SettingsPage> with TickerProviderStateMix
 
                     const SizedBox(height: 30),
 
-                    if (_isSyncing) const Center(
-                      child: Padding(
-                        padding: EdgeInsets.only(bottom: 20),
-                        child: CircularProgressIndicator(color: Colors.cyanAccent),
+                    if (_isSyncing)
+                      const Center(
+                        child: Padding(
+                          padding: EdgeInsets.only(bottom: 20),
+                          child: CircularProgressIndicator(
+                            color: Colors.cyanAccent,
+                          ),
+                        ),
                       ),
-                    ),
 
                     SizedBox(
                       width: double.infinity,
@@ -319,15 +373,22 @@ class _SettingsPageState extends State<SettingsPage> with TickerProviderStateMix
                           foregroundColor: Colors.black,
                           elevation: 10,
                           shadowColor: Colors.cyanAccent.withOpacity(0.5),
-                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(18)),
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(18),
+                          ),
                         ),
                         onPressed: _isSyncing ? null : _saveAll,
-                        child: _isSyncing 
-                          ? const CircularProgressIndicator(color: Colors.black)
-                          : Text(
-                              l10n.saveAllChanges,
-                              style: const TextStyle(fontWeight: FontWeight.w900, letterSpacing: 1.5),
-                            ),
+                        child: _isSyncing
+                            ? const CircularProgressIndicator(
+                                color: Colors.black,
+                              )
+                            : Text(
+                                l10n.saveAllChanges,
+                                style: const TextStyle(
+                                  fontWeight: FontWeight.w900,
+                                  letterSpacing: 1.5,
+                                ),
+                              ),
                       ),
                     ),
                   ],
