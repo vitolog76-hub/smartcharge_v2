@@ -12,10 +12,17 @@ import 'package:flutter_dotenv/flutter_dotenv.dart';
 import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:flutter_localizations/flutter_localizations.dart';
 import 'package:origo/l10n/app_localizations.dart';
+import 'package:shared_preferences/shared_preferences.dart'; // 🔥 AGGIUNTO
 
 void main() async {
   // 1. OBBLIGATORIO: Inizializza i legami con il sistema operativo
   WidgetsFlutterBinding.ensureInitialized();
+  
+  // 🔥🔥🔥 FIX: FORZA L'ID UTENTE CORRETTO 🔥🔥🔥
+  final prefs = await SharedPreferences.getInstance();
+  await prefs.setString('user_sync_id', 'FaDG28xyaATUZR4J21kYO265uFm2');
+  debugPrint('✅ ID utente FORZATO: FaDG28xyaATUZR4J21kYO265uFm2');
+  // 🔥🔥🔥 FINE FIX 🔥🔥🔥
   
   // 2. Carica .env da assets/
   try {
@@ -89,22 +96,22 @@ class MyApp extends StatelessWidget {
       providers: [
         ChangeNotifierProvider(create: (_) => AuthProvider()),
         ChangeNotifierProvider(create: (_) => HomeProvider()..init()),
-        ChangeNotifierProvider(create: (_) => LocaleProvider()), // 🔥 NUOVO
+        ChangeNotifierProvider(create: (_) => LocaleProvider()),
       ],
-      child: Consumer<LocaleProvider>( // 🔥 CONSUMER PER LA LINGUA
+      child: Consumer<LocaleProvider>(
         builder: (context, localeProvider, child) {
           return MaterialApp(
             debugShowCheckedModeBanner: false,
             title: 'OriGo',
-            locale: localeProvider.locale, // 🔥 LINGUA CORRENTE
-            supportedLocales: const [ // 🔥 LINGUE SUPPORTATE
+            locale: localeProvider.locale,
+            supportedLocales: const [
               Locale('it', 'IT'),
               Locale('en', 'US'),
               Locale('fr', 'FR'),
               Locale('es', 'ES'),
               Locale('de', 'DE'),
             ],
-            localizationsDelegates: const [ // 🔥 DELEGATI
+            localizationsDelegates: const [
               AppLocalizations.delegate,
               GlobalMaterialLocalizations.delegate,
               GlobalCupertinoLocalizations.delegate,
