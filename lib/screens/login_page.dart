@@ -16,15 +16,11 @@ class LoginPage extends StatelessWidget {
 
     return Scaffold(
       body: Container(
-        decoration: BoxDecoration(
+        decoration: const BoxDecoration(
           gradient: LinearGradient(
             begin: Alignment.topLeft,
             end: Alignment.bottomRight,
-            colors: [
-              const Color(0xFF0A0F1E),
-              const Color(0xFF1A1F2E),
-              const Color(0xFF050507),
-            ],
+            colors: [Color(0xFF0A0F1E), Color(0xFF1A1F2E), Color(0xFF050507)],
           ),
         ),
         child: SafeArea(
@@ -67,7 +63,7 @@ class LoginPage extends StatelessWidget {
                     ),
                   ),
                   const SizedBox(height: 20),
-                  
+
                   // Title
                   const Text(
                     "OriGo",
@@ -77,10 +73,7 @@ class LoginPage extends StatelessWidget {
                       fontWeight: FontWeight.bold,
                       letterSpacing: 2,
                       shadows: [
-                        Shadow(
-                          color: Colors.blueAccent,
-                          blurRadius: 10,
-                        ),
+                        Shadow(color: Colors.blueAccent, blurRadius: 10),
                       ],
                     ),
                   ),
@@ -93,7 +86,7 @@ class LoginPage extends StatelessWidget {
                     ),
                   ),
                   const SizedBox(height: 40),
-                  
+
                   // Email Field
                   Container(
                     decoration: BoxDecoration(
@@ -112,22 +105,29 @@ class LoginPage extends StatelessWidget {
                       decoration: InputDecoration(
                         labelText: "Email",
                         labelStyle: const TextStyle(color: Colors.white38),
-                        prefixIcon: const Icon(Icons.email, color: Colors.blueAccent),
+                        prefixIcon: const Icon(
+                          Icons.email,
+                          color: Colors.blueAccent,
+                        ),
                         filled: true,
                         fillColor: Colors.white.withOpacity(0.05),
                         enabledBorder: OutlineInputBorder(
                           borderRadius: BorderRadius.circular(12),
-                          borderSide: BorderSide(color: Colors.white.withOpacity(0.1)),
+                          borderSide: BorderSide(
+                            color: Colors.white.withOpacity(0.1),
+                          ),
                         ),
                         focusedBorder: OutlineInputBorder(
                           borderRadius: BorderRadius.circular(12),
-                          borderSide: const BorderSide(color: Colors.blueAccent),
+                          borderSide: const BorderSide(
+                            color: Colors.blueAccent,
+                          ),
                         ),
                       ),
                     ),
                   ),
                   const SizedBox(height: 16),
-                  
+
                   // Password Field
                   Container(
                     decoration: BoxDecoration(
@@ -147,23 +147,30 @@ class LoginPage extends StatelessWidget {
                       decoration: InputDecoration(
                         labelText: "Password",
                         labelStyle: const TextStyle(color: Colors.white38),
-                        prefixIcon: const Icon(Icons.lock, color: Colors.blueAccent),
+                        prefixIcon: const Icon(
+                          Icons.lock,
+                          color: Colors.blueAccent,
+                        ),
                         filled: true,
                         fillColor: Colors.white.withOpacity(0.05),
                         enabledBorder: OutlineInputBorder(
                           borderRadius: BorderRadius.circular(12),
-                          borderSide: BorderSide(color: Colors.white.withOpacity(0.1)),
+                          borderSide: BorderSide(
+                            color: Colors.white.withOpacity(0.1),
+                          ),
                         ),
                         focusedBorder: OutlineInputBorder(
                           borderRadius: BorderRadius.circular(12),
-                          borderSide: const BorderSide(color: Colors.blueAccent),
+                          borderSide: const BorderSide(
+                            color: Colors.blueAccent,
+                          ),
                         ),
                       ),
                     ),
                   ),
-                  
+
                   const SizedBox(height: 8),
-                  
+
                   // Forgot password link
                   Align(
                     alignment: Alignment.centerRight,
@@ -175,9 +182,9 @@ class LoginPage extends StatelessWidget {
                       child: const Text("Forgot password?"),
                     ),
                   ),
-                  
+
                   const SizedBox(height: 20),
-                  
+
                   // Login Button
                   SizedBox(
                     width: double.infinity,
@@ -185,7 +192,7 @@ class LoginPage extends StatelessWidget {
                       onPressed: () async {
                         final email = emailController.text.trim();
                         final password = passwordController.text.trim();
-                        
+
                         if (email.isEmpty || password.isEmpty) {
                           ScaffoldMessenger.of(context).showSnackBar(
                             const SnackBar(
@@ -195,8 +202,11 @@ class LoginPage extends StatelessWidget {
                           );
                           return;
                         }
-                        
-                        final error = await authProvider.signIn(email, password);
+
+                        final error = await authProvider.signIn(
+                          email,
+                          password,
+                        );
                         if (error != null && context.mounted) {
                           ScaffoldMessenger.of(context).showSnackBar(
                             SnackBar(
@@ -225,46 +235,56 @@ class LoginPage extends StatelessWidget {
                       ),
                     ),
                   ),
-                  
+
                   const SizedBox(height: 16),
-                  
+
                   // Divider
                   Row(
                     children: [
-                      Expanded(child: Divider(color: Colors.white.withOpacity(0.2))),
+                      Expanded(
+                        child: Divider(color: Colors.white.withOpacity(0.2)),
+                      ),
                       Padding(
                         padding: const EdgeInsets.symmetric(horizontal: 16),
                         child: Text(
                           "OR",
-                          style: TextStyle(color: Colors.white.withOpacity(0.4), fontSize: 12),
+                          style: TextStyle(
+                            color: Colors.white.withOpacity(0.4),
+                            fontSize: 12,
+                          ),
                         ),
                       ),
-                      Expanded(child: Divider(color: Colors.white.withOpacity(0.2))),
+                      Expanded(
+                        child: Divider(color: Colors.white.withOpacity(0.2)),
+                      ),
                     ],
                   ),
-                  
+
                   const SizedBox(height: 16),
-                  
+
                   // Google Sign-In Button
                   SizedBox(
                     width: double.infinity,
                     child: OutlinedButton.icon(
                       onPressed: () async {
-                        final success = await authProvider.signInWithGoogle();
-                        if (!success && context.mounted) {
+                        final error = await authProvider.signInWithGoogle();
+                        if (error != null && context.mounted) {
                           ScaffoldMessenger.of(context).showSnackBar(
-                            const SnackBar(
-                              content: Text("Google Sign-In failed or cancelled"),
+                            SnackBar(
+                              content: Text(error),
                               backgroundColor: Colors.red,
                             ),
                           );
                         }
                       },
-                      icon: const Text("G", style: TextStyle(
-                        fontSize: 20, 
-                        fontWeight: FontWeight.bold, 
-                        color: Colors.white,
-                      )),
+                      icon: const Text(
+                        "G",
+                        style: TextStyle(
+                          fontSize: 20,
+                          fontWeight: FontWeight.bold,
+                          color: Colors.white,
+                        ),
+                      ),
                       label: const Text(
                         "Sign in with Google",
                         style: TextStyle(
@@ -282,9 +302,9 @@ class LoginPage extends StatelessWidget {
                       ),
                     ),
                   ),
-                  
+
                   const SizedBox(height: 20),
-                  
+
                   // Registration link
                   Row(
                     mainAxisAlignment: MainAxisAlignment.center,
@@ -297,7 +317,9 @@ class LoginPage extends StatelessWidget {
                         onPressed: () {
                           Navigator.push(
                             context,
-                            MaterialPageRoute(builder: (_) => const RegisterPage()),
+                            MaterialPageRoute(
+                              builder: (_) => const RegisterPage(),
+                            ),
                           );
                         },
                         style: TextButton.styleFrom(
@@ -307,9 +329,9 @@ class LoginPage extends StatelessWidget {
                       ),
                     ],
                   ),
-                  
+
                   const SizedBox(height: 20),
-                  
+
                   // Language selector with flags
                   Container(
                     padding: const EdgeInsets.all(12),
@@ -320,25 +342,57 @@ class LoginPage extends StatelessWidget {
                     child: Row(
                       mainAxisAlignment: MainAxisAlignment.center,
                       children: [
-                        const Icon(Icons.language, color: Colors.blueAccent, size: 20),
+                        const Icon(
+                          Icons.language,
+                          color: Colors.blueAccent,
+                          size: 20,
+                        ),
                         const SizedBox(width: 12),
                         Consumer<LocaleProvider>(
                           builder: (context, localeProvider, child) {
                             return DropdownButton<Locale>(
                               value: localeProvider.locale,
                               dropdownColor: const Color(0xFF0F172A),
-                              icon: const Icon(Icons.arrow_drop_down, color: Colors.blueAccent),
+                              icon: const Icon(
+                                Icons.arrow_drop_down,
+                                color: Colors.blueAccent,
+                              ),
                               onChanged: (Locale? newLocale) {
                                 if (newLocale != null) {
                                   localeProvider.setLocale(newLocale);
                                 }
                               },
                               items: [
-                                _buildDropdownItem('en', 'US', 'English', '🇬🇧'),
-                                _buildDropdownItem('it', 'IT', 'Italiano', '🇮🇹'),
-                                _buildDropdownItem('es', 'ES', 'Español', '🇪🇸'),
-                                _buildDropdownItem('de', 'DE', 'Deutsch', '🇩🇪'),
-                                _buildDropdownItem('fr', 'FR', 'Français', '🇫🇷'),
+                                _buildDropdownItem(
+                                  'en',
+                                  'US',
+                                  'English',
+                                  '🇬🇧',
+                                ),
+                                _buildDropdownItem(
+                                  'it',
+                                  'IT',
+                                  'Italiano',
+                                  '🇮🇹',
+                                ),
+                                _buildDropdownItem(
+                                  'es',
+                                  'ES',
+                                  'Español',
+                                  '🇪🇸',
+                                ),
+                                _buildDropdownItem(
+                                  'de',
+                                  'DE',
+                                  'Deutsch',
+                                  '🇩🇪',
+                                ),
+                                _buildDropdownItem(
+                                  'fr',
+                                  'FR',
+                                  'Français',
+                                  '🇫🇷',
+                                ),
                               ],
                             );
                           },
@@ -356,10 +410,10 @@ class LoginPage extends StatelessWidget {
   }
 
   DropdownMenuItem<Locale> _buildDropdownItem(
-    String languageCode, 
-    String countryCode, 
-    String name, 
-    String flag
+    String languageCode,
+    String countryCode,
+    String name,
+    String flag,
   ) {
     return DropdownMenuItem(
       value: Locale(languageCode, countryCode),
@@ -376,7 +430,7 @@ class LoginPage extends StatelessWidget {
   // Password reset dialog
   void _showResetPasswordDialog(BuildContext context) {
     final emailController = TextEditingController();
-    
+
     showDialog(
       context: context,
       builder: (ctx) => AlertDialog(
@@ -418,7 +472,10 @@ class LoginPage extends StatelessWidget {
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(ctx),
-            child: const Text("Cancel", style: TextStyle(color: Colors.white38)),
+            child: const Text(
+              "Cancel",
+              style: TextStyle(color: Colors.white38),
+            ),
           ),
           ElevatedButton(
             onPressed: () => _resetPassword(context, emailController.text, ctx),
@@ -434,9 +491,9 @@ class LoginPage extends StatelessWidget {
   }
 
   void _resetPassword(
-    BuildContext context, 
-    String email, 
-    BuildContext dialogContext
+    BuildContext context,
+    String email,
+    BuildContext dialogContext,
   ) async {
     if (email.isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(
@@ -449,9 +506,21 @@ class LoginPage extends StatelessWidget {
     }
 
     try {
-      await FirebaseAuth.instance.sendPasswordResetEmail(email: email);
+      // 🔥 ActionCodeSettings per il reset password con dominio corretto
+      final actionCodeSettings = ActionCodeSettings(
+        url: 'https://web-tawny-iota-87.vercel.app/reset-password',
+        handleCodeInApp: true,
+        iOSBundleId: 'com.example.smartcharge_v2',
+        androidPackageName: 'com.example.smartcharge_v2',
+        androidInstallApp: true,
+      );
+
+      await FirebaseAuth.instance.sendPasswordResetEmail(
+        email: email,
+        actionCodeSettings: actionCodeSettings,
+      );
       Navigator.pop(dialogContext);
-      
+
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
           content: Text("Reset link sent to $email"),
@@ -465,8 +534,10 @@ class LoginPage extends StatelessWidget {
         message = "No user found with this email";
       } else if (e.code == 'invalid-email') {
         message = "Invalid email format";
+      } else if (e.code == 'invalid-action-code') {
+        message = "The action code is invalid or expired";
       }
-      
+
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(content: Text(message), backgroundColor: Colors.red),
       );

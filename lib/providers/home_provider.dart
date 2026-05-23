@@ -22,18 +22,20 @@ class HomeProvider extends ChangeNotifier {
   double lastSavedEnergy = 0.0;
   double lastSavedCost = 0.0;
   TimeOfDay readyTime = const TimeOfDay(hour: 7, minute: 0);
-  
+
   late CarModel selectedCar;
   List<CarModel> allCars = [];
   bool carsLoaded = false;
   final capacityController = TextEditingController();
   List<ChargeSession> chargeHistory = [];
   static const String KEY_SOC_INIZIALE_CONGELATO = 'soc_iniziale_congelato';
-  static const String KEY_TIMESTAMP_INIZIO_CONGELATO = 'timestamp_inizio_congelato';
+  static const String KEY_TIMESTAMP_INIZIO_CONGELATO =
+      'timestamp_inizio_congelato';
   static const String KEY_FROZEN_START_TIME = 'frozen_start_time';
-  
+
   final SimulationService simService = SimulationService();
   bool isSimulating = false;
+  bool manualStartMode = false;
   bool _showCompletionDialog = false;
   bool _isSavingCompletion = false;
   bool _showErrorDialog = false;
@@ -92,37 +94,44 @@ class HomeProvider extends ChangeNotifier {
 
   String getSmartBatteryAdvice([AppLocalizations? l10n]) {
     final t = l10n;
-    
+
     if (chargeHistory.isEmpty) {
-      return t?.batteryAdviceEmpty ?? "Inizia a caricare per ricevere consigli basati sul tuo stile di guida.";
+      return t?.batteryAdviceEmpty ??
+          "Inizia a caricare per ricevere consigli basati sul tuo stile di guida.";
     }
 
     final ora = DateTime.now();
-    
+
     if (_batteryChemistry == "LFP") {
-      bool haCaricatoAl100Recentemente = chargeHistory.any((s) => 
-        s.endSoc >= 99 && ora.difference(s.date).inDays <= 7
+      bool haCaricatoAl100Recentemente = chargeHistory.any(
+        (s) => s.endSoc >= 99 && ora.difference(s.date).inDays <= 7,
       );
 
       if (!haCaricatoAl100Recentemente) {
-        return t?.batteryAdviceLfp ?? "⚠️ Non carichi al 100% da più di una settimana. Fallo stasera per allineare le celle (BMS).";
+        return t?.batteryAdviceLfp ??
+            "⚠️ Non carichi al 100% da più di una settimana. Fallo stasera per allineare le celle (BMS).";
       }
-      return t?.batteryAdviceLfpGood ?? "✅ Batteria ben calibrata. Mantieni il target tra 20-80% per il resto della settimana.";
+      return t?.batteryAdviceLfpGood ??
+          "✅ Batteria ben calibrata. Mantieni il target tra 20-80% per il resto della settimana.";
     }
 
     if (_batteryChemistry == "NMC / NCA") {
-      int caricheEccessive = chargeHistory.where((s) => 
-        s.endSoc > 85 && ora.difference(s.date).inDays <= 30
-      ).length;
+      int caricheEccessive = chargeHistory
+          .where((s) => s.endSoc > 85 && ora.difference(s.date).inDays <= 30)
+          .length;
 
       if (caricheEccessive > 4) {
-        String message = t?.batteryAdviceNmc ?? "⚠️ Hai caricato oltre l'80% ben %d volte nell'ultimo mese. Cerca di limitarlo per ridurre il degrado.";
+        String message =
+            t?.batteryAdviceNmc ??
+            "⚠️ Hai caricato oltre l'80% ben %d volte nell'ultimo mese. Cerca di limitarlo per ridurre il degrado.";
         return message.replaceAll('%d', caricheEccessive.toString());
       }
-      return t?.batteryAdviceNmcGood ?? "✅ Ottima gestione: stai preservando la chimica al nichel limitando i picchi di carica.";
+      return t?.batteryAdviceNmcGood ??
+          "✅ Ottima gestione: stai preservando la chimica al nichel limitando i picchi di carica.";
     }
 
-    return t?.batteryAdviceGeneric ?? "Mantieni la carica tra 20-80% per una longevità ottimale.";
+    return t?.batteryAdviceGeneric ??
+        "Mantieni la carica tra 20-80% per una longevità ottimale.";
   }
 
   // --- GESTIONE PROFILO ---
@@ -130,26 +139,29 @@ class HomeProvider extends ChangeNotifier {
     _globalUserName = nuovoNome;
     final prefs = await SharedPreferences.getInstance();
     await prefs.setString('global_user_name', nuovoNome);
-    
+
     final String? userId = prefs.getString('user_sync_id');
     if (userId != null && userId.isNotEmpty) {
       await SyncService().uploadData(
-        userId, 
-        chargeHistory, 
-        allContracts, 
-        activeContractId, 
-        _globalUserName
+        userId,
+        chargeHistory,
+        allContracts,
+        activeContractId,
+        _globalUserName,
       );
     }
-    notifyListeners(); 
+    notifyListeners();
   }
-  
+
   // Getter per ottenere il contratto attivo corrente
   EnergyContract get myContract {
-    if (allContracts.isEmpty) return EnergyContract(id: 'default', contractName: 'Contratto Base');
+    if (allContracts.isEmpty)
+      return EnergyContract(id: 'default', contractName: 'Contratto Base');
     return allContracts.firstWhere(
       (c) => c.id == activeContractId,
-      orElse: () => allContracts.isNotEmpty ? allContracts.first : EnergyContract(id: 'default', contractName: 'Contratto Base'),
+      orElse: () => allContracts.isNotEmpty
+          ? allContracts.first
+          : EnergyContract(id: 'default', contractName: 'Contratto Base'),
     );
   }
 
@@ -165,10 +177,12 @@ class HomeProvider extends ChangeNotifier {
   static const String KEY_SIM_START = 'simulation_start';
   static const String KEY_SIM_END = 'simulation_end';
   static const String KEY_SIM_START_SOC = 'simulation_start_soc';
+  static const String KEY_SIM_CURRENT_SOC = 'simulation_current_soc';
+  static const String KEY_MANUAL_START_MODE = 'manual_start_mode';
 
   // --- COSTRUTTORE ---
   HomeProvider() {
-    currentSoc = -1.0; 
+    currentSoc = -1.0;
     _socAtStartOfSim = -1.0;
     carsLoaded = false;
 
@@ -198,45 +212,51 @@ class HomeProvider extends ChangeNotifier {
   Future<void> _handleSimulationCompletion() async {
     _isSavingCompletion = true;
     notifyListeners();
-    
+
     final double socIniziale = _socAtStartOfSim;
     final double socFinale = currentSoc;
     final double capacita = currentBatteryCap;
-    
+
     if (socIniziale < currentSoc) {
-      final kwhEffettivi = ChargeEngine.calculateEnergy(socIniziale, socFinale, capacita);
+      final kwhEffettivi = ChargeEngine.calculateEnergy(
+        socIniziale,
+        socFinale,
+        capacita,
+      );
       final costoCalcolato = CostCalculator.calculate(
         totalKwh: kwhEffettivi,
         wallboxPower: wallboxPwr,
-        startTime: TimeOfDay.fromDateTime(simService.scheduledStart ?? DateTime.now()),
+        startTime: TimeOfDay.fromDateTime(
+          simService.scheduledStart ?? DateTime.now(),
+        ),
         date: DateTime.now(),
         contract: myContract,
       );
-      
+
       lastSavedEnergy = kwhEffettivi;
       lastSavedCost = costoCalcolato;
     }
-    
+
     _showCompletionDialog = true;
     _isSavingCompletion = false;
     _clearSimulationProgress();
     notifyListeners();
   }
-  
+
   Future<void> init() async {
     try {
       debugPrint("🚀 INIT: Inizio caricamento HomeProvider");
-      
+
       _isInitializing = true;
       _initProgress = 0.0;
       _initMessage = "Avvio applicazione...";
       notifyListeners();
-      
+
       _initProgress = 0.2;
       _initMessage = "Caricamento parametri...";
       notifyListeners();
-      await _loadSimulationParameters(); 
-      
+      await _loadSimulationParameters();
+
       if (currentSoc == -1.0) {
         currentSoc = 20.0;
         _socAtStartOfSim = 20.0;
@@ -245,42 +265,48 @@ class HomeProvider extends ChangeNotifier {
       _initProgress = 0.4;
       _initMessage = "Caricamento modelli auto...";
       notifyListeners();
-      await _loadCarsFromJson();  
-      
+      await _loadCarsFromJson();
+
       _initProgress = 0.6;
       _initMessage = "Preparazione interfaccia...";
       carsLoaded = true;
       notifyListeners();
-      
+
       _initProgress = 0.8;
       _initMessage = "Caricamento dati aggiuntivi...";
       _initSubMessage = "Questo potrebbe richiedere qualche secondo";
       notifyListeners();
-      
+
       WidgetsBinding.instance.addPostFrameCallback((_) {
         _loadSecondaryData();
       });
-      
+
       _initProgress = 0.9;
       _initMessage = "Quasi pronto...";
       notifyListeners();
-      
+
       Future.delayed(const Duration(seconds: 10), () {
         if (_isInitializing) {
-          debugPrint("⏱️ Timeout caricamento secondario, forzo visualizzazione");
+          debugPrint(
+            "⏱️ Timeout caricamento secondario, forzo visualizzazione",
+          );
           _isInitializing = false;
           notifyListeners();
         }
       });
-      
+
       debugPrint("🚀 INIT: Completato con successo");
     } catch (e, stackTrace) {
       debugPrint("❌❌❌ ERRORE GRAVE IN INIT: $e");
       debugPrint("❌❌❌ STACKTRACE: $stackTrace");
-      
+
       if (currentSoc == -1.0) currentSoc = 20.0;
       if (allCars.isEmpty) {
-        selectedCar = CarModel(brand: "Default", model: "EV", batteryCapacity: 50.0);
+        selectedCar = CarModel(
+          brand: "Default",
+          model: "EV",
+          batteryCapacity: 50.0,
+        );
       }
       _isInitializing = false;
       carsLoaded = true;
@@ -291,13 +317,13 @@ class HomeProvider extends ChangeNotifier {
   Future<void> _loadSecondaryData() async {
     try {
       debugPrint("🔄 Caricamento dati secondari in background...");
-      
+
       await loadBatteryConfig();
-      await _loadContract(); 
-      await _loadHistory(); 
+      await _loadContract();
+      await _loadHistory();
       await _loadSimulationProgress();
       _startBackgroundSync();
-      
+
       debugPrint("✅ Dati secondari caricati");
     } catch (e) {
       debugPrint("❌ Errore caricamento dati secondari: $e");
@@ -306,26 +332,30 @@ class HomeProvider extends ChangeNotifier {
 
   void _recuperaRicaricaTerminataOffline(DateTime inizioReale, DateTime end) {
     debugPrint("🔄 Eseguo recupero offline in post-init...");
-    
+
     try {
       if (selectedCar.batteryCapacity <= 0) {
-        debugPrint("⚠️ Dati auto non ancora caricati, impossibile recuperare - riprovo tra 1 secondo");
+        debugPrint(
+          "⚠️ Dati auto non ancora caricati, impossibile recuperare - riprovo tra 1 secondo",
+        );
         Future.delayed(const Duration(seconds: 1), () {
           _recuperaRicaricaTerminataOffline(inizioReale, end);
         });
         return;
       }
-      
-      debugPrint("🔄 Calcolo kWh con: socIniziale=$_socAtStartOfSim, target=$targetSoc, capacita=$currentBatteryCap");
-      
-      final double kwhEffettivi = ChargeEngine.calculateEnergy(
-        _socAtStartOfSim, 
-        targetSoc, 
-        currentBatteryCap
+
+      debugPrint(
+        "🔄 Calcolo kWh con: socIniziale=$_socAtStartOfSim, target=$targetSoc, capacita=$currentBatteryCap",
       );
-      
+
+      final double kwhEffettivi = ChargeEngine.calculateEnergy(
+        _socAtStartOfSim,
+        targetSoc,
+        currentBatteryCap,
+      );
+
       debugPrint("🔄 kWh calcolati: $kwhEffettivi");
-      
+
       final double costoCalcolato = CostCalculator.calculate(
         totalKwh: kwhEffettivi,
         wallboxPower: wallboxPwr,
@@ -337,7 +367,7 @@ class HomeProvider extends ChangeNotifier {
       debugPrint("🔄 Costo calcolato: $costoCalcolato");
 
       final session = ChargeSession(
-        id: "CHG_${DateTime.now().millisecondsSinceEpoch}", 
+        id: "CHG_${DateTime.now().millisecondsSinceEpoch}",
         date: DateTime.now(),
         startDateTime: inizioReale,
         endDateTime: DateTime.now(),
@@ -361,23 +391,23 @@ class HomeProvider extends ChangeNotifier {
         f2PriceAtTime: myContract.f2Price,
         f3PriceAtTime: myContract.f3Price,
       );
-      
+
       chargeHistory.add(session);
       saveHistory();
-      
+
       currentSoc = targetSoc;
       lastSavedEnergy = kwhEffettivi;
       lastSavedCost = costoCalcolato;
       _showCompletionDialog = true;
-      
+
       NotificationService().showChargingCompleteNotification(
         socFinale: targetSoc,
         energia: kwhEffettivi,
         durata: end.difference(inizioReale),
       );
-      
+
       notifyListeners();
-      
+
       debugPrint("✅ Recupero offline completato con successo");
     } catch (e, stackTrace) {
       debugPrint("❌❌❌ Errore nel recupero offline: $e");
@@ -395,7 +425,7 @@ class HomeProvider extends ChangeNotifier {
   Future<void> _syncFromCloudBackground() async {
     final prefs = await SharedPreferences.getInstance();
     final userId = prefs.getString('user_sync_id');
-    
+
     if (userId != null && userId.isNotEmpty) {
       try {
         final cloudData = await SyncService().downloadAllData(userId);
@@ -417,39 +447,52 @@ class HomeProvider extends ChangeNotifier {
     double? f3,
   }) {
     final index = allContracts.indexWhere((c) => c.id == activeContractId);
-    
+
     if (index != -1) {
       allContracts[index].provider = provider;
       allContracts[index].isMonorario = isMonorario;
       allContracts[index].f1Price = f1;
       allContracts[index].f2Price = isMonorario ? f1 : (f2 ?? f1);
       allContracts[index].f3Price = isMonorario ? f1 : (f3 ?? f1);
-      saveAllContracts(); 
+      saveAllContracts();
     }
   }
 
   // --- CALCOLI ---
-  double get currentBatteryCap => double.tryParse(capacityController.text) ?? (carsLoaded ? selectedCar.batteryCapacity : 50.0);
-  double get energyNeeded => ChargeEngine.calculateEnergy(currentSoc, targetSoc, currentBatteryCap);
-  Duration get duration => ChargeEngine.calculateDuration(energyNeeded, wallboxPwr);
+  double get currentBatteryCap =>
+      double.tryParse(capacityController.text) ??
+      (carsLoaded ? selectedCar.batteryCapacity : 50.0);
+  double get energyNeeded =>
+      ChargeEngine.calculateEnergy(currentSoc, targetSoc, currentBatteryCap);
+  Duration get duration =>
+      ChargeEngine.calculateDuration(energyNeeded, wallboxPwr);
 
   DateTime get targetReadyDateTime {
     final now = DateTime.now();
-    DateTime target = DateTime(now.year, now.month, now.day, readyTime.hour, readyTime.minute);
+    DateTime target = DateTime(
+      now.year,
+      now.month,
+      now.day,
+      readyTime.hour,
+      readyTime.minute,
+    );
     if (target.isBefore(now)) target = target.add(const Duration(days: 1));
     return target;
   }
 
-  DateTime get calculatedStartDateTime => targetReadyDateTime.subtract(duration);
-  
+  DateTime get calculatedStartDateTime =>
+      targetReadyDateTime.subtract(duration);
+
   String get startTimeDisplay {
     if (_frozenStartTime != null) {
       return DateFormat('HH:mm').format(_frozenStartTime!);
     }
     return DateFormat('HH:mm').format(calculatedStartDateTime);
   }
-  
-  bool get isChargingReal => isSimulating && DateTime.now().isAfter(simService.scheduledStart ?? DateTime.now());
+
+  bool get isChargingReal =>
+      isSimulating &&
+      DateTime.now().isAfter(simService.scheduledStart ?? DateTime.now());
 
   double get estimatedCost {
     final startTimeOfDay = TimeOfDay.fromDateTime(calculatedStartDateTime);
@@ -462,16 +505,26 @@ class HomeProvider extends ChangeNotifier {
     );
   }
 
+  double get simulationStartSoc {
+    return _socAtStartOfSim >= 0 ? _socAtStartOfSim : currentSoc;
+  }
+
   // --- AZIONI SIMULAZIONE ---
   void startSimulation() {
     _socAtStartOfSim = currentSoc;
-    _frozenStartTime = calculatedStartDateTime;
+    final now = DateTime.now();
+
+    DateTime startTime;
+    if (manualStartMode) {
+      startTime = now;
+      _frozenStartTime = now;
+    } else {
+      _frozenStartTime = calculatedStartDateTime;
+      startTime = _frozenStartTime!;
+      if (startTime.isBefore(now)) startTime = now;
+    }
 
     _clearSimulationProgress().then((_) async {
-      DateTime startTime = _frozenStartTime!;
-      final now = DateTime.now();
-      if (startTime.isBefore(now)) startTime = now;
-
       simService.initSimulation(
         startDateTime: startTime,
         currentSoc: _socAtStartOfSim,
@@ -495,14 +548,24 @@ class HomeProvider extends ChangeNotifier {
       );
 
       isSimulating = true;
-      
+
       final prefs = await SharedPreferences.getInstance();
       await prefs.setDouble(KEY_SOC_INIZIALE_CONGELATO, _socAtStartOfSim);
-      await prefs.setInt(KEY_TIMESTAMP_INIZIO_CONGELATO, startTime.millisecondsSinceEpoch);
-      
+      await prefs.setInt(
+        KEY_TIMESTAMP_INIZIO_CONGELATO,
+        startTime.millisecondsSinceEpoch,
+      );
+
       _saveSimulationProgress();
       notifyListeners();
     });
+  }
+
+  void toggleManualStartMode() {
+    if (isSimulating) return;
+    manualStartMode = !manualStartMode;
+    _saveSimulationParameters();
+    notifyListeners();
   }
 
   Future<void> loadBatteryConfig() async {
@@ -514,7 +577,7 @@ class HomeProvider extends ChangeNotifier {
   void stopSimulation() {
     _frozenStartTime = null;
     simService.stopSimulation();
-    NotificationService().cancelAllNotifications(); 
+    NotificationService().cancelAllNotifications();
     isSimulating = false;
     _clearSimulationProgress();
     _saveSimulationParameters();
@@ -551,14 +614,18 @@ class HomeProvider extends ChangeNotifier {
       final double socIniziale = _socAtStartOfSim;
       final double socFinale = currentSoc;
       final double capacita = currentBatteryCap;
-      
+
       if (socIniziale < 0 || socFinale < 0 || capacita <= 0) {
         _saveError = "Dati non validi";
         return false;
       }
-      
-      final kwhEffettivi = ChargeEngine.calculateEnergy(socIniziale, socFinale, capacita);
-      
+
+      final kwhEffettivi = ChargeEngine.calculateEnergy(
+        socIniziale,
+        socFinale,
+        capacita,
+      );
+
       if (kwhEffettivi <= 0.05) {
         _saveError = "Energia troppo bassa";
         _saveProgress = 0;
@@ -591,7 +658,7 @@ class HomeProvider extends ChangeNotifier {
       );
 
       final session = ChargeSession(
-        id: "CHG_${now.millisecondsSinceEpoch}_${now.microsecond}", 
+        id: "CHG_${now.millisecondsSinceEpoch}_${now.microsecond}",
         date: now,
         startDateTime: simService.scheduledStart ?? now,
         endDateTime: now,
@@ -615,30 +682,30 @@ class HomeProvider extends ChangeNotifier {
         f2PriceAtTime: contrattoAttivo.f2Price,
         f3PriceAtTime: contrattoAttivo.f3Price,
       );
-      
+
       chargeHistory.add(session);
 
       _saveStep = "Salvataggio su dispositivo...";
       _saveProgress = 50;
       notifyListeners();
       await Future.delayed(const Duration(milliseconds: 300));
-      
+
       await saveHistory();
 
       _saveStep = "Sincronizzazione con Cloud...";
       _saveProgress = 75;
       notifyListeners();
-      
+
       final prefs = await SharedPreferences.getInstance();
       final userId = prefs.getString('user_sync_id');
-      
+
       if (userId != null && userId.isNotEmpty) {
         await SyncService().uploadData(
-          userId, 
-          chargeHistory, 
-          allContracts, 
-          activeContractId, 
-          _globalUserName
+          userId,
+          chargeHistory,
+          allContracts,
+          activeContractId,
+          _globalUserName,
         );
       }
 
@@ -650,17 +717,18 @@ class HomeProvider extends ChangeNotifier {
       lastSavedEnergy = kwhEffettivi;
       lastSavedCost = costoCalcolato;
       _socAtStartOfSim = currentSoc;
-      
+
       _saveStep = "Completato!";
       _saveProgress = 100;
       _saveSuccess = true;
       notifyListeners();
-      
+
       await Future.delayed(const Duration(seconds: 1));
-      
-      debugPrint("✅ Ricarica salvata: ${kwhEffettivi.toStringAsFixed(2)} kWh, ${costoCalcolato.toStringAsFixed(2)} €");
+
+      debugPrint(
+        "✅ Ricarica salvata: ${kwhEffettivi.toStringAsFixed(2)} kWh, ${costoCalcolato.toStringAsFixed(2)} €",
+      );
       return true;
-      
     } catch (e, stackTrace) {
       _saveError = "Errore: $e";
       _saveProgress = 0;
@@ -677,15 +745,22 @@ class HomeProvider extends ChangeNotifier {
   Future<bool> saveHistory() async {
     try {
       final prefs = await SharedPreferences.getInstance();
-      final String jsonData = jsonEncode(chargeHistory.map((s) => s.toJson()).toList());
-      
+      final String jsonData = jsonEncode(
+        chargeHistory.map((s) => s.toJson()).toList(),
+      );
+
       bool success = await prefs.setString('charge_history', jsonData);
-      
+
       if (success) {
         final savedData = prefs.getString('charge_history');
         if (savedData == jsonData) {
-          await prefs.setInt('last_local_update', DateTime.now().millisecondsSinceEpoch);
-          debugPrint("💾 History salvata e VERIFICATA: ${chargeHistory.length} sessioni");
+          await prefs.setInt(
+            'last_local_update',
+            DateTime.now().millisecondsSinceEpoch,
+          );
+          debugPrint(
+            "💾 History salvata e VERIFICATA: ${chargeHistory.length} sessioni",
+          );
           return true;
         } else {
           debugPrint("⚠️ Verifica fallita: dato salvato non corrisponde");
@@ -706,32 +781,34 @@ class HomeProvider extends ChangeNotifier {
     final userId = prefs.getString('user_sync_id');
     if (userId != null && userId.isNotEmpty) {
       await SyncService().uploadData(
-        userId, 
-        chargeHistory, 
-        allContracts, 
-        activeContractId, 
-        _globalUserName
+        userId,
+        chargeHistory,
+        allContracts,
+        activeContractId,
+        _globalUserName,
       );
     }
   }
 
   Future<void> saveAllContracts() async {
     final prefs = await SharedPreferences.getInstance();
-    
+
     await prefs.setString('global_user_name', _globalUserName);
-    
-    final String jsonData = jsonEncode(allContracts.map((c) => c.toJson()).toList());
+
+    final String jsonData = jsonEncode(
+      allContracts.map((c) => c.toJson()).toList(),
+    );
     await prefs.setString(KEY_CONTRACTS_LIST, jsonData);
     await prefs.setString(KEY_ACTIVE_CONTRACT_ID, activeContractId);
 
     final userId = prefs.getString('user_sync_id');
-    if (userId != null && userId.isNotEmpty) { 
+    if (userId != null && userId.isNotEmpty) {
       await SyncService().uploadData(
-        userId, 
-        chargeHistory, 
-        allContracts, 
-        activeContractId, 
-        _globalUserName
+        userId,
+        chargeHistory,
+        allContracts,
+        activeContractId,
+        _globalUserName,
       );
     }
     notifyListeners();
@@ -753,7 +830,7 @@ class HomeProvider extends ChangeNotifier {
   }
 
   void deleteContract(String id) {
-    if (allContracts.length > 1) { 
+    if (allContracts.length > 1) {
       allContracts.removeWhere((c) => c.id == id);
       if (activeContractId == id) {
         activeContractId = allContracts.first.id;
@@ -769,26 +846,31 @@ class HomeProvider extends ChangeNotifier {
   }
 
   // --- PARAMETRI SIMULAZIONE ---
-  Future<void> salvaTuttiParametri() async { await _saveSimulationParameters(); }
+  Future<void> salvaTuttiParametri() async {
+    await _saveSimulationParameters();
+  }
 
   Future<void> _loadSimulationParameters() async {
     final prefs = await SharedPreferences.getInstance();
-    
+
     currentSoc = prefs.getDouble(KEY_SOC_INIZIALE) ?? 20.0;
-    _socAtStartOfSim = currentSoc; 
-    
+    _socAtStartOfSim = currentSoc;
+
     targetSoc = prefs.getDouble(KEY_SOC_TARGET) ?? 80.0;
     wallboxPwr = prefs.getDouble(KEY_WALLBOX_PWR) ?? 3.7;
-    
+    manualStartMode = prefs.getBool(KEY_MANUAL_START_MODE) ?? false;
+
     final h = prefs.getInt(KEY_READY_TIME_HOUR);
     final m = prefs.getInt(KEY_READY_TIME_MINUTE);
     if (h != null && m != null) {
       readyTime = TimeOfDay(hour: h, minute: m);
     }
-    
-    debugPrint("📥 Parametri caricati: SoC attuale $currentSoc%, StartSim: $_socAtStartOfSim%");
+
+    debugPrint(
+      "📥 Parametri caricati: SoC attuale $currentSoc%, StartSim: $_socAtStartOfSim%, Manuale: $manualStartMode",
+    );
   }
-  
+
   Future<void> _saveSimulationParameters() async {
     final prefs = await SharedPreferences.getInstance();
     await prefs.setDouble(KEY_SOC_INIZIALE, currentSoc);
@@ -796,30 +878,41 @@ class HomeProvider extends ChangeNotifier {
     await prefs.setDouble(KEY_WALLBOX_PWR, wallboxPwr);
     await prefs.setInt(KEY_READY_TIME_HOUR, readyTime.hour);
     await prefs.setInt(KEY_READY_TIME_MINUTE, readyTime.minute);
+    await prefs.setBool(KEY_MANUAL_START_MODE, manualStartMode);
   }
 
   Future<void> _saveSimulationProgress() async {
     if (!isSimulating) return;
     final prefs = await SharedPreferences.getInstance();
     await prefs.setBool(KEY_SIM_ACTIVE, true);
-    await prefs.setString(KEY_SIM_START, simService.scheduledStart?.toIso8601String() ?? '');
-    await prefs.setString(KEY_SIM_END, simService.endTime?.toIso8601String() ?? '');
+    await prefs.setString(
+      KEY_SIM_START,
+      simService.scheduledStart?.toIso8601String() ?? '',
+    );
+    await prefs.setString(
+      KEY_SIM_END,
+      simService.endTime?.toIso8601String() ?? '',
+    );
     await prefs.setDouble(KEY_SIM_START_SOC, _socAtStartOfSim);
+    await prefs.setDouble(KEY_SIM_CURRENT_SOC, currentSoc);
     if (_frozenStartTime != null) {
-      await prefs.setString(KEY_FROZEN_START_TIME, _frozenStartTime!.toIso8601String());
+      await prefs.setString(
+        KEY_FROZEN_START_TIME,
+        _frozenStartTime!.toIso8601String(),
+      );
     }
   }
 
   Future<void> _loadSimulationProgress() async {
     try {
       debugPrint("📂 _loadSimulationProgress: INIZIO");
-      
+
       await Future.any([
         _loadSimulationProgressInternal(),
         Future.delayed(const Duration(seconds: 3), () {
           debugPrint("⏱️ TIMEOUT _loadSimulationProgress, forzo uscita");
           return null;
-        })
+        }),
       ]);
     } catch (e) {
       debugPrint("❌ ERRORE TIMEOUT: $e");
@@ -833,31 +926,39 @@ class HomeProvider extends ChangeNotifier {
     if (!carsLoaded || selectedCar.batteryCapacity <= 0) {
       debugPrint("⚠️ Dati auto non pronti, rimando _loadSimulationProgress");
       await Future.delayed(const Duration(milliseconds: 300));
-      _loadSimulationProgressInternal();
+      await _loadSimulationProgressInternal();
       return;
     }
-    
+
     final prefs = await SharedPreferences.getInstance();
-    
+
     if (!(prefs.getBool(KEY_SIM_ACTIVE) ?? false)) {
       debugPrint("ℹ️ Nessun progresso da ripristinare.");
       return;
     }
 
     debugPrint("📂 Trovata simulazione attiva in SharedPreferences");
-    
+
     final String? startStr = prefs.getString(KEY_SIM_START);
     final String? endStr = prefs.getString(KEY_SIM_END);
     final double? savedStartSoc = prefs.getDouble(KEY_SIM_START_SOC);
-    
+
     final String? frozenStartStr = prefs.getString(KEY_FROZEN_START_TIME);
     if (frozenStartStr != null) {
       _frozenStartTime = DateTime.parse(frozenStartStr);
       debugPrint("📂 frozenStartTime ripristinato: $_frozenStartTime");
     }
-    
-    debugPrint("📂 startStr: $startStr, endStr: $endStr, savedStartSoc: $savedStartSoc");
-    
+
+    final double? savedCurrentSoc = prefs.getDouble(KEY_SIM_CURRENT_SOC);
+    if (savedCurrentSoc != null) {
+      currentSoc = savedCurrentSoc;
+      debugPrint("📂 currentSoc ripristinato da simulazione: $currentSoc");
+    }
+
+    debugPrint(
+      "📂 startStr: $startStr, endStr: $endStr, savedStartSoc: $savedStartSoc",
+    );
+
     if (startStr == null || endStr == null || savedStartSoc == null) {
       debugPrint("⚠️ Dati simulazione incompleti, pulisco...");
       await _clearSimulationProgress();
@@ -867,22 +968,32 @@ class HomeProvider extends ChangeNotifier {
     final start = DateTime.parse(startStr);
     final end = DateTime.parse(endStr);
     final now = DateTime.now();
-    
-    final double? socInizialeCongelato = prefs.getDouble(KEY_SOC_INIZIALE_CONGELATO);
-    final int? timestampInizioCongelato = prefs.getInt(KEY_TIMESTAMP_INIZIO_CONGELATO);
-    
-    debugPrint("📂 socInizialeCongelato: $socInizialeCongelato, timestampInizioCongelato: $timestampInizioCongelato");
-    
+
+    final double? socInizialeCongelato = prefs.getDouble(
+      KEY_SOC_INIZIALE_CONGELATO,
+    );
+    final int? timestampInizioCongelato = prefs.getInt(
+      KEY_TIMESTAMP_INIZIO_CONGELATO,
+    );
+
+    debugPrint(
+      "📂 socInizialeCongelato: $socInizialeCongelato, timestampInizioCongelato: $timestampInizioCongelato",
+    );
+
     _socAtStartOfSim = socInizialeCongelato ?? savedStartSoc;
-    final DateTime inizioReale = timestampInizioCongelato != null 
+    final DateTime inizioReale = timestampInizioCongelato != null
         ? DateTime.fromMillisecondsSinceEpoch(timestampInizioCongelato)
         : start;
-    
-    debugPrint("📂 _socAtStartOfSim: $_socAtStartOfSim, inizioReale: $inizioReale");
+
+    debugPrint(
+      "📂 _socAtStartOfSim: $_socAtStartOfSim, inizioReale: $inizioReale",
+    );
 
     if (now.isAfter(end)) {
-      debugPrint("🏁 Carica terminata offline. Pianifico salvataggio post-init...");
-      
+      debugPrint(
+        "🏁 Carica terminata offline. Pianifico salvataggio post-init...",
+      );
+
       if (selectedCar.batteryCapacity <= 0) {
         debugPrint("⚠️ Dati auto non ancora caricati, rimando recupero...");
         Future.delayed(const Duration(milliseconds: 500), () {
@@ -893,21 +1004,21 @@ class HomeProvider extends ChangeNotifier {
           _recuperaRicaricaTerminataOffline(inizioReale, end);
         });
       }
-      
+
       isSimulating = false;
       await _clearSimulationProgress();
       notifyListeners();
     } else {
       debugPrint("⚡ Ripristino simulazione attiva...");
-      
+
       if (selectedCar.batteryCapacity > 0) {
         simService.restoreSimulation(
           startDateTime: inizioReale,
-          endDateTime: end, 
+          endDateTime: end,
           currentSoc: _socAtStartOfSim,
-          targetSoc: targetSoc, 
-          pwr: wallboxPwr, 
-          cap: currentBatteryCap
+          targetSoc: targetSoc,
+          pwr: wallboxPwr,
+          cap: currentBatteryCap,
         );
         isSimulating = true;
       } else {
@@ -916,11 +1027,11 @@ class HomeProvider extends ChangeNotifier {
           if (selectedCar.batteryCapacity > 0) {
             simService.restoreSimulation(
               startDateTime: inizioReale,
-              endDateTime: end, 
+              endDateTime: end,
               currentSoc: _socAtStartOfSim,
-              targetSoc: targetSoc, 
-              pwr: wallboxPwr, 
-              cap: currentBatteryCap
+              targetSoc: targetSoc,
+              pwr: wallboxPwr,
+              cap: currentBatteryCap,
             );
             isSimulating = true;
             notifyListeners();
@@ -929,7 +1040,7 @@ class HomeProvider extends ChangeNotifier {
       }
       notifyListeners();
     }
-    
+
     debugPrint("📂 _loadSimulationProgress: FINE");
   }
 
@@ -939,6 +1050,7 @@ class HomeProvider extends ChangeNotifier {
     await prefs.remove(KEY_SIM_START);
     await prefs.remove(KEY_SIM_END);
     await prefs.remove(KEY_SIM_START_SOC);
+    await prefs.remove(KEY_SIM_CURRENT_SOC);
     await prefs.remove(KEY_SOC_INIZIALE_CONGELATO);
     await prefs.remove(KEY_TIMESTAMP_INIZIO_CONGELATO);
     await prefs.remove(KEY_FROZEN_START_TIME);
@@ -952,26 +1064,34 @@ class HomeProvider extends ChangeNotifier {
     final prefs = await SharedPreferences.getInstance();
     final b = prefs.getString('selected_car_brand');
     final m = prefs.getString('selected_car_model');
-    selectedCar = allCars.firstWhere((c) => c.brand == b && c.model == m, orElse: () => allCars.first);
+    selectedCar = allCars.firstWhere(
+      (c) => c.brand == b && c.model == m,
+      orElse: () => allCars.first,
+    );
     capacityController.text = selectedCar.batteryCapacity.toString();
     carsLoaded = true;
   }
 
   Future<void> _loadContract() async {
     final prefs = await SharedPreferences.getInstance();
-    
+
     _globalUserName = prefs.getString('global_user_name') ?? "Utente";
 
     final String? listData = prefs.getString(KEY_CONTRACTS_LIST);
     if (listData != null) {
       final List<dynamic> decoded = jsonDecode(listData);
-      allContracts = decoded.map((item) => EnergyContract.fromJson(item)).toList();
+      allContracts = decoded
+          .map((item) => EnergyContract.fromJson(item))
+          .toList();
     }
-    
+
     activeContractId = prefs.getString(KEY_ACTIVE_CONTRACT_ID) ?? "";
 
     if (allContracts.isEmpty) {
-      final defaultContract = EnergyContract(id: 'def_1', contractName: 'Principale');
+      final defaultContract = EnergyContract(
+        id: 'def_1',
+        contractName: 'Principale',
+      );
       allContracts.add(defaultContract);
       activeContractId = defaultContract.id;
     }
@@ -982,7 +1102,7 @@ class HomeProvider extends ChangeNotifier {
     try {
       final prefs = await SharedPreferences.getInstance();
       final data = prefs.getString('charge_history');
-      
+
       if (data == null || data.isEmpty) {
         debugPrint("📂 Cronologia vuota o inesistente.");
         chargeHistory = [];
@@ -992,7 +1112,6 @@ class HomeProvider extends ChangeNotifier {
       final List<dynamic> list = jsonDecode(data);
       chargeHistory = list.map((e) => ChargeSession.fromJson(e)).toList();
       debugPrint("✅ Cronologia caricata: ${chargeHistory.length} sessioni.");
-      
     } catch (e) {
       debugPrint("❌ ERRORE FATALE CARICAMENTO HISTORY (File corrotto?): $e");
       chargeHistory = [];
@@ -1000,25 +1119,30 @@ class HomeProvider extends ChangeNotifier {
       await prefs.remove('charge_history');
     }
   }
-  
+
   // --- SYNC DOWNLOAD ---
   void _updateFromDownload(Map<String, dynamic> data) async {
     final prefs = await SharedPreferences.getInstance();
-    
+
     int localTS = prefs.getInt('last_local_update') ?? 0;
-    
+
     int cloudTS = 0;
     var cloudRaw = data['lastUpdate'];
-    if (cloudRaw is int) cloudTS = cloudRaw;
-    else if (cloudRaw != null && cloudRaw.runtimeType.toString().contains('Timestamp')) {
+    if (cloudRaw is int) {
+      cloudTS = cloudRaw;
+    } else if (cloudRaw != null &&
+        cloudRaw.runtimeType.toString().contains('Timestamp')) {
       cloudTS = cloudRaw.millisecondsSinceEpoch;
     }
 
     if (localTS > cloudTS) {
-      debugPrint("⏳ MacBook più recente ($localTS) del Cloud ($cloudTS). Salto download history.");
-      if (data['globalUserName'] != null) _globalUserName = data['globalUserName'];
+      debugPrint(
+        "⏳ MacBook più recente ($localTS) del Cloud ($cloudTS). Salto download history.",
+      );
+      if (data['globalUserName'] != null)
+        _globalUserName = data['globalUserName'];
       notifyListeners();
-      return; 
+      return;
     }
 
     bool hasChanged = false;
@@ -1036,50 +1160,53 @@ class HomeProvider extends ChangeNotifier {
     }
 
     if (hasChanged) {
-      await prefs.setString('charge_history', jsonEncode(chargeHistory.map((s) => s.toJson()).toList()));
+      await prefs.setString(
+        'charge_history',
+        jsonEncode(chargeHistory.map((s) => s.toJson()).toList()),
+      );
       notifyListeners();
     }
   }
 
-  void selectCar(CarModel c) { 
-    selectedCar = c; 
-    capacityController.text = c.batteryCapacity.toString(); 
-    _saveSimulationParameters(); 
-    notifyListeners(); 
-  }
-  
-  void updateReadyTime(TimeOfDay t) { 
-    readyTime = t; 
-    _saveSimulationParameters(); 
-    notifyListeners(); 
-  }
-  
-  void updateWallboxPwr(double v) { 
-    wallboxPwr = v; 
-    _saveSimulationParameters(); 
-    notifyListeners(); 
-  }
-  
-  void updateCurrentSoc(double v) { 
-    currentSoc = double.parse(v.toStringAsFixed(1)); 
-    _socAtStartOfSim = currentSoc;
-    _saveSimulationParameters(); 
-    notifyListeners(); 
+  void selectCar(CarModel c) {
+    selectedCar = c;
+    capacityController.text = c.batteryCapacity.toString();
+    _saveSimulationParameters();
+    notifyListeners();
   }
 
-  void updateTargetSoc(double v) { 
-    targetSoc = v; 
-    _saveSimulationParameters(); 
-    notifyListeners(); 
+  void updateReadyTime(TimeOfDay t) {
+    readyTime = t;
+    _saveSimulationParameters();
+    notifyListeners();
   }
-  
+
+  void updateWallboxPwr(double v) {
+    wallboxPwr = v;
+    _saveSimulationParameters();
+    notifyListeners();
+  }
+
+  void updateCurrentSoc(double v) {
+    currentSoc = double.parse(v.toStringAsFixed(1));
+    _socAtStartOfSim = currentSoc;
+    _saveSimulationParameters();
+    notifyListeners();
+  }
+
+  void updateTargetSoc(double v) {
+    targetSoc = v;
+    _saveSimulationParameters();
+    notifyListeners();
+  }
+
   bool get shouldShowCompletionDialog => _showCompletionDialog;
   void resetCompletionDialog() => _showCompletionDialog = false;
-  
-  Future<void> refreshAfterSettings() async { 
-    await _loadHistory(); 
-    await _loadContract(); 
-    notifyListeners(); 
+
+  Future<void> refreshAfterSettings() async {
+    await _loadHistory();
+    await _loadContract();
+    notifyListeners();
     await loadBatteryConfig();
   }
 

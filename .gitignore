@@ -60,3 +60,5 @@ GoogleService-Info.plist
 .vscode/
 .vscode-flutter.json
 
+.vercel
+.env*.local

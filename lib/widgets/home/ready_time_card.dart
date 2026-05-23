@@ -1,6 +1,5 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/cupertino.dart';
-import 'package:flutter/services.dart';
 import 'package:origo/providers/home_provider.dart';
 import 'package:origo/l10n/app_localizations.dart';
 
@@ -12,9 +11,11 @@ class ReadyTimeCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final l10n = AppLocalizations.of(context)!;
-    
+
     return GestureDetector(
-      onTap: provider.isSimulating ? null : () => _showCupertinoTimePicker(context, l10n),
+      onTap: provider.isSimulating || provider.manualStartMode
+          ? null
+          : () => _showCupertinoTimePicker(context, l10n),
       child: Container(
         padding: const EdgeInsets.symmetric(vertical: 8, horizontal: 12),
         decoration: BoxDecoration(
@@ -30,20 +31,28 @@ class ReadyTimeCard extends StatelessWidget {
                 children: [
                   Text(
                     provider.isSimulating
-                        ? (provider.isChargingReal ? l10n.charging : l10n.waiting)
+                        ? (provider.isChargingReal
+                              ? l10n.charging
+                              : l10n.waiting)
+                        : provider.manualStartMode
+                        ? 'AVVIO IMMEDIATO'
                         : l10n.readyAt,
                     style: TextStyle(
                       color: provider.isSimulating
                           ? (provider.isChargingReal
-                              ? Colors.greenAccent
-                              : Colors.orangeAccent)
+                                ? Colors.greenAccent
+                                : Colors.orangeAccent)
                           : Colors.blueAccent,
                       fontSize: 10,
                       fontWeight: FontWeight.w600,
                     ),
                   ),
                   Text(
-                    provider.readyTime.format(context),
+                    provider.isSimulating
+                        ? provider.readyTime.format(context)
+                        : provider.manualStartMode
+                        ? 'ORA'
+                        : provider.readyTime.format(context),
                     style: TextStyle(
                       color: Colors.white,
                       fontSize: 24,
@@ -52,8 +61,8 @@ class ReadyTimeCard extends StatelessWidget {
                         Shadow(
                           color: provider.isSimulating
                               ? (provider.isChargingReal
-                                  ? Colors.greenAccent
-                                  : Colors.orangeAccent)
+                                    ? Colors.greenAccent
+                                    : Colors.orangeAccent)
                               : Colors.blueAccent,
                           blurRadius: 12,
                         ),
@@ -71,13 +80,47 @@ class ReadyTimeCard extends StatelessWidget {
                 ],
               ),
             ),
+            if (!provider.isSimulating) ...[
+              const SizedBox(width: 8),
+              Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  TextButton(
+                    onPressed: provider.toggleManualStartMode,
+                    style: TextButton.styleFrom(
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 12,
+                        vertical: 8,
+                      ),
+                      backgroundColor: provider.manualStartMode
+                          ? Colors.orangeAccent.withOpacity(0.15)
+                          : Colors.blueAccent.withOpacity(0.15),
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(12),
+                      ),
+                    ),
+                    child: Text(
+                      provider.manualStartMode ? 'MANUALE' : 'PROGRAMMATA',
+                      style: TextStyle(
+                        color: provider.manualStartMode
+                            ? Colors.orangeAccent
+                            : Colors.blueAccent,
+                        fontSize: 12,
+                        fontWeight: FontWeight.bold,
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ],
+            const SizedBox(width: 8),
             Container(
               padding: const EdgeInsets.all(8),
               decoration: BoxDecoration(
                 color: provider.isSimulating
                     ? (provider.isChargingReal
-                        ? Colors.greenAccent.withOpacity(0.15)
-                        : Colors.orangeAccent.withOpacity(0.15))
+                          ? Colors.greenAccent.withOpacity(0.15)
+                          : Colors.orangeAccent.withOpacity(0.15))
                     : Colors.blueAccent.withOpacity(0.15),
                 shape: BoxShape.circle,
               ),
@@ -87,8 +130,8 @@ class ReadyTimeCard extends StatelessWidget {
                     : Icons.access_time,
                 color: provider.isSimulating
                     ? (provider.isChargingReal
-                        ? Colors.greenAccent
-                        : Colors.orangeAccent)
+                          ? Colors.greenAccent
+                          : Colors.orangeAccent)
                     : Colors.blueAccent,
                 size: 22,
               ),
@@ -111,10 +154,7 @@ class ReadyTimeCard extends StatelessWidget {
           gradient: const LinearGradient(
             begin: Alignment.topCenter,
             end: Alignment.bottomCenter,
-            colors: [
-              Color(0xFF1A1F36),
-              Color(0xFF0A0F1E),
-            ],
+            colors: [Color(0xFF1A1F36), Color(0xFF0A0F1E)],
           ),
           borderRadius: BorderRadius.circular(32),
           border: Border.all(
@@ -142,17 +182,25 @@ class ReadyTimeCard extends StatelessWidget {
                   borderRadius: BorderRadius.circular(2),
                 ),
               ),
-              
+
               // Header con i comandi e titolo
               Padding(
-                padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 16),
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 24,
+                  vertical: 16,
+                ),
                 child: Row(
                   mainAxisAlignment: MainAxisAlignment.spaceBetween,
                   children: [
                     CupertinoButton(
                       padding: EdgeInsets.zero,
-                      child: Text(l10n.cancel, 
-                        style: const TextStyle(color: Colors.white38, fontSize: 15)),
+                      child: Text(
+                        l10n.cancel,
+                        style: const TextStyle(
+                          color: Colors.white38,
+                          fontSize: 15,
+                        ),
+                      ),
                       onPressed: () => Navigator.pop(context),
                     ),
                     Column(
@@ -161,20 +209,30 @@ class ReadyTimeCard extends StatelessWidget {
                         Text(
                           l10n.readyAt.toUpperCase(),
                           style: const TextStyle(
-                            color: Colors.cyanAccent, 
-                            fontSize: 10, 
+                            color: Colors.cyanAccent,
+                            fontSize: 10,
                             fontWeight: FontWeight.w900,
-                            letterSpacing: 2.0
+                            letterSpacing: 2.0,
                           ),
                         ),
                         const SizedBox(height: 4),
-                        Container(width: 12, height: 1.5, color: Colors.cyanAccent),
+                        Container(
+                          width: 12,
+                          height: 1.5,
+                          color: Colors.cyanAccent,
+                        ),
                       ],
                     ),
                     CupertinoButton(
                       padding: EdgeInsets.zero,
-                      child: Text(l10n.confirm, 
-                        style: const TextStyle(color: Colors.cyanAccent, fontWeight: FontWeight.bold, fontSize: 15)),
+                      child: Text(
+                        l10n.confirm,
+                        style: const TextStyle(
+                          color: Colors.cyanAccent,
+                          fontWeight: FontWeight.bold,
+                          fontSize: 15,
+                        ),
+                      ),
                       onPressed: () => Navigator.pop(context),
                     ),
                   ],
@@ -190,7 +248,7 @@ class ReadyTimeCard extends StatelessWidget {
                       dateTimePickerTextStyle: TextStyle(
                         color: Colors.white.withOpacity(0.9),
                         fontSize: 25,
-                        fontWeight: FontWeight.w300, 
+                        fontWeight: FontWeight.w300,
                         letterSpacing: 1.5,
                       ),
                     ),
@@ -208,12 +266,15 @@ class ReadyTimeCard extends StatelessWidget {
                     onDateTimeChanged: (DateTime newDateTime) {
                       // ✅ SOLUZIONE 1: Usare Feedback (il più semplice)
                       Feedback.forTap(context);
-                      
+
                       // ✅ SOLUZIONE 2: Usare HapticFeedback (più controllato)
                       // HapticFeedback.selectionClick();
-                      
+
                       provider.updateReadyTime(
-                        TimeOfDay(hour: newDateTime.hour, minute: newDateTime.minute),
+                        TimeOfDay(
+                          hour: newDateTime.hour,
+                          minute: newDateTime.minute,
+                        ),
                       );
                     },
                   ),

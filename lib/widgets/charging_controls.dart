@@ -10,7 +10,7 @@ class ChargingControls extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final l10n = AppLocalizations.of(context)!;
-    
+
     return Container(
       padding: const EdgeInsets.symmetric(vertical: 8, horizontal: 20),
       child: LayoutBuilder(
@@ -20,9 +20,9 @@ class ChargingControls extends StatelessWidget {
             children: [
               // 🔥 POTENZA (SENZA input manuale)
               _buildPowerSlider(l10n),
-              
+
               const SizedBox(height: 16),
-              
+
               // 🔥 RANGESLIDER con INPUT MANUALE per SOC
               _buildRangeSliderWithInput(l10n),
             ],
@@ -39,7 +39,7 @@ class ChargingControls extends StatelessWidget {
       children: [
         Row(
           children: [
-            Icon(Icons.flash_on, color: Colors.blueAccent, size: 16),
+            const Icon(Icons.flash_on, color: Colors.blueAccent, size: 16),
             const SizedBox(width: 8),
             Text(
               l10n.power,
@@ -81,8 +81,12 @@ class ChargingControls extends StatelessWidget {
               child: SliderTheme(
                 data: SliderThemeData(
                   trackHeight: 2.5,
-                  thumbShape: const RoundSliderThumbShape(enabledThumbRadius: 8),
-                  overlayShape: const RoundSliderOverlayShape(overlayRadius: 16),
+                  thumbShape: const RoundSliderThumbShape(
+                    enabledThumbRadius: 8,
+                  ),
+                  overlayShape: const RoundSliderOverlayShape(
+                    overlayRadius: 16,
+                  ),
                   activeTrackColor: Colors.blueAccent,
                   inactiveTrackColor: Colors.blueAccent.withOpacity(0.1),
                   thumbColor: Colors.blueAccent,
@@ -91,8 +95,8 @@ class ChargingControls extends StatelessWidget {
                   value: provider.wallboxPwr,
                   min: 1.0,
                   max: 22.0,
-                  onChanged: provider.isSimulating 
-                      ? (v) {} 
+                  onChanged: provider.isSimulating
+                      ? (v) {}
                       : (newValue) => provider.updateWallboxPwr(newValue),
                 ),
               ),
@@ -108,13 +112,16 @@ class ChargingControls extends StatelessWidget {
     );
   }
 
- // 🔥 AGGIUNTO SOLO + E - AI LATI DEI TEXTFIELD ORIGINALI
+  // 🔥 AGGIUNTO SOLO + E - AI LATI DEI TEXTFIELD ORIGINALI
   Widget _buildRangeSliderWithInput(AppLocalizations l10n) {
+    final double displayedStartSoc = provider.isSimulating
+        ? provider.simulationStartSoc
+        : provider.currentSoc;
     final TextEditingController startController = TextEditingController(
-      text: provider.currentSoc.toInt().toString()
+      text: displayedStartSoc.toInt().toString(),
     );
     final TextEditingController endController = TextEditingController(
-      text: provider.targetSoc.toInt().toString()
+      text: provider.targetSoc.toInt().toString(),
     );
 
     return StatefulBuilder(
@@ -127,7 +134,11 @@ class ChargingControls extends StatelessWidget {
               padding: const EdgeInsets.only(left: 4, bottom: 8),
               child: Row(
                 children: [
-                  Icon(Icons.battery_charging_full, color: Colors.greenAccent, size: 16),
+                  const Icon(
+                    Icons.battery_charging_full,
+                    color: Colors.greenAccent,
+                    size: 16,
+                  ),
                   const SizedBox(width: 8),
                   Text(
                     l10n.batteryRange,
@@ -141,10 +152,10 @@ class ChargingControls extends StatelessWidget {
                 ],
               ),
             ),
-            
+
             // RangeSlider (Invariato)
             RangeSlider(
-              values: RangeValues(provider.currentSoc, provider.targetSoc),
+              values: RangeValues(displayedStartSoc, provider.targetSoc),
               min: 0,
               max: 100,
               divisions: 100,
@@ -158,7 +169,18 @@ class ChargingControls extends StatelessWidget {
                       setState(() {});
                     },
             ),
-            
+            if (provider.isSimulating)
+              Padding(
+                padding: const EdgeInsets.only(top: 6, bottom: 6, left: 4),
+                child: Text(
+                  'SOC iniziale partenza: ${provider.simulationStartSoc.toStringAsFixed(1)}%',
+                  style: TextStyle(
+                    color: Colors.white.withOpacity(0.7),
+                    fontSize: 12,
+                  ),
+                ),
+              ),
+
             // Riga Input con l'aggiunta dei tasti + e -
             Padding(
               padding: const EdgeInsets.symmetric(horizontal: 0, vertical: 4),
@@ -169,24 +191,45 @@ class ChargingControls extends StatelessWidget {
                   Expanded(
                     child: Row(
                       children: [
-                        _buildSmallButton(Icons.remove, Colors.orangeAccent, () {
-                          if (provider.currentSoc > 0) {
-                            provider.updateCurrentSoc(provider.currentSoc - 1);
-                            setState(() {});
-                          }
-                        }),
+                        _buildSmallButton(
+                          Icons.remove,
+                          Colors.orangeAccent,
+                          () {
+                            if (!provider.isSimulating &&
+                                provider.currentSoc > 0) {
+                              provider.updateCurrentSoc(
+                                provider.currentSoc - 1,
+                              );
+                              setState(() {});
+                            }
+                          },
+                        ),
                         Expanded(
                           child: TextField(
                             controller: startController,
+                            enabled: !provider.isSimulating,
                             keyboardType: TextInputType.number,
                             textAlign: TextAlign.center,
-                            style: const TextStyle(color: Colors.orangeAccent, fontWeight: FontWeight.bold, fontSize: 14),
-                            decoration: const InputDecoration(isDense: true, border: InputBorder.none, suffixText: '%'),
-                            onSubmitted: (v) => provider.updateCurrentSoc(double.tryParse(v) ?? provider.currentSoc),
+                            style: const TextStyle(
+                              color: Colors.orangeAccent,
+                              fontWeight: FontWeight.bold,
+                              fontSize: 14,
+                            ),
+                            decoration: const InputDecoration(
+                              isDense: true,
+                              border: InputBorder.none,
+                              suffixText: '%',
+                            ),
+                            onSubmitted: provider.isSimulating
+                                ? null
+                                : (v) => provider.updateCurrentSoc(
+                                    double.tryParse(v) ?? provider.currentSoc,
+                                  ),
                           ),
                         ),
                         _buildSmallButton(Icons.add, Colors.orangeAccent, () {
-                          if (provider.currentSoc < provider.targetSoc - 1) {
+                          if (!provider.isSimulating &&
+                              provider.currentSoc < provider.targetSoc - 1) {
                             provider.updateCurrentSoc(provider.currentSoc + 1);
                             setState(() {});
                           }
@@ -194,7 +237,7 @@ class ChargingControls extends StatelessWidget {
                       ],
                     ),
                   ),
-                  
+
                   const SizedBox(width: 12),
 
                   // --- SOC FINALE CON TASTI ---
@@ -202,7 +245,8 @@ class ChargingControls extends StatelessWidget {
                     child: Row(
                       children: [
                         _buildSmallButton(Icons.remove, Colors.greenAccent, () {
-                          if (provider.targetSoc > provider.currentSoc + 1) {
+                          if (!provider.isSimulating &&
+                              provider.targetSoc > provider.currentSoc + 1) {
                             provider.updateTargetSoc(provider.targetSoc - 1);
                             setState(() {});
                           }
@@ -210,15 +254,29 @@ class ChargingControls extends StatelessWidget {
                         Expanded(
                           child: TextField(
                             controller: endController,
+                            enabled: !provider.isSimulating,
                             keyboardType: TextInputType.number,
                             textAlign: TextAlign.center,
-                            style: const TextStyle(color: Colors.greenAccent, fontWeight: FontWeight.bold, fontSize: 14),
-                            decoration: const InputDecoration(isDense: true, border: InputBorder.none, suffixText: '%'),
-                            onSubmitted: (v) => provider.updateTargetSoc(double.tryParse(v) ?? provider.targetSoc),
+                            style: const TextStyle(
+                              color: Colors.greenAccent,
+                              fontWeight: FontWeight.bold,
+                              fontSize: 14,
+                            ),
+                            decoration: const InputDecoration(
+                              isDense: true,
+                              border: InputBorder.none,
+                              suffixText: '%',
+                            ),
+                            onSubmitted: provider.isSimulating
+                                ? null
+                                : (v) => provider.updateTargetSoc(
+                                    double.tryParse(v) ?? provider.targetSoc,
+                                  ),
                           ),
                         ),
                         _buildSmallButton(Icons.add, Colors.greenAccent, () {
-                          if (provider.targetSoc < 100) {
+                          if (!provider.isSimulating &&
+                              provider.targetSoc < 100) {
                             provider.updateTargetSoc(provider.targetSoc + 1);
                             setState(() {});
                           }
