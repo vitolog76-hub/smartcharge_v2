@@ -1,168 +1,51 @@
-import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'dart:convert';
 import 'package:origo/services/sync_service.dart';
 import 'package:origo/models/contract_model.dart';
-import 'package:google_sign_in/google_sign_in.dart';
-import 'package:flutter/foundation.dart' show kIsWeb; // 🔥 AGGIUNTO
 
 class AuthProvider extends ChangeNotifier {
-  final FirebaseAuth _auth = FirebaseAuth.instance;
-  User? _user;
-  bool _isLoading = false;
-
-  // 🔥 GOOGLE SIGN IN CON CLIENT ID PER WEB (AGGIUNTO)
-  final GoogleSignIn _googleSignIn = GoogleSignIn(
-    clientId: kIsWeb
-        ? const String.fromEnvironment('GOOGLE_CLIENT_ID')
-        : null, // Su mobile non serve, usa il default
-  );
-
-  User? get user => _user;
+  String? _userId;
+  bool _isLoading = true;  // Inizia in caricamento
+  String? _error;
+  
+  String? get userId => _userId;
   bool get isLoading => _isLoading;
-  bool get isAuthenticated => _user != null;
-  String? get userId => _user?.uid;
-  String? get userEmail => _user?.email;
-  String? get userName => _user?.displayName;
+  bool get isAuthenticated => _userId != null && _userId!.isNotEmpty;
+  String? get error => _error;
+  
+  // 🔥 ID FISSO DELL'APP
+  static const String FIXED_USER_ID = 'FaDG28xyaATUZR4J21kYO265uFm2';
 
+  // Costruttore - avvia l'inizializzazione
   AuthProvider() {
-    _auth.authStateChanges().listen((User? user) async {
-      _user = user;
-      if (user != null) {
-        final prefs = await SharedPreferences.getInstance();
-        await prefs.setString('user_sync_id', user.uid);
-        await _downloadUserData(user.uid);
-      }
-      notifyListeners();
-    });
+    _init();
   }
 
-  Future<String?> signIn(String email, String password) async {
+  Future<void> _init() async {
     _isLoading = true;
     notifyListeners();
-
+    
     try {
-      final userCredential = await _auth.signInWithEmailAndPassword(
-        email: email,
-        password: password,
-      );
-
       final prefs = await SharedPreferences.getInstance();
-      await prefs.setString('user_sync_id', userCredential.user!.uid);
-
-      await _downloadUserData(userCredential.user!.uid);
-
-      _isLoading = false;
-      notifyListeners();
-      return null;
-    } on FirebaseAuthException catch (e) {
-      _isLoading = false;
-      notifyListeners();
-      return e.message;
-    }
-  }
-
-  // 🔥 METODO PER LOGIN CON GOOGLE (MODIFICATO - USA _googleSignIn)
-  Future<String?> signInWithGoogle() async {
-    _isLoading = true;
-    notifyListeners();
-
-    try {
-      final GoogleSignInAccount? googleUser = await _googleSignIn.signIn();
-      if (googleUser == null) {
-        _isLoading = false;
-        notifyListeners();
-        return "Google Sign-In cancelled";
-      }
-
-      final GoogleSignInAuthentication googleAuth =
-          await googleUser.authentication;
-
-      final credential = GoogleAuthProvider.credential(
-        accessToken: googleAuth.accessToken,
-        idToken: googleAuth.idToken,
-      );
-
-      final userCredential = await _auth.signInWithCredential(credential);
-
-      final prefs = await SharedPreferences.getInstance();
-      await prefs.setString('user_sync_id', userCredential.user!.uid);
-
-      await _downloadUserData(userCredential.user!.uid);
-
-      _isLoading = false;
-      notifyListeners();
-      return null;
-    } on FirebaseAuthException catch (e) {
-      _isLoading = false;
-      notifyListeners();
-      return e.message ?? "Google Sign-In failed";
+      
+      // Forza l'ID fisso
+      _userId = FIXED_USER_ID;
+      await prefs.setString('user_sync_id', _userId!);
+      
+      debugPrint('✅ Utente inizializzato con ID fisso: $_userId');
+      
+      // Carica i dati esistenti da Firestore
+      await _downloadUserData(_userId!);
+      
+      _error = null;
     } catch (e) {
+      _error = e.toString();
+      debugPrint('❌ Errore init AuthProvider: $e');
+    } finally {
       _isLoading = false;
       notifyListeners();
-      return "Google Sign-In failed: $e";
     }
-  }
-
-  Future<String?> signUp(String email, String password, String name) async {
-    _isLoading = true;
-    notifyListeners();
-
-    try {
-      final userCredential = await _auth.createUserWithEmailAndPassword(
-        email: email,
-        password: password,
-      );
-
-      await userCredential.user?.updateDisplayName(name);
-
-      final prefs = await SharedPreferences.getInstance();
-      await prefs.setString('user_sync_id', userCredential.user!.uid);
-
-      await _createInitialUserData(userCredential.user!.uid, name);
-
-      _isLoading = false;
-      notifyListeners();
-      return null;
-    } on FirebaseAuthException catch (e) {
-      _isLoading = false;
-      notifyListeners();
-      return e.message;
-    }
-  }
-
-  Future<void> _createInitialUserData(String userId, String displayName) async {
-    debugPrint("🆕 Creazione dati iniziali per nuovo utente: $displayName");
-
-    final defaultContract = EnergyContract(
-      id: "default_contract_${DateTime.now().millisecondsSinceEpoch}",
-      contractName: "Contratto Base",
-      provider: "Esempio",
-      f1Price: 0.20,
-      f2Price: 0.18,
-      f3Price: 0.15,
-      isMonorario: false,
-    );
-
-    final prefs = await SharedPreferences.getInstance();
-
-    await prefs.setString('global_user_name', displayName);
-
-    await prefs.setString(
-      'energy_contracts_list',
-      jsonEncode([defaultContract.toJson()]),
-    );
-    await prefs.setString('active_contract_id', defaultContract.id);
-    await prefs.setString('charge_history', jsonEncode([]));
-
-    await SyncService().uploadData(
-      userId,
-      [],
-      [defaultContract],
-      defaultContract.id,
-      displayName,
-    );
   }
 
   Future<void> _downloadUserData(String userId) async {
@@ -203,16 +86,39 @@ class AuthProvider extends ChangeNotifier {
             );
           }
         }
+      } else {
+        debugPrint("📝 Nessun dato esistente su Firestore per l'utente");
       }
     } catch (e) {
       debugPrint("❌ Errore download: $e");
     }
   }
 
-  Future<void> signOut() async {
-    await _auth.signOut();
-    await _googleSignIn.signOut(); // 🔥 CAMBIATO: usa _googleSignIn
+  // Metodo per forzare il salvataggio dei dati su Firestore
+  Future<void> syncToCloud() async {
+    if (_userId == null || _userId!.isEmpty) return;
+    
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      final history = prefs.getString('charge_history') ?? '[]';
+      final contracts = prefs.getString('energy_contracts_list') ?? '[]';
+      final activeContractId = prefs.getString('active_contract_id') ?? '';
+      final userName = prefs.getString('global_user_name') ?? 'Utente';
+      
+      await SyncService().uploadData(
+        _userId!,
+        jsonDecode(history),
+        (jsonDecode(contracts) as List).map((c) => EnergyContract.fromJson(c)).toList(),
+        activeContractId,
+        userName,
+      );
+      debugPrint('✅ Dati sincronizzati su Firestore');
+    } catch (e) {
+      debugPrint('❌ Errore sincronizzazione: $e');
+    }
+  }
 
+  Future<void> signOut() async {
     final prefs = await SharedPreferences.getInstance();
     final userKeys = [
       'user_sync_id',
@@ -232,5 +138,11 @@ class AuthProvider extends ChangeNotifier {
     for (final key in userKeys) {
       await prefs.remove(key);
     }
+    
+    _userId = null;
+    notifyListeners();
+    
+    // Riavvia l'init
+    await _init();
   }
 }
